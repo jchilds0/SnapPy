@@ -36,7 +36,8 @@
 #ifndef _SnapPea_
 #define _SnapPea_
 
-#include "real_type.h"
+//#include "../real_type/real_type.h"          // compile kernel
+#include "real_type.h"                         // compile snappy
 
 #include "kernel_namespace.h"
 
@@ -2588,6 +2589,17 @@ extern void sg_get_factor(  SymmetryGroupPresentation   *group,
 extern void free_symmetry_group_presentation(SymmetryGroupPresentation *group);
 /**<
  *  Frees the storage occupied by a SymmetryGroupPresentation.
+ */
+
+/************************************************************************/
+/*                                                                      */
+/*                           symplectic_basis.c                         */
+/*                                                                      */
+/************************************************************************/
+
+extern int get_symplectic_basis(Triangulation *manifold);
+/**<
+ *  Returns the symplectic basis
  */
 
 

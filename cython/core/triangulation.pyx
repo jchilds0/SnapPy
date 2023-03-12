@@ -3035,3 +3035,12 @@ cdef class Triangulation():
                 ignore_curve_orientations = ignore_curve_orientations,
                 ignore_orientation = ignore_orientation)
         return self._cache.save(result, 'triangulation_isosig', *args)
+
+    def symplectic_basis(self):
+        """
+        Returns a symplectic basis for the symplectic vector space associated with the ideal triangulation of a
+        cusped 3-manifold
+
+        <https://arxiv.org/abs/2208.06969>
+        """
+        return get_symplectic_basis(self.c_triangulation)
