@@ -245,6 +245,7 @@ cdef extern from "SnapPea.h":
         int               num_tetrahedra
         c_SolutionType    solution_type
         Real              volume
+        int               get_symplectic_basis
         c_Orientability   orientability
         Boolean           CS_value_is_known
         Real              CS_value
@@ -705,6 +706,8 @@ cdef extern from "SnapPea.h":
     extern void two_bridge(c_Triangulation *manifold, Boolean *is_two_bridge, long int *p, long int *q) except *
     extern Real volume(c_Triangulation *manifold, int *precision) except *
     extern Boolean mark_fake_cusps(c_Triangulation   *manifold) except *
+
+    extern int get_symplectic_basis(c_Triangulation *manifold) except *
     extern void register_callbacks(void (*begin_callback)(),
                                    void (*middle_callback)(),
                                    void (*end_callback)())
