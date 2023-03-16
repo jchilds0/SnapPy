@@ -3051,4 +3051,39 @@ cdef class Triangulation():
 
         <https://arxiv.org/abs/2208.06969>
         """
-        return get_symplectic_basis(self.c_triangulation)
+        cdef int **c_eqns;
+        cdef int **g_eqns;
+        cdef int num_rows, num_cols, dual_rows
+        cdef int* eqn
+
+        if self.c_triangulation is NULL:
+            raise ValueError('The Triangulation is empty.')
+
+        # Edge Equations
+        c_eqns = get_gluing_equations(self.c_triangulation, &num_rows, &num_cols)
+        eqns = [ [ c_eqns[i][j] for j in range(num_cols) ] for i in range(num_rows) ]
+
+        free_gluing_equations(c_eqns, num_rows)
+
+        # Cusp Equations
+        for i in range(self.num_cusps()):
+            cusp_info = self.cusp_info(i)
+            if cusp_info.is_complete:
+                to_do = [(1,0), (0,1)]
+            else:
+                to_do = [cusp_info.filling]
+            for (m, l) in to_do:
+                eqn = get_cusp_equation(self.c_triangulation,
+                                        i, int(m), int(l), &num_rows)
+                eqns.append([eqn[j] for j in range(num_rows)])
+                free_cusp_equation(eqn)
+
+        # Dual Curve Equations
+        g_eqns = get_symplectic_basis(self.c_triangulation, &dual_rows)
+
+        for i in range(dual_rows):
+            eqns.append([g_eqns[i][j] for j in range(num_cols)])
+
+        free_gluing_equations(g_eqns, dual_rows)
+
+        return matrix(eqns)
