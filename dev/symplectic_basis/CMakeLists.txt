@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 3.12)
+
+project(SnapPea)
+
+# Set the name of your program
+set(YOUR_PROGRAM symplectic_basis)
+
+# Set the location of the SnapPea kernel code
+set(SNAPPEA_KERNEL ${PROJECT_SOURCE_DIR}/../../kernel)
+
+# Compiler options
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
+
+# Add include directories
+include_directories(${SNAPPEA_KERNEL}/headers ${SNAPPEA_KERNEL}/unix_kit ${SNAPPEA_KERNEL}/unix_kit/CuspedCensusData)
+
+# Add source files
+file(GLOB KERNEL_SOURCES ${SNAPPEA_KERNEL}/kernel_code/*.c ${SNAPPEA_KERNEL}/addl_code/*.c ${SNAPPEA_KERNEL}/unix_kit/*.c)
+file(GLOB HEADER_FILES ${SNAPPEA_KERNEL}/headers/*.h ${SNAPPEA_KERNEL}/real_type/*.h)
+file(COPY ${CMAKE_SOURCE_DIR}/CuspedCensusData DESTINATION ${CMAKE_BUILD_RPATH}/ )      # Copy census data to be used by program
+
+# Create executable target
+add_executable(${YOUR_PROGRAM} ${YOUR_PROGRAM}_main.c ${KERNEL_SOURCES} ${HEADER_FILES} ${CUSPED_CENSUS})
+
+# Link math library
+target_link_libraries(${YOUR_PROGRAM} m)
+
+# Define custom target to create BuildDate file
+#add_custom_target(BuildDate ALL
+#        COMMAND date > ${CMAKE_SOURCE_DIR}/BuildDate
+#        DEPENDS ${KERNEL_SOURCES} ${HEADER_FILES}
+#        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+#        )
+
+# Clean target
+add_custom_target(clean-all
+        COMMAND ${CMAKE_COMMAND} -E remove ${YOUR_PROGRAM} ${YOUR_PROGRAM}.o
+        COMMAND ${CMAKE_COMMAND} -E remove_directory KernelObjects
+        COMMAND ${CMAKE_COMMAND} -E remove *.pyc
+        )
+
