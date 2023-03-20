@@ -39,9 +39,6 @@ void mergeRows(Triangulation *manifold) {
     printMatrix(eqns, numCols, numRows);
     free_gluing_equations(eqns, numRows);
 
-    // Cusp Equations
-
-
     // Dual Equations
     eqns = get_symplectic_basis(manifold, &dualRows);
     printMatrix(eqns, numCols, dualRows);

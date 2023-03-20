@@ -32,6 +32,19 @@ target_link_libraries(${YOUR_PROGRAM} m)
 #        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 #        )
 
+# testing binary
+add_executable(${YOUR_PROGRAM}_test ${YOUR_PROGRAM}_test.c ${KERNEL_SOURCES} ${HEADER_FILES} ${CUSPED_CENSUS})
+target_link_libraries(${YOUR_PROGRAM}_test m)
+
+# enable testing functionality
+enable_testing()
+
+# define tests
+add_test(
+        NAME symplectic_test
+        COMMAND $<TARGET_FILE:${YOUR_PROGRAM}_test>
+)
+
 # Clean target
 add_custom_target(clean-all
         COMMAND ${CMAKE_COMMAND} -E remove ${YOUR_PROGRAM} ${YOUR_PROGRAM}.o
