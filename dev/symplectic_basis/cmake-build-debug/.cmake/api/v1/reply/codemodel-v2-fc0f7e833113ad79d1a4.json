@@ -16,7 +16,8 @@
 					"targetIndexes" : 
 					[
 						0,
-						1
+						1,
+						2
 					]
 				}
 			],
@@ -32,7 +33,8 @@
 					"targetIndexes" : 
 					[
 						0,
-						1
+						1,
+						2
 					]
 				}
 			],
@@ -41,7 +43,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "clean-all::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-clean-all-Debug-ecb2cb1d16c715db2f3f.json",
+					"jsonFile" : "target-clean-all-Debug-7d072b6b291db7f8383f.json",
 					"name" : "clean-all",
 					"projectIndex" : 0
 				},
@@ -50,6 +52,13 @@
 					"id" : "symplectic_basis::@6890427a1f51a3e7e1df",
 					"jsonFile" : "target-symplectic_basis-Debug-e2a9a1bb0bdb1b5ae9dc.json",
 					"name" : "symplectic_basis",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "symplectic_basis_test::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-symplectic_basis_test-Debug-24018f3d54e4b7f3f88d.json",
+					"name" : "symplectic_basis_test",
 					"projectIndex" : 0
 				}
 			]
