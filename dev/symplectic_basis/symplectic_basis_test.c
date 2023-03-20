@@ -24,11 +24,12 @@ int main() {
 }
 
 void testQueue(void) {
-    int i;
+    int i, j;
     char *tests[] = {"Enqueue", "Dequeue", "Circular", "Resize", "Empty"};
 
     Triangulation *theTriangulation;
     Tetrahedron *tet0, *tet1;
+    struct queue q, p;
 
     theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
     tet0 = theTriangulation->tet_list_begin.next;
@@ -37,11 +38,12 @@ void testQueue(void) {
     for (i = 0; i < 5; i++) {
         printf("    %s: ", tests[i]);
 
-        if (i == 0) {
-            int index[] = {0, 0, 0, 0};
-            struct queue q;
-            initialise_queue(&q, 10);
+        initialise_queue(&q, 10);
+        initialise_queue(&p, 3);
 
+        int index[] = {0, 0, 0, 0};
+
+        if (i == 0) {
             // Enqueue
             enqueue(&q, tet0);
             enqueue(&q, tet0);
@@ -59,10 +61,6 @@ void testQueue(void) {
                 printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
             }
         } else if (i == 1) {
-            int index[] = {0, 0, 0, 0};
-            struct queue q;
-            initialise_queue(&q, 10);
-
             // Dequeue
             enqueue(&q, tet0);
             enqueue(&q, tet0);
@@ -80,11 +78,6 @@ void testQueue(void) {
                 printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
             }
         } else if (i == 2) {
-            int j, index[] = {0, 0, 0, 0};
-            struct queue q;
-            Tetrahedron *tet;
-            initialise_queue(&q, 10);
-
             // Circular
             for (j = 0; j < 9; j++)
                 enqueue(&q, tet0);
@@ -107,20 +100,16 @@ void testQueue(void) {
                 printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
             }
         } else if (i == 3) {
-            int index[] = {0, 0, 0, 0};
-            struct queue q;
-            initialise_queue(&q, 2);
-
             // Resize
-            q = *enqueue(&q, tet1);
-            q = *enqueue(&q, tet0);
-            q = *enqueue(&q, tet1);
-            q = *enqueue(&q, tet0);
+            p = *enqueue(&p, tet1);
+            p = *enqueue(&p, tet0);
+            p = *enqueue(&p, tet1);
+            p = *enqueue(&p, tet0);
 
-            index[0] = dequeue(&q)->index;
-            index[1] = dequeue(&q)->index;
-            index[2] = dequeue(&q)->index;
-            index[3] = dequeue(&q)->index;
+            index[0] = dequeue(&p)->index;
+            index[1] = dequeue(&p)->index;
+            index[2] = dequeue(&p)->index;
+            index[3] = dequeue(&p)->index;
 
             if (index[0] == 1 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
                 printf("Passed");
@@ -128,18 +117,14 @@ void testQueue(void) {
                 printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
             }
         } else if (i == 4) {
-            struct queue q, p;
-            initialise_queue(&q, 3);
-            initialise_queue(&p, 3);
-
-            enqueue(&q, tet0);
-            enqueue(&q, tet0);
-            dequeue(&q);
-            enqueue(&q, tet0);
-            enqueue(&q, tet0);
-            dequeue(&q);
-            dequeue(&q);
-            dequeue(&q);
+            enqueue(&p, tet0);
+            enqueue(&p, tet0);
+            dequeue(&p);
+            enqueue(&p, tet0);
+            enqueue(&p, tet0);
+            dequeue(&p);
+            dequeue(&p);
+            dequeue(&p);
 
             if (empty_queue(&q) && empty_queue(&p)) {
                 printf("Passed");
@@ -152,6 +137,9 @@ void testQueue(void) {
             }
         }
         printf("\n");
+
+        free_queue(&p);
+        free_queue(&q);
     }
 }
 

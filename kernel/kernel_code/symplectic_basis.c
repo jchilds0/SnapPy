@@ -40,53 +40,47 @@ int** get_symplectic_basis(Triangulation *manifold, int* dual_rows)
 // Queue
 
 void initialise_queue(struct queue *q, int size) {
-    q->head = -1;
-    q->tail = 0;
-    q->len = size;
-
-    q->array = malloc( sizeof(Tetrahedron *) * size);
+    q->front = 0;
+    q->rear = -1;
+    q->len = 0;
+    q->size = size;
+    q->array = NEW_ARRAY(size, Tetrahedron *);
 }
 
 struct queue *enqueue(struct queue *q, Tetrahedron *tet) {
     // Queue is full
-    if ((q->head == 0 && q->tail == q->len - 1) || (q->head == q->tail - 1 && q->head != -1)) {
+    if ( q->size == q->len ) {
         resize_queue(q);
-        enqueue(q, tet);
-        return q;
-    }
-
-    if (q->head == q->len - 1) {
-        q->head = 0;
+        q = enqueue(q, tet);
     } else {
-        q->head++;
+        q->rear = (q->rear + 1) % (q->size - 1);
+        q->array[q->rear] = tet;
+        q->len++;
     }
-
-    q->array[q->head] = tet;
 
     return q;
 }
 
 Tetrahedron *dequeue(struct queue *q) {
-    Tetrahedron *tet = q->array[q->tail];
+    // User to verify queue is not empty
+    Tetrahedron *tet = q->array[q->front];
 
-    if (q->tail == q->len - 1) {
-        q->tail = 0;
-    } else {
-        q->tail++;
-    }
+    tet = q->array[q->front];
+    q->front = (q->front + 1) % (q->size - 1);
+    q->len--;
 
     return tet;
 }
 
 int empty_queue(struct queue *q) {
-    return (q->head == q->len - 1 && q->tail == 0) || (q->head == q->tail - 1);
+    return (!q->len);
 }
 
 void resize_queue(struct queue *q) {
     Tetrahedron *tet;
     struct queue p;
 
-    initialise_queue(&p, 2 * q->len);
+    initialise_queue(&p, 2 * q->size);
 
     // Copy elements to new array
     while (!empty_queue(q)) {
@@ -94,21 +88,22 @@ void resize_queue(struct queue *q) {
         enqueue(&p, tet);
     }
 
-    // Move p queue to q
-    q->tail = p.tail;
-    q->head = p.head;
-    q->len = p.len;
-    q->array = p.array;
+    free_queue(q);
 
-    free_queue(&p);
+    // Move p queue to q
+    q->front = p.front;
+    q->rear = p.rear;
+    q->len = p.len;
+    q->size = p.size;
+    q->array = p.array;
 }
 
 void free_queue(struct queue *q) {
     free(q->array);
 }
 
-// Breadth First Search
-
+//// Breadth First Search
+//
 //void insert_edge(graph *g, int x, int y, bool directed) {
 //    edgenode *p;
 //
