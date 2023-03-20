@@ -11,9 +11,10 @@
 #include <stdbool.h>
 
 struct queue {
-    int head;   // First element of queue
-    int tail;   // Last element of queue
-    int len;
+    int front;      // First element of queue
+    int rear;       // Last element of queue
+    int len;        // num of elements
+    int size;       // array size
     struct Tetrahedron **array;
 };
 
