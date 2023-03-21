@@ -44,32 +44,31 @@ void initialise_queue(struct queue *q, int size) {
     q->rear = -1;
     q->len = 0;
     q->size = size;
-    q->array = NEW_ARRAY(size, Tetrahedron *);
+    q->array = NEW_ARRAY(size, int);
 }
 
-struct queue *enqueue(struct queue *q, Tetrahedron *tet) {
+struct queue *enqueue(struct queue *q, int i) {
     // Queue is full
     if ( q->size == q->len ) {
         resize_queue(q);
-        q = enqueue(q, tet);
+        q = enqueue(q, i);
     } else {
         q->rear = (q->rear + 1) % (q->size - 1);
-        q->array[q->rear] = tet;
+        q->array[q->rear] = i;
         q->len++;
     }
 
     return q;
 }
 
-Tetrahedron *dequeue(struct queue *q) {
+int dequeue(struct queue *q) {
     // User to verify queue is not empty
-    Tetrahedron *tet = q->array[q->front];
+    int i = q->array[q->front];
 
-    tet = q->array[q->front];
     q->front = (q->front + 1) % (q->size - 1);
     q->len--;
 
-    return tet;
+    return i;
 }
 
 int empty_queue(struct queue *q) {
@@ -77,15 +76,15 @@ int empty_queue(struct queue *q) {
 }
 
 void resize_queue(struct queue *q) {
-    Tetrahedron *tet;
+    int i;
     struct queue p;
 
     initialise_queue(&p, 2 * q->size);
 
     // Copy elements to new array
     while (!empty_queue(q)) {
-        tet = dequeue(q);
-        enqueue(&p, tet);
+        i = dequeue(q);
+        enqueue(&p, i);
     }
 
     free_queue(q);
@@ -102,85 +101,111 @@ void free_queue(struct queue *q) {
     free(q->array);
 }
 
-//// Breadth First Search
-//
-//void insert_edge(graph *g, int x, int y, bool directed) {
-//    edgenode *p;
-//
-//    p = malloc(sizeof( edgenode));
-//    p->weight = 0;
-//    p->y = y;
-//    p->next = g->edges[x];
-//
-//    g->edges[x] = p;
-//
-//    g->degree[x]++;
-//
-//    if (!directed) {
-//        insert_edge(g, y, x, true);
-//    }
-//}
-//
-//void initialise_search(graph *g) {
-//    int i;
-//
-//    for (i = 0; i <= g->nvertices; i ++) {
-//        processed[i] = false;
-//        discovered[i] = false;
-//        parent[i] = -1;
-//    }
-//}
-//
-//void bfs(graph *g, Triangulation *start) {
-//    struct queue q;
-//    int v, y;
-//    edgenode *p;
-//
-//    initialise_queue(&q, 10);
-//    enqueue(&q, (Tetrahedron *) start);
-//    discovered[start] = true;
-//
-//    while (!empty_queue(&q)) {
-//        v = dequeue(&q);
-//        process_vertex_early(v);
-//        processed[v] = true;
-//        p = g->edges[v];
-//        while (p != NULL) {
-//            y = p->y;
-//            if ((!processed[y]) || g->directed) {
-//                process_edge(v, y);
-//            }
-//            if (!discovered[y]) {
-//                enqueue(&q, y);
-//                discovered[y] = true;
-//                parent[y] = v;
-//            }
-//            p = p->next;
-//        }
-//
-//        process_vertex_late(v);
-//    }
-//
-//    free_queue(&q);
-//}
-//
-//void process_vertex_early(int v) {
-//
-//}
-//
-//void process_edge(int x, int y) {
-//    printf("processed edge (%d, %d)\n", x, y);
-//}
-//
-//void process_vertex_late(int v) {
-//
-//}
-//
-//void find_path(int start, int end, int parents[]) {
-//    if ((start == end) || (end == -1)) {
-//        printf("\n%d", start);
-//    } else {
-//        find_path(start, parents[end], parents);
-//        printf(" %d", end);
-//    }
-//}
+// Breadth First Search
+
+void initialise_graph(graph *g, int maxVertices, int maxEdges, bool directed) {
+    int i;
+
+    g->nvertices = maxVertices;
+    g->nedges = 0;
+    g->directed = directed;
+
+    for (i = 0; i < MAXV; i++) {
+        g->degree[i] = 0;
+    }
+    for (i = 0; i < MAXV; i++) {
+        g->edges[i] = NULL;
+    }
+//    g->edges = NEW_ARRAY(maxEdges, edgenode *);
+//    g->degree = NEW_ARRAY(maxVertices, int);
+}
+
+void free_graph(graph *g) {
+//    free(g->edges);
+//    free(g->degree);
+}
+
+void insert_edge(graph *g, int x, int y, bool directed) {
+    edgenode *p;
+
+    p = malloc(sizeof( edgenode ));
+    p->weight = 0;
+    p->y = y;
+    p->next = g->edges[x];
+
+    g->edges[x] = p;
+
+    g->degree[x]++;
+
+    if (!directed) {
+        insert_edge(g, y, x, true);
+    }
+}
+
+//bool *processed = NEW_ARRAY(nvertices, bool);
+//bool *discovered = NEW_ARRAY(nvertices, bool);
+//int *parent = NEW_ARRAY(nvertices, int);
+
+void initialise_search(graph *g, bool *processed, bool *discovered, int *parent) {
+    int i;
+
+    for (i = 0; i <= g->nvertices; i ++) {
+        processed[i] = false;
+        discovered[i] = false;
+        parent[i] = -1;
+    }
+}
+
+void bfs(graph *g, int start, bool *processed, bool *discovered, int *parent) {
+    struct queue q;
+    int v, y;
+    edgenode *p;
+
+    initialise_queue(&q, 10);
+    enqueue(&q, start);
+    discovered[start] = true;
+
+    while (!empty_queue(&q)) {
+        v = dequeue(&q);
+        process_vertex_early(v);
+        processed[v] = true;
+        p = g->edges[v];
+        while (p != NULL) {
+            y = p->y;
+            if ((!processed[y]) || g->directed) {
+                process_edge(v, y);
+            }
+            if (!discovered[y]) {
+                enqueue(&q, y);
+                discovered[y] = true;
+                parent[y] = v;
+            }
+            p = p->next;
+        }
+
+        process_vertex_late(v);
+    }
+
+    free_queue(&q);
+}
+
+void process_vertex_early(int v) {
+
+}
+
+void process_edge(int x, int y) {
+    printf("    Processed edge (%d, %d)\n", x, y);
+}
+
+void process_vertex_late(int v) {
+
+}
+
+void find_path(int start, int end, int *parents, int *path, int index) {
+    if ((start == end) || (end == -1)) {
+        path[index] = start;
+    } else {
+        find_path(start, parents[end], parents, path, index + 1);
+        path[index] = end;
+    }
+}
