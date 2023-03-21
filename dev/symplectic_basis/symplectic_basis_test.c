@@ -2,7 +2,11 @@
 // Created by joshu on 19/03/2023.
 //
 
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "kernel.h"
+#include "kernel_namespace.h"
 #include "SnapPea.h"
 #include "symplectic_basis.h"
 #include "unix_cusped_census.h"
@@ -27,13 +31,7 @@ void testQueue(void) {
     int i, j;
     char *tests[] = {"Enqueue", "Dequeue", "Circular", "Resize", "Empty"};
 
-    Triangulation *theTriangulation;
-    Tetrahedron *tet0, *tet1;
     struct queue q, p;
-
-    theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
-    tet0 = theTriangulation->tet_list_begin.next;
-    tet1 = tet0->next;
 
     for (i = 0; i < 5; i++) {
         printf("    %s: ", tests[i]);
@@ -45,15 +43,15 @@ void testQueue(void) {
 
         if (i == 0) {
             // Enqueue
-            enqueue(&q, tet0);
-            enqueue(&q, tet0);
-            enqueue(&q, tet1);
-            enqueue(&q, tet0);
+            enqueue(&q, 0);
+            enqueue(&q, 0);
+            enqueue(&q, 1);
+            enqueue(&q, 0);
 
-            index[0] = dequeue(&q)->index;
-            index[1] = dequeue(&q)->index;
-            index[2] = dequeue(&q)->index;
-            index[3] = dequeue(&q)->index;
+            index[0] = dequeue(&q);
+            index[1] = dequeue(&q);
+            index[2] = dequeue(&q);
+            index[3] = dequeue(&q);
 
             if (index[0] == 0 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
                 printf("Passed");
@@ -62,15 +60,15 @@ void testQueue(void) {
             }
         } else if (i == 1) {
             // Dequeue
-            enqueue(&q, tet0);
-            enqueue(&q, tet0);
-            enqueue(&q, tet1);
-            enqueue(&q, tet0);
+            enqueue(&q, 0);
+            enqueue(&q, 0);
+            enqueue(&q, 1);
+            enqueue(&q, 0);
 
-            index[0] = dequeue(&q)->index;
-            index[1] = dequeue(&q)->index;
-            index[2] = dequeue(&q)->index;
-            index[3] = dequeue(&q)->index;
+            index[0] = dequeue(&q);
+            index[1] = dequeue(&q);
+            index[2] = dequeue(&q);
+            index[3] = dequeue(&q);
 
             if (index[0] == 0 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
                 printf("Passed");
@@ -80,19 +78,19 @@ void testQueue(void) {
         } else if (i == 2) {
             // Circular
             for (j = 0; j < 9; j++)
-                enqueue(&q, tet0);
+                enqueue(&q, 0);
 
             for (j = 0; j < 8; j++)
                 dequeue(&q);
 
-            enqueue(&q, tet1);
-            enqueue(&q, tet0);
-            enqueue(&q, tet1);
+            enqueue(&q, 1);
+            enqueue(&q, 0);
+            enqueue(&q, 1);
 
-            index[0] = dequeue(&q)->index;
-            index[1] = dequeue(&q)->index;
-            index[2] = dequeue(&q)->index;
-            index[3] = dequeue(&q)->index;
+            index[0] = dequeue(&q);
+            index[1] = dequeue(&q);
+            index[2] = dequeue(&q);
+            index[3] = dequeue(&q);
 
             if (index[0] == 0 && index[1] == 1 && index[2] == 0 && index[3] == 1) {
                 printf("Passed");
@@ -101,15 +99,15 @@ void testQueue(void) {
             }
         } else if (i == 3) {
             // Resize
-            p = *enqueue(&p, tet1);
-            p = *enqueue(&p, tet0);
-            p = *enqueue(&p, tet1);
-            p = *enqueue(&p, tet0);
+            p = *enqueue(&p, 1);
+            p = *enqueue(&p, 0);
+            p = *enqueue(&p, 1);
+            p = *enqueue(&p, 0);
 
-            index[0] = dequeue(&p)->index;
-            index[1] = dequeue(&p)->index;
-            index[2] = dequeue(&p)->index;
-            index[3] = dequeue(&p)->index;
+            index[0] = dequeue(&p);
+            index[1] = dequeue(&p);
+            index[2] = dequeue(&p);
+            index[3] = dequeue(&p);
 
             if (index[0] == 1 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
                 printf("Passed");
@@ -117,11 +115,11 @@ void testQueue(void) {
                 printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
             }
         } else if (i == 4) {
-            enqueue(&p, tet0);
-            enqueue(&p, tet0);
+            enqueue(&p, 0);
+            enqueue(&p, 0);
             dequeue(&p);
-            enqueue(&p, tet0);
-            enqueue(&p, tet0);
+            enqueue(&p, 0);
+            enqueue(&p, 0);
             dequeue(&p);
             dequeue(&p);
             dequeue(&p);
@@ -144,7 +142,44 @@ void testQueue(void) {
 }
 
 void testBreadthFirstSearch(void) {
+    int i, j, nvertices = 4;
+    graph g;
 
+    initialise_graph(&g, MAXV, 10, TRUE);
+
+    bool *processed = malloc(sizeof(bool *) * MAXV);
+    bool *discovered = malloc(sizeof(bool *) * MAXV);
+    int *parent = malloc(sizeof(int *) * MAXV);
+
+    int *path = malloc(sizeof(int *) * MAXV);
+
+    int matrix[4][4] = {
+            {0, 1, 0, 1},
+            {1, 0, 0, 0},
+            {0, 1, 0, 0},
+            {1, 0, 0, 0}
+    };
+
+    for (i = 0; i < 4; i++)
+        for (j = 0; j < 4; j++)
+            if (matrix[i][j] == 1)
+                insert_edge(&g, i, j, TRUE);
+
+    initialise_search(&g, processed, discovered, parent);
+    bfs(&g, 1, processed, discovered, parent);
+
+    find_path(1, 3, parent, path, 0);
+    if (path[0] == 3 && path[1] == 0 && path[2] == 1) {
+        printf("    Passed\n");
+    } else {
+        printf("    Failed - Path returned [%d, %d, %d, %d]\n", path[0], path[1], path[2], path[3]);
+    }
+
+    free_graph(&g);
+    free(processed);
+    free(discovered);
+    free(parent);
+    free(path);
 }
 
 void testDual(void) {

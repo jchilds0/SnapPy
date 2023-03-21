@@ -1,2 +1,2 @@
-symplectic_test 10 0.0643293
+symplectic_test 27 0.0236673
 ---
