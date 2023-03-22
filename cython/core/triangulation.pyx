@@ -3076,6 +3076,6 @@ cdef class Triangulation():
         for i in range(dual_rows):
             eqns.append([g_eqns[i][j] for j in range(num_cols)])
 
-        free_gluing_equations(g_eqns, dual_rows)
+        free_symplectic_basis(g_eqns, dual_rows)
 
         return matrix(eqns)

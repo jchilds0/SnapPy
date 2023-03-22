@@ -12,6 +12,31 @@
 
 #define     MAXV    10
 
+/**
+ * Cusp Triangulation
+ */
+
+struct Vertex {
+    int index;
+    EdgeClass *edge;
+    int v1;
+    int v2;
+};
+
+struct Triangle {
+    Tetrahedron *tet;
+    int vertex;
+    struct Vertex vertices[3];
+    int edges[3];
+};
+
+void init_cusp_triangulation(Triangulation *, struct Triangle ***);
+int **construct_equations(Triangulation *, int, int **);
+
+/**
+ * Queue
+ */
+
 struct queue {
     int front;      // First element of queue
     int rear;       // Last element of queue
@@ -26,6 +51,10 @@ int dequeue(struct queue *);
 void resize_queue(struct queue *);
 int empty_queue(struct queue *);
 void free_queue(struct queue *);
+
+/**
+ * Graph for Breadth First Search
+ */
 
 typedef struct edgenode {
     int y;
