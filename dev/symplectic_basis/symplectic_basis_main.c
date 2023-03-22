@@ -8,8 +8,7 @@
 
 #include "SnapPea.h"
 #include "unix_cusped_census.h"
-//#include "addl_code.h"                  // SnapPy
-#include "../addl_code/addl_code.h"     // Kernel
+#include "../addl_code/addl_code.h"
 #include <stdio.h>
 
 void printMatrix(int**, int, int);
@@ -42,7 +41,7 @@ void mergeRows(Triangulation *manifold) {
     // Dual Equations
     eqns = get_symplectic_basis(manifold, &dualRows);
     printMatrix(eqns, numCols, dualRows);
-    free_gluing_equations(eqns, dualRows);
+    free_symplectic_basis(eqns, dualRows);
 
     free_triangulation(manifold);
 }
