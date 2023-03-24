@@ -10,111 +10,121 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
+#include "../addl_code/addl_code.h"
 
-int** get_symplectic_basis(Triangulation *manifold, int* dual_rows) {
+int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
     int i;
-    int genus = 1;
 
-    *dual_rows = 2;
+    // Edge Curves C_i -> gluing equations
+    int **edge_eqns, edge_num_rows;
 
-    // Allocate Equations and Cusp Arrays
+    // Dual Edge Curves Gamma_i -> symplectic equations
+    int **symp_eqns, symp_num_rows;
 
-    int **eqns = NEW_ARRAY(*dual_rows, int*);
+    // Get Gluing Equations
+    edge_eqns = get_gluing_equations(manifold, &edge_num_rows, num_cols);
+    symp_num_rows = edge_num_rows;
 
-    for (i = 0; i < *dual_rows; i ++)
-        eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
+    // Allocate Symplectic Equations Array
+    symp_eqns = NEW_ARRAY(symp_num_rows, int*);
 
-    struct Triangle ***pTriangle = NEW_ARRAY(manifold->num_tetrahedra, struct Triangle **);
+    for (i = 0; i < symp_num_rows; i ++)
+        symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
 
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
-        pTriangle[i] = NEW_ARRAY(4, struct Triangle *);
-        pTriangle[i][0] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][1] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][2] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][3] = malloc(sizeof( struct Triangle ));
-    }
+    struct Triangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct Triangle *);
 
-    // Algorithm
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
+        pTriangle[i] = malloc(sizeof( struct Triangle ));
 
-    init_cusp_triangulation(manifold, pTriangle);
-
-    eqns = construct_equations(manifold, *dual_rows, eqns);
+    // Get Symplectic Equation
+    symp_eqns = get_symplectic_equations(manifold, pTriangle, symp_num_rows, symp_eqns);
 
     // Free Cusp Triangulation Array
-
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
-        free(pTriangle[i][0]);
-        free(pTriangle[i][1]);
-        free(pTriangle[i][2]);
-        free(pTriangle[i][3]);
-        my_free(pTriangle[i]);
-    }
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
+        free(pTriangle[i]);
 
     my_free(pTriangle);
 
+    // Construct return array
+    int **eqns = NEW_ARRAY(edge_num_rows + symp_num_rows, int *);
+
+    for (i = 0; i < edge_num_rows; i++) {
+        eqns[2 * i] = edge_eqns[i];
+        eqns[2 * i + 1] = symp_eqns[i];
+    }
+
+    *num_rows = 2 * edge_num_rows;
     return eqns;
 }
 
-void init_cusp_triangulation(Triangulation *manifold, struct Triangle ***pTriangle) {
+void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangle) {
     int i, j, k;
+    EdgeClass *edge;
     Tetrahedron *tet= manifold->tet_list_begin.next;
 
     for (i = 0; i < manifold->num_tetrahedra; i++) {
-        for (j = 0; j < 4; j++) {
-            pTriangle[i][j]->tet = tet;
-            pTriangle[i][j]->vertex = j;
+        pTriangle[i]->tet = tet;
+        pTriangle[i]->vertex = i % 4;
 
-            switch (j) {
-                case 0:
-                    pTriangle[i][j]->edges[0] = 1;
-                    pTriangle[i][j]->edges[1] = 2;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 1:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 2;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 2:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 1;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 3:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 1;
-                    pTriangle[i][j]->edges[2] = 2;
-                    break;
-                default:
-                    break;
-            }
-
-            for (k = 0; k < 3; k++) {
-                // Edge between pTriangle[i][j]->vertex and pTriangle[i][j]->edges[k]
-                pTriangle[i][j]->vertices[k].v1 = pTriangle[i][j]->vertex;
-                pTriangle[i][j]->vertices[k].v2 = pTriangle[i][j]->edges[k];
-
-                pTriangle[i][j]->vertices[k].edge = tet->edge_class[
-                        edge_between_vertices[
-                                pTriangle[i][j]->vertices[k].v1][
-                                pTriangle[i][j]->vertices[k].v2]];
-
-                pTriangle[i][j]->vertices[k].index = (int) pTriangle[i][j]->vertices[k].edge->incident_edge_index;
-            }
+        switch (pTriangle[i]->vertex) {
+            case 0:
+                pTriangle[i]->edges[0] = 1;
+                pTriangle[i]->edges[1] = 2;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 1:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 2;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 2:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 1;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 3:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 1;
+                pTriangle[i]->edges[2] = 2;
+                break;
+            default:
+                break;
         }
 
+        for (j = 0; j < 3; j++) {
+            // Edge between pTriangle[i]->vertex and pTriangle[i]->edges[j]
+            pTriangle[i]->vertices[j].v1 = pTriangle[i]->vertex;
+            pTriangle[i]->vertices[j].v2 = pTriangle[i]->edges[j];
+
+            pTriangle[i]->vertices[j].edge = tet->edge_class[
+                    edge_between_vertices[
+                            pTriangle[i]->vertices[j].v1][
+                            pTriangle[i]->vertices[j].v2]];
+
+            k = 0;
+            for (edge = manifold->edge_list_begin.next; edge != pTriangle[i]->vertices[j].edge; edge = edge->next, k++);
+
+            pTriangle[i]->vertices[j].index = k;
+        }
         tet = tet->next;
     }
 }
 
-int **construct_equations(Triangulation *manifold, int dual_rows, int **eqns) {
+int **get_symplectic_equations(Triangulation *manifold, struct Triangle **pTriangle, int num_rows, int **eqns) {
     int i, j, T = manifold -> num_tetrahedra;
+    int genus = 2 * manifold->num_tetrahedra - num_rows;
+    struct graph graph1;
+
+    init_cusp_triangulation(manifold, pTriangle);
+    initialise_graph(&graph1, 4 * (genus + 2) * manifold->num_tetrahedra, FALSE);
 
     // Dual Curve Equations
-    for (i = 0; i < dual_rows; i ++) {
+    for (i = 0; i < num_rows; i ++) {
         for (j = 0; j < 3 * T; j ++)
             eqns[i][j] = i + j;
     }
+
+    free_graph(&graph1);
 
     return eqns;
 }
@@ -125,6 +135,57 @@ void free_symplectic_basis(int **eqns, int num_rows) {
     for (i = 0; i < num_rows; i++)
         my_free(eqns[i]);
     my_free(eqns);
+}
+
+/* Construct Dual Graph
+ *
+ * Start in the corner of a triangle of the cusp triangulation
+ * and walk around the boundary of the manifold, add edges to
+ * the dual graph.
+ */
+
+void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct Triangle **pTriangle) {
+    int index;
+    struct Triangle *tri;
+    struct queue queue1;
+
+    initialise_queue(&queue1, 3 * manifold->num_tetrahedra);
+
+    // Start at the inside corner of triangle 1.
+    enqueue(&queue1, 0);
+    graph1->vertexHomology[0] = 0;          // triangle index
+    graph1->vertexHomology[1] = 0;          // e0 lower
+    graph1->vertexHomology[2] = 0;          // e0 upper
+    graph1->vertexHomology[3] = 0;          // e1 lower
+    graph1->vertexHomology[4] = 0;          // e1 upper
+    graph1->vertexHomology[5] = 0;          // e2 lower
+    graph1->vertexHomology[6] = 0;          // e2 upper
+
+    while (!empty_queue(&queue1)) {
+        index = dequeue(&queue1);
+        tri = pTriangle[index];
+
+
+    }
+}
+
+/* Remove Extra Edges
+ *
+ * Remove edges associated to the curves that dive into the
+ * manifold since we can only do this once.
+ */
+void remove_extra_edges(struct graph *graph1) {
+
+}
+
+/* Add Misc Edges
+ *
+ * Add edges associated to
+ *  - Diving through the manifold
+ *  -
+ */
+void add_misc_edges(struct graph *graph1) {
+
 }
 
 // -----------------------------------------------------------
@@ -197,33 +258,42 @@ void free_queue(struct queue *q) {
 
 // Breadth First Search
 
-void initialise_graph(graph *g, int maxVertices, int maxEdges, bool directed) {
-    int i;
+void initialise_graph(struct graph *g, int maxVertices, bool directed) {
+    int i, j;
 
     g->nvertices = maxVertices;
     g->nedges = 0;
     g->directed = directed;
 
-    for (i = 0; i < MAXV; i++) {
+    g->edges = NEW_ARRAY(maxVertices, edgenode *);
+    g->degree = NEW_ARRAY(maxVertices, int);
+    g->vertexHomology = NEW_ARRAY(maxVertices, int *);
+
+    for (i = 0; i < maxVertices; i++) {
         g->degree[i] = 0;
-    }
-    for (i = 0; i < MAXV; i++) {
         g->edges[i] = NULL;
+
+        g->vertexHomology[i] = NEW_ARRAY(7, int);
+        for (j = 0; j < 6; j++)
+            g->vertexHomology[i][j] = 0
     }
-//    g->edges = NEW_ARRAY(maxEdges, edgenode *);
-//    g->degree = NEW_ARRAY(maxVertices, int);
 }
 
-void free_graph(graph *g) {
-//    free(g->edges);
-//    free(g->degree);
+void free_graph(struct graph *g) {
+    int i;
+
+    free(g->edges);
+    free(g->degree);
+
+    for (i = 0; i < g->nvertices; i++)
+        free(g->vertexHomology[i]);
+    free(g->vertexHomology);
 }
 
-void insert_edge(graph *g, int x, int y, bool directed) {
+void insert_edge(struct graph *g, int x, int y, bool directed) {
     edgenode *p;
 
     p = malloc(sizeof( edgenode ));
-    p->weight = 0;
     p->y = y;
     p->next = g->edges[x];
 
@@ -240,7 +310,7 @@ void insert_edge(graph *g, int x, int y, bool directed) {
 //bool *discovered = NEW_ARRAY(nvertices, bool);
 //int *parent = NEW_ARRAY(nvertices, int);
 
-void initialise_search(graph *g, bool *processed, bool *discovered, int *parent) {
+void initialise_search(struct graph *g, bool *processed, bool *discovered, int *parent) {
     int i;
 
     for (i = 0; i <= g->nvertices; i ++) {
@@ -250,7 +320,7 @@ void initialise_search(graph *g, bool *processed, bool *discovered, int *parent)
     }
 }
 
-void bfs(graph *g, int start, bool *processed, bool *discovered, int *parent) {
+void bfs(struct graph *g, int start, bool *processed, bool *discovered, int *parent) {
     struct queue q;
     int v, y;
     edgenode *p;

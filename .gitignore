@@ -51,3 +51,4 @@ windows_exe/vc_redist_installers/vc_redist_*.exe
 quad_double/qd/lib/
 quad_double/qd/qd-*
 .idea
+dev/symplectic_basis/cmake-build-debug
