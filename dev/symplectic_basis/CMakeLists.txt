@@ -15,8 +15,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 include_directories(${SNAPPEA_KERNEL}/headers ${SNAPPEA_KERNEL}/unix_kit ${SNAPPEA_KERNEL}/unix_kit/CuspedCensusData)
 
 # Add source files
-file(GLOB KERNEL_SOURCES ${SNAPPEA_KERNEL}/kernel_code/*.c ${SNAPPEA_KERNEL}/addl_code/*.c ${SNAPPEA_KERNEL}/unix_kit/*.c)
-file(GLOB HEADER_FILES ${SNAPPEA_KERNEL}/headers/*.h ${SNAPPEA_KERNEL}/real_type/*.h)
+file(GLOB KERNEL_SOURCES ${SNAPPEA_KERNEL}/*/*.c)
+file(GLOB HEADER_FILES ${SNAPPEA_KERNEL}/*/*.h)
 file(COPY ${CMAKE_SOURCE_DIR}/CuspedCensusData DESTINATION ${CMAKE_BUILD_RPATH}/ )      # Copy census data to be used by program
 
 # Create executable target
