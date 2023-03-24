@@ -2597,7 +2597,7 @@ extern void free_symmetry_group_presentation(SymmetryGroupPresentation *group);
 /*                                                                      */
 /************************************************************************/
 
-extern int** get_symplectic_basis(Triangulation *manifold, int*);
+extern int** get_symplectic_basis(Triangulation *manifold);
 /**<
  *  Returns the symplectic basis
  */

@@ -30,7 +30,7 @@ struct Triangle {
     int edges[3];
 };
 
-void init_cusp_triangulation(Triangulation *, struct Triangle ***);
+void init_cusp_triangulation(Triangulation *, struct Triangle **);
 int **construct_equations(Triangulation *, int, int **);
 
 /**

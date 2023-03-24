@@ -362,7 +362,18 @@
 				130,
 				131,
 				132,
-				133
+				133,
+				134,
+				135,
+				136,
+				137,
+				138,
+				139,
+				140,
+				141,
+				142,
+				143,
+				144
 			]
 		}
 	],
@@ -1024,6 +1035,41 @@
 		},
 		{
 			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/addl_code.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/change_peripheral_curves_nonorientable.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/dilog.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/gluing_equations_pgl.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/isomorphism_signature.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/ptolemy_equations.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/addl_code/ptolemy_types.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
 			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/headers/Dirichlet.h",
 			"sourceGroupIndex" : 1
 		},
@@ -1114,6 +1160,11 @@
 		},
 		{
 			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/headers/symplectic_basis.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
 			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/headers/tables.h",
 			"sourceGroupIndex" : 1
 		},
@@ -1145,6 +1196,21 @@
 		{
 			"backtrace" : 1,
 			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/real_type/real_type.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/unix_kit/unix_cusped_census.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/unix_kit/unix_file_io.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/kernel/unix_kit/unix_kit.h",
 			"sourceGroupIndex" : 1
 		}
 	],

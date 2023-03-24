@@ -10,97 +10,87 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
+#include "../addl_code/addl_code.h"
 
-int** get_symplectic_basis(Triangulation *manifold, int* dual_rows) {
-    int i;
-    int genus = 1;
+int** get_symplectic_basis(Triangulation *manifold) {
+    int i, **c_eqns, *num_rows, *num_cols, dual_rows;
 
-    *dual_rows = 2;
+    // Get Gluing Equations
+    c_eqns = get_gluing_equations(manifold, num_rows, num_cols);
+    dual_rows = *num_rows - 1;
 
     // Allocate Equations and Cusp Arrays
 
-    int **eqns = NEW_ARRAY(*dual_rows, int*);
+    int **eqns = NEW_ARRAY(dual_rows, int*);
 
-    for (i = 0; i < *dual_rows; i ++)
+    for (i = 0; i < dual_rows; i ++)
         eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
 
-    struct Triangle ***pTriangle = NEW_ARRAY(manifold->num_tetrahedra, struct Triangle **);
+    struct Triangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct Triangle *);
 
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
-        pTriangle[i] = NEW_ARRAY(4, struct Triangle *);
-        pTriangle[i][0] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][1] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][2] = malloc(sizeof( struct Triangle ));
-        pTriangle[i][3] = malloc(sizeof( struct Triangle ));
-    }
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
+        pTriangle[i] = malloc(sizeof( struct Triangle ));
 
     // Algorithm
 
     init_cusp_triangulation(manifold, pTriangle);
 
-    eqns = construct_equations(manifold, *dual_rows, eqns);
+    eqns = construct_equations(manifold, dual_rows, eqns);
 
     // Free Cusp Triangulation Array
 
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
-        free(pTriangle[i][0]);
-        free(pTriangle[i][1]);
-        free(pTriangle[i][2]);
-        free(pTriangle[i][3]);
-        my_free(pTriangle[i]);
-    }
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
+        free(pTriangle[i]);
 
     my_free(pTriangle);
 
     return eqns;
 }
 
-void init_cusp_triangulation(Triangulation *manifold, struct Triangle ***pTriangle) {
-    int i, j, k;
+void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangle) {
+    int i, j;
     Tetrahedron *tet= manifold->tet_list_begin.next;
 
     for (i = 0; i < manifold->num_tetrahedra; i++) {
-        for (j = 0; j < 4; j++) {
-            pTriangle[i][j]->tet = tet;
-            pTriangle[i][j]->vertex = j;
+        pTriangle[i]->tet = tet;
+        pTriangle[i]->vertex = i % 4;
 
-            switch (j) {
-                case 0:
-                    pTriangle[i][j]->edges[0] = 1;
-                    pTriangle[i][j]->edges[1] = 2;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 1:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 2;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 2:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 1;
-                    pTriangle[i][j]->edges[2] = 3;
-                    break;
-                case 3:
-                    pTriangle[i][j]->edges[0] = 0;
-                    pTriangle[i][j]->edges[1] = 1;
-                    pTriangle[i][j]->edges[2] = 2;
-                    break;
-                default:
-                    break;
-            }
+        switch (pTriangle[i]->vertex) {
+            case 0:
+                pTriangle[i]->edges[0] = 1;
+                pTriangle[i]->edges[1] = 2;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 1:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 2;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 2:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 1;
+                pTriangle[i]->edges[2] = 3;
+                break;
+            case 3:
+                pTriangle[i]->edges[0] = 0;
+                pTriangle[i]->edges[1] = 1;
+                pTriangle[i]->edges[2] = 2;
+                break;
+            default:
+                break;
+        }
 
-            for (k = 0; k < 3; k++) {
-                // Edge between pTriangle[i][j]->vertex and pTriangle[i][j]->edges[k]
-                pTriangle[i][j]->vertices[k].v1 = pTriangle[i][j]->vertex;
-                pTriangle[i][j]->vertices[k].v2 = pTriangle[i][j]->edges[k];
+        for (j = 0; j < 3; j++) {
+            // Edge between pTriangle[i]->vertex and pTriangle[i]->edges[j]
+            pTriangle[i]->vertices[j].v1 = pTriangle[i]->vertex;
+            pTriangle[i]->vertices[j].v2 = pTriangle[i]->edges[j];
 
-                pTriangle[i][j]->vertices[k].edge = tet->edge_class[
-                        edge_between_vertices[
-                                pTriangle[i][j]->vertices[k].v1][
-                                pTriangle[i][j]->vertices[k].v2]];
+            pTriangle[i]->vertices[j].edge = tet->edge_class[
+                    edge_between_vertices[
+                            pTriangle[i]->vertices[j].v1][
+                            pTriangle[i]->vertices[j].v2]];
 
-                pTriangle[i][j]->vertices[k].index = (int) pTriangle[i][j]->vertices[k].edge->incident_edge_index;
-            }
+            pTriangle[i]->vertices[j].index = (int) pTriangle[i]->vertices[j].edge->incident_edge_index;
         }
 
         tet = tet->next;

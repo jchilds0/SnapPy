@@ -30,7 +30,7 @@ int main(void) {
 
 
 void mergeRows(Triangulation *manifold) {
-    int numRows, numCols, dualRows;
+    int numRows, numCols;
     int** eqns;
 
     // Edge Equations
@@ -39,9 +39,9 @@ void mergeRows(Triangulation *manifold) {
     free_gluing_equations(eqns, numRows);
 
     // Dual Equations
-    eqns = get_symplectic_basis(manifold, &dualRows);
-    printMatrix(eqns, numCols, dualRows);
-    free_symplectic_basis(eqns, dualRows);
+    eqns = get_symplectic_basis(manifold);
+    printMatrix(eqns, numCols, numRows);
+    free_symplectic_basis(eqns, numRows);
 
     free_triangulation(manifold);
 }
