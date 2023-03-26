@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis
+# Install script for directory: C:/Users/joshu/Documents/Monash/Honours - Research Project/development/SnapPy/dev/symplectic_basis
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "C:/Users/joshu/Documents/Monash/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
