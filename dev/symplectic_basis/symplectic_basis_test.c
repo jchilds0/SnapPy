@@ -145,13 +145,13 @@ void testBreadthFirstSearch(void) {
     int i, j, nvertices = 4;
     graph g;
 
-    initialise_graph(&g, MAXV, 10, TRUE);
+    initialise_graph(&g, maxVertices, 10, TRUE);
 
-    bool *processed = malloc(sizeof(bool *) * MAXV);
-    bool *discovered = malloc(sizeof(bool *) * MAXV);
-    int *parent = malloc(sizeof(int *) * MAXV);
+    bool *processed = malloc(sizeof(bool *) * maxVertices);
+    bool *discovered = malloc(sizeof(bool *) * maxVertices);
+    int *parent = malloc(sizeof(int *) * maxVertices);
 
-    int *path = malloc(sizeof(int *) * MAXV);
+    int *path = malloc(sizeof(int *) * maxVertices);
 
     int matrix[4][4] = {
             {0, 1, 0, 1},

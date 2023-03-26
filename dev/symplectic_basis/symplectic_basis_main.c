@@ -15,35 +15,19 @@ void printMatrix(int**, int, int);
 void mergeRows(Triangulation *);
 
 int main(void) {
-
+    int **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
     theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
 
     if (theTriangulation != NULL) {
-        mergeRows(theTriangulation);
+        eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
+        printMatrix(eqns, num_cols, num_rows);
+        free_symplectic_basis(eqns, num_rows);
     } else
         printf("Couldn't read census manifold.\n");
 
     return 0;
-}
-
-
-void mergeRows(Triangulation *manifold) {
-    int numRows, numCols;
-    int** eqns;
-
-    // Edge Equations
-    eqns = get_gluing_equations(manifold, &numRows, &numCols);
-    printMatrix(eqns, numCols, numRows);
-    free_gluing_equations(eqns, numRows);
-
-    // Dual Equations
-    eqns = get_symplectic_basis(manifold);
-    printMatrix(eqns, numCols, numRows);
-    free_symplectic_basis(eqns, numRows);
-
-    free_triangulation(manifold);
 }
 
 
