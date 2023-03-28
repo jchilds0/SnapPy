@@ -53,6 +53,8 @@ struct Triangle {
 void init_cusp_triangulation(Triangulation *, struct Triangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct Triangle **, int, int **);
 void construct_dual_graph(struct graph *, Triangulation *, struct Triangle **);
+int flow(struct Triangle *, int, int);
+void printTriangleInfo(Triangulation *, struct Triangle **);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
 
