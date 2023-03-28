@@ -62,7 +62,7 @@ void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangl
     EdgeClass *edge;
     Tetrahedron *tet= manifold->tet_list_begin.next;
 
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
         pTriangle[i]->tet = tet;
         pTriangle[i]->vertex = i % 4;
 
@@ -106,7 +106,10 @@ void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangl
 
             pTriangle[i]->vertices[j].index = k;
         }
-        tet = tet->next;
+
+        if (i % 4 == 3) {
+            tet = tet->next;
+        }
     }
 }
 
@@ -117,6 +120,8 @@ int **get_symplectic_equations(Triangulation *manifold, struct Triangle **pTrian
 
     init_cusp_triangulation(manifold, pTriangle);
     initialise_graph(&graph1, 4 * (genus + 2) * manifold->num_tetrahedra, FALSE);
+    construct_dual_graph(&graph1, manifold, pTriangle);
+    printTriangleInfo(manifold, pTriangle);
 
     // Dual Curve Equations
     for (i = 0; i < num_rows; i ++) {
@@ -167,6 +172,28 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
 
 
     }
+}
+
+void printTriangleInfo(Triangulation *manifold, struct Triangle **pTriangle) {
+    int i, j;
+
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
+        for (j = 0; j < 3; j++) {
+            printf("Face %d of Vertex %d of tet %d glues to Vertex %d on tet %d\n", pTriangle[i]->edges[j],
+                   pTriangle[i]->vertex, pTriangle[i]->tet->index,
+                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->vertex),
+                   pTriangle[i]->tet->neighbor[pTriangle[i]->edges[j]]->index);
+        }
+    }
+}
+
+
+int flow(struct Triangle *pTri, int i, int j) {
+//    Tetrahedron *tet = pTri->tet;
+//    int mflow = FLOW(tet->curve[0][right_handed][v][f], tet->curve[0][right_handed][v][ff]);
+//    int lflow = FLOW(tet->curve[1][right_handed][v][f], tet->curve[1][right_handed][v][ff]);
+//
+//    return mflow + lflow;
 }
 
 /* Remove Extra Edges
@@ -275,7 +302,7 @@ void initialise_graph(struct graph *g, int maxVertices, bool directed) {
 
         g->vertexHomology[i] = NEW_ARRAY(7, int);
         for (j = 0; j < 6; j++)
-            g->vertexHomology[i][j] = 0
+            g->vertexHomology[i][j] = 0;
     }
 }
 
