@@ -1,4 +1,4 @@
-C:\Users\joshu\AppData\Local\JetBrains\Toolbox\apps\CLion\ch-0\223.8836.42\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/joshu/AppData/Local/JetBrains/Toolbox/apps/CLion/ch-0/223.8836.42/bin/ninja/win/x64/ninja.exe -G Ninja -S "C:\Users\joshu\Documents\1. School Stuff\Monash 2023\Honours - Research Project\development\SnapPy\dev\symplectic_basis" -B "C:\Users\joshu\Documents\1. School Stuff\Monash 2023\Honours - Research Project\development\SnapPy\dev\symplectic_basis\cmake-build-debug"
+C:\Users\joshu\AppData\Local\JetBrains\Toolbox\apps\CLion\ch-0\223.8836.42\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/joshu/AppData/Local/JetBrains/Toolbox/apps/CLion/ch-0/223.8836.42/bin/ninja/win/x64/ninja.exe -G Ninja -S "C:\Users\joshu\Documents\Monash\Honours - Research Project\development\SnapPy\dev\symplectic_basis" -B "C:\Users\joshu\Documents\Monash\Honours - Research Project\development\SnapPy\dev\symplectic_basis\cmake-build-debug"
 -- The C compiler identification is GNU 11.2.0
 -- The CXX compiler identification is GNU 11.2.0
 -- Detecting C compiler ABI info
@@ -13,4 +13,4 @@ C:\Users\joshu\AppData\Local\JetBrains\Toolbox\apps\CLion\ch-0\223.8836.42\bin\c
 -- Detecting CXX compile features - done
 -- Configuring done
 -- Generating done
--- Build files have been written to: C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug
+-- Build files have been written to: C:/Users/joshu/Documents/Monash/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug
