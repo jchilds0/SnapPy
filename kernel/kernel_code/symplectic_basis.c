@@ -31,7 +31,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     for (i = 0; i < symp_num_rows; i ++)
         symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
 
-    struct CuspTriangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct Triangle *);
+    struct CuspTriangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct CuspTriangle *);
 
     for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
         pTriangle[i] = malloc(sizeof( struct CuspTriangle ));
@@ -107,6 +107,12 @@ void init_cusp_triangulation(Triangulation *manifold, struct CuspTriangle **pTri
             pTriangle[i]->vertices[j].index = k;
         }
 
+        for (j = 0; j < 4; j++) {
+            pTriangle[i]->neighbours[j] = pTriangle[4 * (pTriangle[i]->tet->neighbor[j]->index)
+                                                    + EVALUATE(pTriangle[i]->tet->gluing[j], pTriangle[i]->tetVertex)];
+        }
+
+
         if (i % 4 == 3) {
             tet = tet->next;
         }
@@ -150,23 +156,57 @@ void free_symplectic_basis(int **eqns, int num_rows) {
  */
 
 void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct CuspTriangle **pTriangle) {
-    int index;
-    struct CuspTriangle *tri;
-    struct queue queue1;
+    int i, index, index1, index2, adj, cuspEdge, graphVertex;
+    struct CuspTriangle *tri, *adjTri;
+//    struct Queue queue1;
 
-    initialise_queue(&queue1, 3 * manifold->num_tetrahedra);
+//    initialise_queue(&queue1, 3 * manifold->num_tetrahedra);
+
+    struct Node stack;
+    stack.item = -1;
+
+    int visited[graph1->nvertices];
+
+    for (i = 0; i < graph1->nvertices; i++)
+        visited[i] = 0;
 
     // Start at the inside corner of triangle 1.
-    enqueue(&queue1, 0);
-    graph1->vertexHomology[0][0] = 0;          // tet vertex
-    graph1->vertexHomology[0][1] = 0;          // cusp vertex
-    graph1->vertexHomology[0][2] = 0;          // distance
+    push(&stack, 0);
+    graph1->vertexHomology[0][0] = 0;          // Tet Index
+    graph1->vertexHomology[0][1] = 0;          // Tet Vertex
+    graph1->vertexHomology[0][2] = 1;          // Cusp Vertex
+    graph1->vertexHomology[0][3] = 0;          // Distance
 
-    while (!empty_queue(&queue1)) {
-        index = dequeue(&queue1);
-        tri = pTriangle[index];
+    while (!is_empty(&stack)) {
+        index = pop(&stack);
 
+        if (visited[index])
+            continue;
 
+        // Find the triangle that vertex (index) of the dual graph lies on.
+        tri = findTriangle(manifold, pTriangle, graph1->vertexHomology[index][0], graph1->vertexHomology[index][1]);
+
+        // First two edges can always be reached
+        cuspEdge = (int) remaining_face[tri->tetVertex][graph1->vertexHomology[index][2]];
+        adjTri = tri->neighbours[cuspEdge];
+        index1 = insert_edge(graph1, index, cuspEdge, tri, adjTri, FALSE);
+
+        cuspEdge = (int) remaining_face[graph1->vertexHomology[index][2]][tri->tetVertex];
+        adjTri = tri->neighbours[cuspEdge];
+        index2 = insert_edge(graph1, index, cuspEdge, tri, adjTri, FALSE);
+
+        // Add vertices to the queue
+        push(&stack, index1);
+        push(&stack, index2);
+
+        // Add the third edge if possible
+        if (flow(tri, graph1->vertexHomology[index][2]) <= graph1->vertexHomology[index][3]) {
+            adjTri = tri->neighbours[graph1->vertexHomology[index][2]];
+            index1 = insert_edge(graph1, index, graph1->vertexHomology[index][2], tri, adjTri, FALSE);
+            push(&stack, index1);
+        }
+
+        visited[index] = 1;
     }
 }
 
@@ -187,12 +227,45 @@ void printTriangleInfo(Triangulation *manifold, struct CuspTriangle **pTriangle)
 }
 
 
-int flow(struct CuspTriangle *pTri, int i, int j) {
-//    Tetrahedron *tet = pTri->tet;
-//    int mflow = FLOW(tet->curve[0][right_handed][v][f], tet->curve[0][right_handed][v][ff]);
-//    int lflow = FLOW(tet->curve[1][right_handed][v][f], tet->curve[1][right_handed][v][ff]);
-//
-//    return mflow + lflow;
+int flow(struct CuspTriangle *tri, int vertex) {
+    int mflow, lflow;
+
+    mflow = FLOW(tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
+                 tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
+
+    lflow = FLOW(tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
+                 tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
+
+    return mflow + lflow;
+}
+
+struct CuspTriangle *findTriangle(Triangulation *manifold, struct CuspTriangle **pTriangle, int tetIndex, int tetVertex) {
+    int i;
+
+    for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
+        if (tetIndex == pTriangle[i]->tet->index && tetVertex == pTriangle[i]->tetVertex)
+            return pTriangle[i];
+    }
+
+    return NULL;
+}
+
+int visited(int **array, int *point, int lenArray, int lenPoint) {
+    int i, j, equal;
+
+    for (i = 0; i < lenArray; i++) {
+        equal = 1;
+
+        for (j = 0; j < lenPoint; j++) {
+            if (array[i][j] != point[j])
+                equal = 0;
+        }
+
+        if (equal == 1)
+            return 1;
+    }
+
+    return 0;
 }
 
 /* Remove Extra Edges
@@ -220,7 +293,7 @@ void add_misc_edges(struct graph *graph1) {
 
 // Queue
 
-void initialise_queue(struct queue *q, int size) {
+void initialise_queue(struct Queue *q, int size) {
     q->front = 0;
     q->rear = -1;
     q->len = 0;
@@ -228,7 +301,7 @@ void initialise_queue(struct queue *q, int size) {
     q->array = NEW_ARRAY(size, int);
 }
 
-struct queue *enqueue(struct queue *q, int i) {
+struct Queue *enqueue(struct Queue *q, int i) {
     // Queue is full
     if ( q->size == q->len ) {
         resize_queue(q);
@@ -242,7 +315,7 @@ struct queue *enqueue(struct queue *q, int i) {
     return q;
 }
 
-int dequeue(struct queue *q) {
+int dequeue(struct Queue *q) {
     // User to verify queue is not empty
     int i = q->array[q->front];
 
@@ -252,13 +325,13 @@ int dequeue(struct queue *q) {
     return i;
 }
 
-int empty_queue(struct queue *q) {
+int empty_queue(struct Queue *q) {
     return (!q->len);
 }
 
-void resize_queue(struct queue *q) {
+void resize_queue(struct Queue *q) {
     int i;
-    struct queue p;
+    struct Queue p;
 
     initialise_queue(&p, 2 * q->size);
 
@@ -278,8 +351,32 @@ void resize_queue(struct queue *q) {
     q->array = p.array;
 }
 
-void free_queue(struct queue *q) {
+void free_queue(struct Queue *q) {
     free(q->array);
+}
+
+// Stack
+
+void push(struct Node *stack, int item) {
+    struct Node *node = malloc(sizeof( struct Node));
+    node->item = stack->item;
+    node->next = stack->next;
+    stack->item = item;
+    stack->next = node;
+}
+
+int pop(struct Node *stack) {
+    int item = stack->item;
+    struct Node *node = stack->next;
+    stack->item = stack->next->item;
+    stack->next = stack->next->next;
+    free(node);
+
+    return item;
+}
+
+int is_empty(struct Node *stack) {
+    return stack->item == -1;
 }
 
 // Breadth First Search
@@ -299,9 +396,9 @@ void initialise_graph(struct graph *g, int maxVertices, bool directed) {
         g->degree[i] = 0;
         g->edges[i] = NULL;
 
-        g->vertexHomology[i] = NEW_ARRAY(7, int);
-        for (j = 0; j < 6; j++)
-            g->vertexHomology[i][j] = 0;
+        g->vertexHomology[i] = NEW_ARRAY(4, int);
+        for (j = 0; j < 4; j++)
+            g->vertexHomology[i][j] = -1;
     }
 }
 
@@ -316,19 +413,65 @@ void free_graph(struct graph *g) {
     free(g->vertexHomology);
 }
 
-void insert_edge(struct graph *g, int x, int y, bool directed) {
+int insert_edge(struct graph *g, int index, int face, struct CuspTriangle *x, struct CuspTriangle *y, bool directed) {
     edgenode *p;
+    int i;
+
+    // Find index of y
+    for (i = 0; i < g->nvertices; i ++) {
+        if (g->vertexHomology[i][0] == y->tet->index                                                // Tet Index
+        && g->vertexHomology[i][1] == y->tetVertex                                                  // Tet Vertex
+        && g->vertexHomology[i][2] == EVALUATE(x->tet->gluing[face], g->vertexHomology[index][2])   // Cusp Vertex
+        && g->vertexHomology[i][3] == g->vertexHomology[index][3]                                   // Distance
+        ) {
+            break;
+        }
+    }
+
+    // Insert new vertex
+    if (i == g->nvertices) {
+        for (i = 0; g->vertexHomology[i][0] != -1; i++);
+
+        g->vertexHomology[i][0] = y->tet->index;
+        g->vertexHomology[i][1] = y->tetVertex;
+        g->vertexHomology[i][2] = EVALUATE(x->tet->gluing[face], g->vertexHomology[index][2]);
+        g->vertexHomology[i][3] = g->vertexHomology[index][3];
+    }
+
+    update_vertex_homology(g, index, i, x, y);
 
     p = malloc(sizeof( edgenode ));
-    p->y = y;
-    p->next = g->edges[x];
+    p->y = i;
+    p->next = g->edges[index];
 
-    g->edges[x] = p;
-
-    g->degree[x]++;
+    g->edges[index] = p;
+    g->degree[index]++;
 
     if (!directed) {
-        insert_edge(g, y, x, true);
+        insert_edge(g, i, EVALUATE(x->tet->gluing[face], face), y, x, true);
+    }
+
+    return i;
+}
+
+void update_vertex_homology(struct graph *g, int index1, int index2, struct CuspTriangle *tri1, struct CuspTriangle *tri2) {
+    int flow_current_vertex, flow_vertex1, flow_vertex2;
+
+    flow_current_vertex = flow(tri2, g->vertexHomology[index2][2]);
+    flow_vertex1 = flow(tri2, remaining_face[g->vertexHomology[index2][2]][tri2->tetVertex]);
+    flow_vertex2 = flow(tri2, remaining_face[tri2->tetVertex][g->vertexHomology[index2][2]]);
+
+    // Check if index2 lies in the "center" of tri2
+    if (g->vertexHomology[index2][3] == flow_current_vertex) {
+        g->vertexHomology[index2][3] = -1;
+    } else if (flow_vertex2 < flow_current_vertex || flow_vertex1 < flow_current_vertex) {
+        if (flow_vertex1 <= flow_vertex2) {
+            g->vertexHomology[index2][2] = (int) remaining_face[g->vertexHomology[index2][2]][tri2->tetVertex];
+            g->vertexHomology[index2][3] = flow_vertex1 + flow_current_vertex - g->vertexHomology[index2][3];
+        } else {
+            g->vertexHomology[index2][2] = (int) remaining_face[tri2->tetVertex][g->vertexHomology[index2][2]];
+            g->vertexHomology[index2][3] = flow_vertex2 + flow_current_vertex - g->vertexHomology[index2][3];
+        }
     }
 }
 
@@ -347,7 +490,7 @@ void initialise_search(struct graph *g, bool *processed, bool *discovered, int *
 }
 
 void bfs(struct graph *g, int start, bool *processed, bool *discovered, int *parent) {
-    struct queue q;
+    struct Queue q;
     int v, y;
     edgenode *p;
 
@@ -399,3 +542,4 @@ void find_path(int start, int end, int *parents, int *path, int index) {
         path[index] = end;
     }
 }
+

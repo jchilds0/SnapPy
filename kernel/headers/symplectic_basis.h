@@ -21,16 +21,12 @@ typedef struct edgenode {
 
 typedef struct graph {
     struct edgenode **edges;
-    int **vertexHomology;     // [tet vertex, cusp vertex, distance from cusp vertex]
+    int **vertexHomology;     // [tet index, tet vertex, cusp vertex, distance from cusp vertex]
     int *degree;
     int nvertices;
     int nedges;
     int directed;
 } graph;
-
-void initialise_graph(struct graph *, int, bool);
-void free_graph(struct graph *);
-void insert_edge(struct graph *, int, int, bool);
 
 /**
  * Cusp Triangulation
@@ -48,21 +44,14 @@ struct CuspTriangle {
     int tetVertex;
     struct CuspVertex vertices[3];
     int edges[3];
+    struct CuspTriangle *neighbours[4];
 };
-
-void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
-int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
-void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
-int flow(struct CuspTriangle *, int, int);
-void printTriangleInfo(Triangulation *, struct CuspTriangle **);
-void remove_extra_edges(struct graph *);
-void add_misc_edges(struct graph *);
 
 /**
  * Queue
  */
 
-struct queue {
+struct Queue {
     int front;      // First element of queue
     int rear;       // Last element of queue
     int len;        // num of elements
@@ -70,12 +59,44 @@ struct queue {
     int *array;
 };
 
-void initialise_queue(struct queue *, int);
-struct queue *enqueue(struct queue *, int);
-int dequeue(struct queue *);
-void resize_queue(struct queue *);
-int empty_queue(struct queue *);
-void free_queue(struct queue *);
+/**
+ * Stack
+ */
+
+struct Node {
+    int item;
+    struct Node *next;
+};
+
+// Graph
+void initialise_graph(struct graph *, int, bool);
+void free_graph(struct graph *);
+int insert_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
+void update_vertex_homology(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *);
+
+// Dual Graph
+void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
+int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
+void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
+int flow(struct CuspTriangle *, int);
+int visited(int **, int *, int, int);
+struct CuspTriangle *findTriangle(Triangulation *, struct CuspTriangle **, int, int);
+void printTriangleInfo(Triangulation *, struct CuspTriangle **);
+void remove_extra_edges(struct graph *);
+void add_misc_edges(struct graph *);
+
+// Queue
+void initialise_queue(struct Queue *, int);
+struct Queue *enqueue(struct Queue *, int);
+int dequeue(struct Queue *);
+void resize_queue(struct Queue *);
+int empty_queue(struct Queue *);
+void free_queue(struct Queue *);
+
+// Stack
+void push(struct Node *, int);
+int pop(struct Node *);
+int is_empty(struct Node *);
 
 /**
  * Graph for Breadth First Search
