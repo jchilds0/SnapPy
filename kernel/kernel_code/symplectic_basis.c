@@ -31,10 +31,10 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     for (i = 0; i < symp_num_rows; i ++)
         symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
 
-    struct Triangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct Triangle *);
+    struct CuspTriangle **pTriangle = NEW_ARRAY(4 * manifold->num_tetrahedra, struct Triangle *);
 
     for (i = 0; i < 4 * manifold->num_tetrahedra; i++)
-        pTriangle[i] = malloc(sizeof( struct Triangle ));
+        pTriangle[i] = malloc(sizeof( struct CuspTriangle ));
 
     // Get Symplectic Equation
     symp_eqns = get_symplectic_equations(manifold, pTriangle, symp_num_rows, symp_eqns);
@@ -57,16 +57,16 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     return eqns;
 }
 
-void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangle) {
+void init_cusp_triangulation(Triangulation *manifold, struct CuspTriangle **pTriangle) {
     int i, j, k;
     EdgeClass *edge;
     Tetrahedron *tet= manifold->tet_list_begin.next;
 
     for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
         pTriangle[i]->tet = tet;
-        pTriangle[i]->vertex = i % 4;
+        pTriangle[i]->tetVertex = i % 4;
 
-        switch (pTriangle[i]->vertex) {
+        switch (pTriangle[i]->tetVertex) {
             case 0:
                 pTriangle[i]->edges[0] = 1;
                 pTriangle[i]->edges[1] = 2;
@@ -93,7 +93,7 @@ void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangl
 
         for (j = 0; j < 3; j++) {
             // Edge between pTriangle[i]->vertex and pTriangle[i]->edges[j]
-            pTriangle[i]->vertices[j].v1 = pTriangle[i]->vertex;
+            pTriangle[i]->vertices[j].v1 = pTriangle[i]->tetVertex;
             pTriangle[i]->vertices[j].v2 = pTriangle[i]->edges[j];
 
             pTriangle[i]->vertices[j].edge = tet->edge_class[
@@ -113,7 +113,7 @@ void init_cusp_triangulation(Triangulation *manifold, struct Triangle **pTriangl
     }
 }
 
-int **get_symplectic_equations(Triangulation *manifold, struct Triangle **pTriangle, int num_rows, int **eqns) {
+int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **pTriangle, int num_rows, int **eqns) {
     int i, j, T = manifold -> num_tetrahedra;
     int genus = 2 * manifold->num_tetrahedra - num_rows;
     struct graph graph1;
@@ -149,22 +149,18 @@ void free_symplectic_basis(int **eqns, int num_rows) {
  * the dual graph.
  */
 
-void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct Triangle **pTriangle) {
+void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct CuspTriangle **pTriangle) {
     int index;
-    struct Triangle *tri;
+    struct CuspTriangle *tri;
     struct queue queue1;
 
     initialise_queue(&queue1, 3 * manifold->num_tetrahedra);
 
     // Start at the inside corner of triangle 1.
     enqueue(&queue1, 0);
-    graph1->vertexHomology[0] = 0;          // triangle index
-    graph1->vertexHomology[1] = 0;          // e0 lower
-    graph1->vertexHomology[2] = 0;          // e0 upper
-    graph1->vertexHomology[3] = 0;          // e1 lower
-    graph1->vertexHomology[4] = 0;          // e1 upper
-    graph1->vertexHomology[5] = 0;          // e2 lower
-    graph1->vertexHomology[6] = 0;          // e2 upper
+    graph1->vertexHomology[0][0] = 0;          // tet vertex
+    graph1->vertexHomology[0][1] = 0;          // cusp vertex
+    graph1->vertexHomology[0][2] = 0;          // distance
 
     while (!empty_queue(&queue1)) {
         index = dequeue(&queue1);
@@ -174,21 +170,24 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
     }
 }
 
-void printTriangleInfo(Triangulation *manifold, struct Triangle **pTriangle) {
+void printTriangleInfo(Triangulation *manifold, struct CuspTriangle **pTriangle) {
     int i, j;
 
     for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
         for (j = 0; j < 3; j++) {
-            printf("Face %d of Vertex %d of tet %d glues to Vertex %d on tet %d\n", pTriangle[i]->edges[j],
-                   pTriangle[i]->vertex, pTriangle[i]->tet->index,
-                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->vertex),
-                   pTriangle[i]->tet->neighbor[pTriangle[i]->edges[j]]->index);
+            printf("Cusp Edge %d of Tet Vertex %d of Tet %d glues to Cusp Edge %d of Tet Vertex %d on Tet %d\n",
+                   pTriangle[i]->edges[j],      // Cusp Edge
+                   pTriangle[i]->tetVertex,     // Tet Vertex
+                   pTriangle[i]->tet->index,    // Tet Index
+                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->edges[j]),    // Cusp Edge
+                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->tetVertex),     // Tet Vertex
+                   pTriangle[i]->tet->neighbor[pTriangle[i]->edges[j]]->index);                             // Tet Index
         }
     }
 }
 
 
-int flow(struct Triangle *pTri, int i, int j) {
+int flow(struct CuspTriangle *pTri, int i, int j) {
 //    Tetrahedron *tet = pTri->tet;
 //    int mflow = FLOW(tet->curve[0][right_handed][v][f], tet->curve[0][right_handed][v][ff]);
 //    int lflow = FLOW(tet->curve[1][right_handed][v][f], tet->curve[1][right_handed][v][ff]);
