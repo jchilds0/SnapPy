@@ -31,7 +31,7 @@ void testQueue(void) {
     int i, j;
     char *tests[] = {"Enqueue", "Dequeue", "Circular", "Resize", "Empty"};
 
-    struct queue q, p;
+    struct Queue q, p;
 
     for (i = 0; i < 5; i++) {
         printf("    %s: ", tests[i]);
