@@ -21,7 +21,7 @@ typedef struct edgenode {
 
 typedef struct graph {
     struct edgenode **edges;
-    int **vertexHomology;     // [tet index, tet vertex, cusp vertex, distance from cusp vertex]
+    int **vertexHomology;     // [tet index, tet vertex, dist. to v0, dist. to v1, dist. to v2]
     int *degree;
     int nvertices;
     int nedges;
@@ -43,7 +43,8 @@ struct CuspTriangle {
     Tetrahedron *tet;
     int tetVertex;
     struct CuspVertex vertices[3];
-    int edges[3];
+    int edgesThreeToFour[3];
+    int edgesFourToThree[4];
     struct CuspTriangle *neighbours[4];
 };
 
@@ -76,12 +77,14 @@ void update_vertex_homology(struct graph *, int, int, struct CuspTriangle *, str
 
 // Dual Graph
 void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
+void free_cusp_triangulation(Triangulation *, struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
 void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
+int minCuspDistance(struct graph *, int);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
 struct CuspTriangle *findTriangle(Triangulation *, struct CuspTriangle **, int, int);
-void printTriangleInfo(Triangulation *, struct CuspTriangle **);
+void printDebugInfo(Triangulation *, struct CuspTriangle **, struct graph *);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
 
