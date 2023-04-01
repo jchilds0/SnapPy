@@ -21,7 +21,7 @@
  */
 
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
-    int i;
+    int i, j;
 
     // Edge Curves C_i -> gluing equations
     int **edge_eqns, edge_num_rows;
@@ -34,7 +34,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     symp_num_rows = edge_num_rows;
 
     // Allocate Symplectic Equations Array
-    symp_eqns = NEW_ARRAY(symp_num_rows, int*);
+    symp_eqns = NEW_ARRAY(symp_num_rows, int *);
 
     for (i = 0; i < symp_num_rows; i ++)
         symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
@@ -57,8 +57,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     }
 
     free_cusp_triangulation(manifold, pTriangle);
-    free_symplectic_basis(symp_eqns, 2 * edge_num_rows);
-    *num_rows = 2 * edge_num_rows;
+    *num_rows = edge_num_rows + symp_num_rows;
     return eqns;
 }
 
@@ -181,9 +180,9 @@ int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **pT
     struct graph graph1;
 
     init_cusp_triangulation(manifold, pTriangle);
-    initialise_graph(&graph1, 4 * (genus + 2) * manifold->num_tetrahedra, FALSE);
+    initialise_graph(&graph1, 12 * (2 * genus + 1) * manifold->num_tetrahedra, FALSE);
     construct_dual_graph(&graph1, manifold, pTriangle);
-    printDebugInfo(manifold, pTriangle, NULL);
+    //printDebugInfo(manifold, pTriangle, NULL);
 
     // Dual Curve Equations
     for (i = 0; i < num_rows; i ++) {
@@ -213,7 +212,7 @@ void free_symplectic_basis(int **eqns, int num_rows) {
  */
 
 void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct CuspTriangle **pTriangle) {
-    int i, index, index1, index2, adj, cuspEdge, graphVertex, cuspVertex;
+    int i, index, index1, index2, cuspEdge, cuspVertex;
     struct CuspTriangle *tri, *adjTri;
 //    struct Queue queue1;
 
@@ -243,8 +242,6 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
         if (visited[index])
             continue;
 
-        printDebugInfo(manifold, pTriangle, graph1);
-
         // Find the triangle that vertex (index) of the dual graph lies on.
         tri = findTriangle(manifold, pTriangle, graph1->vertexHomology[index][0], graph1->vertexHomology[index][1]);
         cuspVertex = tri->edgesThreeToFour[minCuspDistance(graph1, index)];
@@ -254,9 +251,31 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
         adjTri = tri->neighbours[cuspEdge];
         index1 = insert_edge(graph1, index, cuspEdge, tri, adjTri, FALSE);
 
+        if (index1 == -1) {
+            printf("Inserting edge from triangle (%d, %d) across edge %d to triangle (%d, %d) failed\n",
+                   tri->tet->index,
+                   tri->tetVertex,
+                   cuspVertex,
+                   adjTri->tet->index,
+                   adjTri->tetVertex
+            );
+            printDebugInfo(manifold, pTriangle, graph1);
+        }
+
         cuspEdge = (int) remaining_face[cuspVertex][tri->tetVertex];
         adjTri = tri->neighbours[cuspEdge];
         index2 = insert_edge(graph1, index, cuspEdge, tri, adjTri, FALSE);
+
+        if (index2 == -1) {
+            printf("Inserting edge from triangle (%d, %d) across edge %d to triangle (%d, %d) failed\n",
+                   tri->tet->index,
+                   tri->tetVertex,
+                   cuspVertex,
+                   adjTri->tet->index,
+                   adjTri->tetVertex
+            );
+            printDebugInfo(manifold, pTriangle, graph1);
+        }
 
         // Add vertices to the queue
         if (!visited[index1])
@@ -265,9 +284,21 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
             push(&stack, index2);
 
         // Add the third edge if possible
-        if (flow(tri, graph1->vertexHomology[index][2]) <= graph1->vertexHomology[index][3]) {
-            adjTri = tri->neighbours[graph1->vertexHomology[index][2]];
+        if (flow(tri, cuspVertex) <= graph1->vertexHomology[index][tri->edgesFourToThree[cuspVertex] + 2]) {
+            adjTri = tri->neighbours[cuspVertex];
             index1 = insert_edge(graph1, index, cuspVertex, tri, adjTri, FALSE);
+
+            if (index1 == -1) {
+                printf("Inserting edge from triangle (%d, %d) across edge %d to triangle (%d, %d) failed\n",
+                       tri->tet->index,
+                       tri->tetVertex,
+                       cuspVertex,
+                       adjTri->tet->index,
+                       adjTri->tetVertex
+                       );
+                printDebugInfo(manifold, pTriangle, graph1);
+            }
+
             push(&stack, index1);
         }
 
@@ -322,7 +353,7 @@ void printDebugInfo(Triangulation *manifold, struct CuspTriangle **pTriangle, st
 //        }
 //    }
 
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < g->nvertices; i++) {
         if (g->vertexHomology[i][0] == -1 || g->vertexHomology[i][1] == -1) {
             tri = pTriangle[0];
         } else {
@@ -562,7 +593,7 @@ void free_graph(struct graph *g) {
 
 int insert_edge(struct graph *g, int index, int face, struct CuspTriangle *x, struct CuspTriangle *y, bool directed) {
     edgenode *p;
-    int i, x_vertex1, x_vertex2, y_vertex1, y_vertex2;
+    int i, x_vertex1, x_vertex2, y_vertex1, y_vertex2, y_face, temp;
 
     // Vertices on triangle x which are glued to triangle y
     x_vertex1 = (int) remaining_face[x->tetVertex][face];
@@ -571,6 +602,7 @@ int insert_edge(struct graph *g, int index, int face, struct CuspTriangle *x, st
     // Vertices on triangle y which correspond to the vertices v1 and v2
     y_vertex1 = EVALUATE(x->tet->gluing[face], x_vertex1);
     y_vertex2 = EVALUATE(x->tet->gluing[face], x_vertex2);
+    y_face = EVALUATE(x->tet->gluing[face], face);
 
     // Find index of y
     for (i = 0; i < g->nvertices; i ++) {
@@ -580,7 +612,7 @@ int insert_edge(struct graph *g, int index, int face, struct CuspTriangle *x, st
             g->vertexHomology[index][x->edgesFourToThree[x_vertex1] + 2]                // Dist. to y_vertex1
         && g->vertexHomology[i][y->edgesFourToThree[y_vertex2] + 2] ==
             g->vertexHomology[index][x->edgesFourToThree[x_vertex2] + 2]                // Dist. to y_vertex2
-        && g->vertexHomology[i][y->edgesFourToThree[face] + 2] == flow(y, face)            // Dist. to vertex 3
+        && g->vertexHomology[i][y->edgesFourToThree[y_face] + 2] == flow(y, y_face)            // Dist. to vertex 3
         ) {
             break;
         }
@@ -588,13 +620,16 @@ int insert_edge(struct graph *g, int index, int face, struct CuspTriangle *x, st
 
     // Insert new vertex
     if (i == g->nvertices) {
-        for (i = 0; g->vertexHomology[i][0] != -1; i++);
+        for (i = 0; i < g->nvertices && g->vertexHomology[i][0] != -1; i++);
+
+        if (i == g->nvertices)
+            return -1;
 
         g->vertexHomology[i][0] = y->tet->index;
         g->vertexHomology[i][1] = y->tetVertex;
         g->vertexHomology[i][y->edgesFourToThree[y_vertex1] + 2] = g->vertexHomology[index][x->edgesFourToThree[x_vertex1] + 2];
         g->vertexHomology[i][y->edgesFourToThree[y_vertex2] + 2] = g->vertexHomology[index][x->edgesFourToThree[x_vertex2] + 2];
-        g->vertexHomology[i][y->edgesFourToThree[face] + 2] = flow(y, face);
+        g->vertexHomology[i][y->edgesFourToThree[y_face] + 2] = flow(y, y_face);
     }
 
     // update_vertex_homology(g, index, i, x, y);
