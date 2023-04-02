@@ -84,7 +84,7 @@ int minCuspDistance(struct graph *, int);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
 struct CuspTriangle *findTriangle(Triangulation *, struct CuspTriangle **, int, int);
-void printDebugInfo(Triangulation *, struct CuspTriangle **, struct graph *);
+void printDebugInfo(Triangulation *, struct CuspTriangle **, struct graph *, int);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
 
