@@ -57,6 +57,8 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     }
 
     free_cusp_triangulation(manifold, pTriangle);
+    my_free(symp_eqns);
+    my_free(edge_eqns);
     *num_rows = edge_num_rows + symp_num_rows;
     return eqns;
 }
@@ -182,7 +184,10 @@ int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **pT
     init_cusp_triangulation(manifold, pTriangle);
     initialise_graph(&graph1, 12 * (2 * genus + 1) * manifold->num_tetrahedra, FALSE);
     construct_dual_graph(&graph1, manifold, pTriangle);
-    //printDebugInfo(manifold, pTriangle, NULL);
+    printDebugInfo(manifold, pTriangle, &graph1, 0);
+    printDebugInfo(manifold, pTriangle, &graph1, 1);
+    printDebugInfo(manifold, pTriangle, &graph1, 2);
+    printDebugInfo(manifold, pTriangle, &graph1, 3);
 
     // Dual Curve Equations
     for (i = 0; i < num_rows; i ++) {
@@ -259,7 +264,7 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
                    adjTri->tet->index,
                    adjTri->tetVertex
             );
-            printDebugInfo(manifold, pTriangle, graph1);
+             printDebugInfo(manifold, pTriangle, graph1, 1);
         }
 
         cuspEdge = (int) remaining_face[cuspVertex][tri->tetVertex];
@@ -274,7 +279,7 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
                    adjTri->tet->index,
                    adjTri->tetVertex
             );
-            printDebugInfo(manifold, pTriangle, graph1);
+             printDebugInfo(manifold, pTriangle, graph1, 1);
         }
 
         // Add vertices to the queue
@@ -296,7 +301,7 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
                        adjTri->tet->index,
                        adjTri->tetVertex
                        );
-                printDebugInfo(manifold, pTriangle, graph1);
+                 printDebugInfo(manifold, pTriangle, graph1, 1);
             }
 
             push(&stack, index1);
@@ -336,42 +341,93 @@ int minCuspDistance(struct graph *g, int index) {
  * Debug function for printing the gluing information
  */
 
-void printDebugInfo(Triangulation *manifold, struct CuspTriangle **pTriangle, struct graph *g) {
+void printDebugInfo(Triangulation *manifold, struct CuspTriangle **pTriangle, struct graph *g, int flag) {
     int i, j;
 
     struct CuspTriangle *tri;
+    struct edgenode *edge ;
 
-//    for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
-//        for (j = 0; j < 3; j++) {
-//            printf("Cusp Edge %d of Tet Vertex %d of Tet %d glues to Cusp Edge %d of Tet Vertex %d on Tet %d\n",
-//                   pTriangle[i]->edges[j],      // Cusp Edge
-//                   pTriangle[i]->tetVertex,     // Tet Vertex
-//                   pTriangle[i]->tet->index,    // Tet Index
-//                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->edges[j]),    // Cusp Edge
-//                   EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edges[j]], pTriangle[i]->tetVertex),     // Tet Vertex
-//                   pTriangle[i]->tet->neighbor[pTriangle[i]->edges[j]]->index);                             // Tet Index
-//        }
-//    }
-
-    for (i = 0; i < g->nvertices; i++) {
-        if (g->vertexHomology[i][0] == -1 || g->vertexHomology[i][1] == -1) {
-            tri = pTriangle[0];
-        } else {
-            tri = findTriangle(manifold, pTriangle, g->vertexHomology[i][0], g->vertexHomology[i][1]);
+    if (flag == 0) {
+        // Gluing Info
+        for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
+            for (j = 0; j < 3; j++) {
+                printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d glues to (Tet Index: %d, Tet Vertex: %d) Cusp Edge %d\n",
+                       pTriangle[i]->tet->index,               // Tet Index
+                       pTriangle[i]->tetVertex,                // Tet Vertex
+                       pTriangle[i]->edgesThreeToFour[j],      // Cusp Edge
+                       pTriangle[i]->tet->neighbor[pTriangle[i]->edgesThreeToFour[j]]->index,                                       // Tet Index
+                       EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edgesThreeToFour[j]], pTriangle[i]->tetVertex),             // Tet Vertex
+                       EVALUATE(pTriangle[i]->tet->gluing[pTriangle[i]->edgesThreeToFour[j]], pTriangle[i]->edgesThreeToFour[j])    // Cusp Edge
+                       );
+            }
         }
+    } else if (flag == 1) {
+        // Vertex Distance Info
+        for (i = 0; i < g->nvertices; i++) {
+            if (g->vertexHomology[i][0] == -1 || g->vertexHomology[i][1] == -1) {
+                tri = pTriangle[0];
+            } else {
+                tri = findTriangle(manifold, pTriangle, g->vertexHomology[i][0], g->vertexHomology[i][1]);
+            }
 
-        printf("Tet: %d, Tet Vertex: %d, Cusp Vertex %d dist: %d, Cusp Vertex %d dist: %d, Cusp Vertex %d dist: %d.\n",
-               g->vertexHomology[i][0],
-               g->vertexHomology[i][1],
-               tri->edgesThreeToFour[0],
-               g->vertexHomology[i][2],
-               tri->edgesThreeToFour[1],
-               g->vertexHomology[i][3],
-               tri->edgesThreeToFour[2],
-               g->vertexHomology[i][4]
-        );
+            printf("Tet Index: %d, Tet Vertex: %d, Cusp Vertex %d dist: %d, Cusp Vertex %d dist: %d, Cusp Vertex %d dist: %d.\n",
+                   g->vertexHomology[i][0],
+                   g->vertexHomology[i][1],
+                   tri->edgesThreeToFour[0],
+                   g->vertexHomology[i][2],
+                   tri->edgesThreeToFour[1],
+                   g->vertexHomology[i][3],
+                   tri->edgesThreeToFour[2],
+                   g->vertexHomology[i][4]
+            );
+        }
+    } else if (flag == 2) {
+        // Graph Info
+        for (i = 0; i < g->nvertices; i++) {
+            printf("Vertex %d (Tet Index: %d, Tet Vertex: %d): ", i, g->vertexHomology[i][0], g->vertexHomology[i][1]);
+            edge = g->edges[i];
+
+            if (edge == NULL) {
+                printf("no edges\n");
+            } else {
+                printf("%d", edge->y);
+                while ((edge = edge->next) != NULL) {
+                    printf(", %d", edge->y);
+                }
+                printf("\n");
+            }
+        }
+    } else if (flag == 3) {
+        // Homology Info
+        printf("Longitudinal\n");
+        for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
+            tri = pTriangle[i];
+            printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d: %d, Cusp Edge %d: %d, Cusp Edge %d: %d\n",
+                   tri->tet->index,
+                   tri->tetVertex,
+                   tri->edgesThreeToFour[0],
+                   tri->tet->curve[0][right_handed][tri->tetVertex][tri->edgesThreeToFour[0]],
+                   tri->edgesThreeToFour[1],
+                   tri->tet->curve[0][right_handed][tri->tetVertex][tri->edgesThreeToFour[1]],
+                   tri->edgesThreeToFour[2],
+                   tri->tet->curve[0][right_handed][tri->tetVertex][tri->edgesThreeToFour[2]]
+                );
+        }
+        printf("Meridian\n");
+        for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
+            tri = pTriangle[i];
+            printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d: %d, Cusp Edge %d: %d, Cusp Edge %d: %d\n",
+                   tri->tet->index,
+                   tri->tetVertex,
+                   tri->edgesThreeToFour[0],
+                   tri->tet->curve[1][right_handed][tri->tetVertex][tri->edgesThreeToFour[0]],
+                   tri->edgesThreeToFour[1],
+                   tri->tet->curve[1][right_handed][tri->tetVertex][tri->edgesThreeToFour[1]],
+                   tri->edgesThreeToFour[2],
+                   tri->tet->curve[1][right_handed][tri->tetVertex][tri->edgesThreeToFour[2]]
+                );
+        }
     }
-
     printf("-------------------------------\n");
 }
 
