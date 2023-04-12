@@ -74,12 +74,16 @@ void initialise_graph(struct graph *, int, bool);
 void free_graph(struct graph *);
 int insert_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
 void update_vertex_homology(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *);
+int edge_exists(struct graph *, int, int);
+int is_equal(int *, int *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
+void initialise_vertex(int *, int *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
 
 // Dual Graph
 void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
 void free_cusp_triangulation(Triangulation *, struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
 void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
+int is_center_vertex(struct graph *, struct CuspTriangle *, int);
 int minCuspDistance(struct graph *, int);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
