@@ -42,9 +42,6 @@ struct CuspVertex {
 struct CuspTriangle {
     Tetrahedron *tet;
     int tetVertex;
-    struct CuspVertex vertices[3];
-    int edgesThreeToFour[3];
-    int edgesFourToThree[4];
     struct CuspTriangle *neighbours[4];
 };
 
@@ -70,13 +67,12 @@ struct Node {
 };
 
 // Graph
-void initialise_graph(struct graph *, int, bool);
+void init_graph(struct graph *g, int maxVertices, bool directed);
 void free_graph(struct graph *);
 int insert_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
-void update_vertex_homology(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *);
 int edge_exists(struct graph *, int, int);
 int is_equal(int *, int *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
-void initialise_vertex(int *, int *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
+void init_vertex(int *holonomyX, int *holonomyY, struct CuspTriangle *x, struct CuspTriangle *y, int x_vertex1, int x_vertex2, int y_vertex1, int y_vertex2, int y_face, int dist);
 
 // Dual Graph
 void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
@@ -84,11 +80,10 @@ void free_cusp_triangulation(Triangulation *, struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
 void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
 int is_center_vertex(struct graph *, struct CuspTriangle *, int);
-int minCuspDistance(struct graph *, int);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
-struct CuspTriangle *findTriangle(Triangulation *, struct CuspTriangle **, int, int);
-void printDebugInfo(Triangulation *, struct CuspTriangle **, struct graph *, int);
+struct CuspTriangle *find_cusp_triangle(Triangulation *manifold, struct CuspTriangle **pTriangle, int tetIndex, int tetVertex);
+void print_debug_info(Triangulation *manifold, struct CuspTriangle **pTriangle, struct graph *g, int flag);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
 
@@ -109,7 +104,7 @@ int is_empty(struct Node *);
  * Graph for Breadth First Search
  */
 
-void initialise_search(struct graph *, bool *, bool *, int *);
+void init_search(struct graph *g, bool *processed, bool *discovered, int *parent);
 void bfs(struct graph *, int, bool *, bool *, int *);
 void process_vertex_early(int);
 void process_edge(int, int);
