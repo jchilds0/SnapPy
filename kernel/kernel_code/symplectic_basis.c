@@ -186,11 +186,11 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
         tri = find_cusp_triangle(manifold, pTriangle, graph1->vertexHomology[index][0],
                                  graph1->vertexHomology[index][1]);
 
-        if (tri->tetVertex == 0 && tri->tet->index == 0) {
+        if (!tri->tetVertex && !tri->tet->index) {
             // 2 vertices of dist 0
-            if ((graph1->vertexHomology[index][2] == 0 && graph1->vertexHomology[index][3] == 0) ||
-                    (graph1->vertexHomology[index][3] == 0 && graph1->vertexHomology[index][4] == 0) ||
-                    (graph1->vertexHomology[index][2] == 0 && graph1->vertexHomology[index][4] == 0)) {
+            if ((!graph1->vertexHomology[index][2] && !graph1->vertexHomology[index][3]) ||
+                    (!graph1->vertexHomology[index][3] && !graph1->vertexHomology[index][4]) ||
+                    (!graph1->vertexHomology[index][2] && !graph1->vertexHomology[index][4])) {
                 // Insert to all 3 edges
                 for (i = 0; i < 3; i++) {
                     cuspEdge = edgesThreeToFour[tri->tetVertex][i];
@@ -200,7 +200,7 @@ void construct_dual_graph(struct graph *graph1, Triangulation *manifold, struct 
             } else {
                 // 1 vertex of dist 0
                 for (i = 0; i < 3; i++) {
-                    if (graph1->vertexHomology[index][i + 2] == 0) {
+                    if (!graph1->vertexHomology[index][i + 2]) {
                         cuspEdge = (int) remaining_face[edgesThreeToFour[tri->tetVertex][i]][tri->tetVertex];
                         adjTri[0] = tri->neighbours[cuspEdge];
                         indices[0] = insert_edge(graph1, index, cuspEdge, tri, adjTri[0], directed);
@@ -277,7 +277,7 @@ void print_debug_info(Triangulation *manifold, struct CuspTriangle **pTriangle, 
     struct CuspTriangle *tri;
     struct edgenode *edge ;
 
-    if (flag == 0) {
+    if (!flag) {
         // Gluing Info
         for (i = 0; i < 4 * manifold->num_tetrahedra; i++) {
             for (j = 0; j < 3; j++) {
@@ -426,7 +426,7 @@ int visited(int **array, int *point, int lenArray, int lenPoint) {
                 equal = 0;
         }
 
-        if (equal == 1)
+        if (equal)
             return 1;
     }
 
@@ -599,7 +599,7 @@ int is_equal(int *holonomyX, int *holonomyY, struct CuspTriangle *x, struct Cusp
     distTriVertex2 = holonomyY[edgesFourToThree[y->tetVertex][y_vertex2] + 2] == holonomyX[edgesFourToThree[x->tetVertex][x_vertex2] + 2];
     distTriVertex3 = holonomyY[edgesFourToThree[y->tetVertex][y_face] + 2] == dist;
 
-    if (y->tet->index == 0 && y->tetVertex == 0 && holonomyY[2] != 0 && holonomyY[3] != 0 && holonomyY[4] != 0) {
+    if (!y->tet->index && !y->tetVertex && holonomyY[2] && holonomyY[3] && holonomyY[4]) {
         intersectFace = (holonomyY[5] == y_face);
     } else {
         intersectFace = TRUE;
@@ -617,7 +617,7 @@ void init_vertex(int *holonomyX, int *holonomyY, struct CuspTriangle *x, struct 
     holonomyY[edgesFourToThree[y->tetVertex][y_vertex2] + 2] = holonomyX[edgesFourToThree[x->tetVertex][x_vertex2] + 2];
     holonomyY[edgesFourToThree[y->tetVertex][y_face] + 2] = dist;
 
-    if (y->tet->index == 0 && y->tetVertex == 0 && holonomyY[2] != 0 && holonomyY[3] != 0 && holonomyY[4] != 0) {
+    if (!y->tet->index && !y->tetVertex && holonomyY[2] && holonomyY[3] && holonomyY[4]) {
         holonomyY[5] = y_face;
     }
 }
