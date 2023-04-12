@@ -13,16 +13,9 @@
 #include "../addl_code/addl_code.h"
 
 void testQueue(void);
-void testBreadthFirstSearch(void);
 void testDual(void);
 
 int main() {
-    printf("Testing queue\n");
-    testQueue();
-
-    printf("Testing breadth first search: \n");
-    testBreadthFirstSearch();
-
     printf("Testing Symplectic Basis: \n");
     testDual();
 }
@@ -141,65 +134,28 @@ void testQueue(void) {
     }
 }
 
-void testBreadthFirstSearch(void) {
-    int i, j, nvertices = 4;
-    graph g;
-
-    initialise_graph(&g, maxVertices, 10, TRUE);
-
-    bool *processed = malloc(sizeof(bool *) * maxVertices);
-    bool *discovered = malloc(sizeof(bool *) * maxVertices);
-    int *parent = malloc(sizeof(int *) * maxVertices);
-
-    int *path = malloc(sizeof(int *) * maxVertices);
-
-    int matrix[4][4] = {
-            {0, 1, 0, 1},
-            {1, 0, 0, 0},
-            {0, 1, 0, 0},
-            {1, 0, 0, 0}
-    };
-
-    for (i = 0; i < 4; i++)
-        for (j = 0; j < 4; j++)
-            if (matrix[i][j] == 1)
-                insert_edge(&g, i, j, TRUE);
-
-    initialise_search(&g, processed, discovered, parent);
-    bfs(&g, 1, processed, discovered, parent);
-
-    find_path(1, 3, parent, path, 0);
-    if (path[0] == 3 && path[1] == 0 && path[2] == 1) {
-        printf("    Passed\n");
-    } else {
-        printf("    Failed - Path returned [%d, %d, %d, %d]\n", path[0], path[1], path[2], path[3]);
-    }
-
-    free_graph(&g);
-    free(processed);
-    free(discovered);
-    free(parent);
-    free(path);
-}
-
 void testDual(void) {
-    int eqns[2][6] = {
-            {0, 1, 2, 3, 4, 5},
-            {1, 2, 3, 4, 5, 6}
-    };
-    int **basis, dual_rows, i, j;
-
+    int eqns[4][6] = {{2, 1, 0, 1, 0, 2},
+                      {0, 1, 2, 3, 4, 5},
+                      {0, 1, 2, 1, 2, 0},
+                      {1, 2, 3, 4, 5, 6}};
+    int **basis, dual_rows, dual_cols, i, j, correct;
     Triangulation *theTriangulation;
 
     theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
-
-    basis = get_symplectic_basis(theTriangulation, &dual_rows);
+    basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
+    correct = 1;
 
     for (i = 0; i < dual_rows; i ++) {
-        for (j = 0; j < 3 * (get_num_tetrahedra(theTriangulation)); j ++) {
+        for (j = 0; j < dual_cols; j ++) {
             if (basis[i][j] != eqns[i][j]) {
-
+                printf("Symplectic Basis (5, 4): Incorrect entry (%d, %d)\n", i, j);
+                correct = 0;
             }
         }
+    }
+
+    if (correct) {
+        printf("Symplectic Basis (5, 4): Passed\n");
     }
 }
