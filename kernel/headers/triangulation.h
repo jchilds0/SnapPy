@@ -182,7 +182,7 @@ struct EdgeClass
                         *real_edge_equation_im; /**< gluing_equations.c (used locally)        */
     Complex             edge_angle_sum;     /**< used locally in hyperbolic structures module   */
     Complex             target_angle_sum;   /**< used by MC -- force_tet_shapes                 */
-    int                 index;              /**< used locally for saving Triangulations to disk */
+    int                 index; /**< used locally for saving Triangulations to disk and in symplectic_basis */
     Real              intercusp_distance; /**< cusp_neighborhoods.c (used locally)            */
     EdgeClass           *prev;              /**< previous EdgeClass on doubly linked list       */
     EdgeClass           *next;              /**<   next   EdgeClass on doubly linked list       */
