@@ -33,7 +33,8 @@ typedef struct graph {
  */
 
 struct CuspVertex {
-    int index;
+    int edgeIndex;
+    int vertexIndex;
     EdgeClass *edge;
     int v1;
     int v2;
@@ -42,6 +43,7 @@ struct CuspVertex {
 struct CuspTriangle {
     Tetrahedron *tet;
     int tetVertex;
+    struct CuspVertex vertices[3];
     struct CuspTriangle *neighbours[4];
 };
 
@@ -69,23 +71,27 @@ struct Node {
 // Graph
 void init_graph(struct graph *g, int maxVertices, bool directed);
 void free_graph(struct graph *);
-int insert_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
+int insert_edge(struct graph *, int, int, bool);
 int edge_exists(struct graph *, int, int);
-int is_equal(int *, int *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
-void init_vertex(int *holonomyX, int *holonomyY, struct CuspTriangle *x, struct CuspTriangle *y, int x_vertex1, int x_vertex2, int y_vertex1, int y_vertex2, int y_face, int dist);
 
 // Dual Graph
 void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
-void free_cusp_triangulation(Triangulation *, struct CuspTriangle **);
+void cusp_vertex_index(struct CuspTriangle **);
+void walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
+void free_cusp_triangulation(struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
 void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
+int insert_triangle_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
+int is_equal(int *, int *, int, int, int, int, int, int, int, int, int);
+void init_vertex(int *, int *, int, int, int, int, int, int, int, int, int);
 int is_center_vertex(struct graph *, struct CuspTriangle *, int);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
-struct CuspTriangle *find_cusp_triangle(Triangulation *manifold, struct CuspTriangle **pTriangle, int tetIndex, int tetVertex);
-void print_debug_info(Triangulation *manifold, struct CuspTriangle **pTriangle, struct graph *g, int flag);
+struct CuspTriangle *find_cusp_triangle(struct CuspTriangle **pTriangle, int tetIndex, int tetVertex);
+void print_debug_info(struct CuspTriangle **pTriangle, struct graph *g, int flag);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
+void label_triangulation_edges(Triangulation *);
 
 // Queue
 void initialise_queue(struct Queue *, int);
