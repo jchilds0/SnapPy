@@ -80,7 +80,7 @@ void cusp_vertex_index(struct CuspTriangle **);
 void walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
 void free_cusp_triangulation(struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
-void construct_dual_graph(struct graph *, Triangulation *, struct CuspTriangle **);
+void construct_dual_graph(struct graph *, struct CuspTriangle **);
 int insert_triangle_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
 int is_equal(int *, int *, int, int, int, int, int, int, int, int, int);
 void init_vertex(int *, int *, int, int, int, int, int, int, int, int, int);
