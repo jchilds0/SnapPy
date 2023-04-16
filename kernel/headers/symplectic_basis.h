@@ -19,9 +19,17 @@ typedef struct edgenode {
     struct edgenode *next;
 } edgenode;
 
+typedef struct cuspnode {
+    struct CuspTriangle *tri;
+    int tetIndex;
+    int tetVertex;
+    int dist[3];
+    int adjTri[3];
+} cuspnode;
+
 typedef struct graph {
     struct edgenode **edges;
-    int **vertexHomology;     // [tet index, tet vertex, dist. to v0, dist. to v1, dist. to v2]
+    struct cuspnode **vertexData;
     int *degree;
     int nvertices;
     int nedges;
@@ -79,16 +87,16 @@ void init_cusp_triangulation(Triangulation *, struct CuspTriangle **);
 void cusp_vertex_index(struct CuspTriangle **);
 void walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
 void free_cusp_triangulation(struct CuspTriangle **);
-int **get_symplectic_equations(Triangulation *manifold, struct CuspTriangle **, int, int **);
+int **get_symplectic_equations(Triangulation *, struct CuspTriangle **, int, int **);
 void construct_dual_graph(struct graph *, struct CuspTriangle **);
 int insert_triangle_edge(struct graph *, int, int, struct CuspTriangle *, struct CuspTriangle *, bool);
-int is_equal(int *, int *, int, int, int, int, int, int, int, int, int);
-void init_vertex(int *, int *, int, int, int, int, int, int, int, int, int);
-int is_center_vertex(struct graph *, struct CuspTriangle *, int);
+int is_equal(struct cuspnode *, struct cuspnode *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
+void init_vertex(struct cuspnode *, struct cuspnode *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
+int is_center_vertex(struct cuspnode *);
 int flow(struct CuspTriangle *, int);
 int visited(int **, int *, int, int);
-struct CuspTriangle *find_cusp_triangle(struct CuspTriangle **pTriangle, int tetIndex, int tetVertex);
-void print_debug_info(struct CuspTriangle **pTriangle, struct graph *g, int flag);
+struct CuspTriangle *find_cusp_triangle(struct CuspTriangle **, int, int);
+void print_debug_info(struct CuspTriangle **, struct graph *, int);
 void remove_extra_edges(struct graph *);
 void add_misc_edges(struct graph *);
 void label_triangulation_edges(Triangulation *);
@@ -110,7 +118,7 @@ int is_empty(struct Node *);
  * Graph for Breadth First Search
  */
 
-void init_search(struct graph *g, bool *processed, bool *discovered, int *parent);
+void init_search(struct graph *, bool *, bool *, int *);
 void bfs(struct graph *, int, bool *, bool *, int *);
 void process_vertex_early(int);
 void process_edge(int, int);
