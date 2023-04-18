@@ -95,11 +95,17 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
         pTriangle[i]->tetVertex = i % 4;
 
         for (j = 0; j < 4; j++) {
-            pTriangle[i]->neighbours[j] = pTriangle[4 * (pTriangle[i]->tet->neighbor[j]->index)
-                                                    + EVALUATE(pTriangle[i]->tet->gluing[j], pTriangle[i]->tetVertex)];
+            if (pTriangle[i]->tetVertex == j) {
+                pTriangle[i]->neighbours[j] = NULL;
+            } else {
+                pTriangle[i]->neighbours[j] = pTriangle[4 * (pTriangle[i]->tet->neighbor[j]->index)
+                                                        + EVALUATE(pTriangle[i]->tet->gluing[j], pTriangle[i]->tetVertex)];
+            }
         }
 
         for (j = 0; j < 3; j++) {
+            pTriangle[i]->faces[j].index = -1;
+
             pTriangle[i]->vertices[j].v1 = pTriangle[i]->tetVertex;
             pTriangle[i]->vertices[j].v2 = edgesThreeToFour[pTriangle[i]->tetVertex][j];
             pTriangle[i]->vertices[j].edge = pTriangle[i]->tet->edge_class[
@@ -114,6 +120,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
     }
 
     cusp_vertex_index(pTriangle);
+    label_cusp_faces(pTriangle);
     print_debug_info(pTriangle, NULL, 4);
     return pTriangle;
 }
@@ -189,6 +196,42 @@ void walk_around_vertex(struct CuspTriangle **pTriangle, struct CuspTriangle *tr
     }
 }
 
+/*
+ * Label cusp faces
+ */
+
+void label_cusp_faces(struct CuspTriangle **pTriangle) {
+    int i, j, k = 0, face, vertex1, vertex2, adjVertex1, adjVertex2, adjFace;
+    struct CuspTriangle *tri;
+
+    for (i = 0; i < numCuspTriangles; i++) {
+        for (j = 0; j < 3; j++) {
+            if (pTriangle[i]->faces[j].index != -1) {
+                continue;
+            }
+
+            face = edgesThreeToFour[pTriangle[i]->tetVertex][j];
+            vertex1 = (int) remaining_face[pTriangle[i]->tetVertex][face];
+            vertex2 = (int) remaining_face[face][pTriangle[i]->tetVertex];
+
+            pTriangle[i]->faces[j].index = k;
+            pTriangle[4 * pTriangle[i]->tet->index + vertex1]->faces[j].index = k;
+            pTriangle[4 * pTriangle[i]->tet->index + vertex2]->faces[j].index = k;
+
+            tri = pTriangle[i]->neighbours[face];
+            adjFace = EVALUATE(pTriangle[i]->tet->gluing[face], face);
+            adjVertex1 = (int) remaining_face[tri->tetVertex][adjFace];
+            adjVertex2 = (int) remaining_face[adjFace][tri->tetVertex];
+
+            tri->faces[edgesFourToThree[tri->tetVertex][adjFace]].index = k;
+            pTriangle[4 * tri->tet->index + adjVertex1]->faces[edgesFourToThree[tri->tetVertex][adjFace]].index = k;
+            pTriangle[4 * tri->tet->index + adjVertex2]->faces[edgesFourToThree[tri->tetVertex][adjFace]].index = k;
+
+            k++;
+        }
+    }
+}
+
 // Free memory for cusp triangulation data structure
 void free_cusp_triangulation(struct CuspTriangle **pTriangle) {
     int i;
@@ -228,7 +271,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int **eqns
             eqns[i][j] = i + j;
     }
 
-    free_graph(graph1);
+    free_graph(graph1, TRUE);
     free_cusp_triangulation(pTriangle);
 
     return eqns;
@@ -598,18 +641,22 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, int flag
         // Edge indices
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
-            printf("(Tet Index: %d, Tet Vertex: %d) Cusp Vertex %d: (%d, %d), Cusp Vertex %d: (%d, %d), Cusp Vertex %d: (%d, %d)\n",
+            printf("(Tet Index: %d, Tet Vertex: %d) Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d), "
+                   "Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d), Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d)\n",
                    tri->tet->index,
                    tri->tetVertex,
                    edgesThreeToFour[tri->tetVertex][0],
                    tri->vertices[0].edgeIndex,
                    tri->vertices[0].vertexIndex,
+                   tri->faces[0].index,
                    edgesThreeToFour[tri->tetVertex][1],
                    tri->vertices[1].edgeIndex,
                    tri->vertices[1].vertexIndex,
+                   tri->faces[1].index,
                    edgesThreeToFour[tri->tetVertex][2],
                    tri->vertices[2].edgeIndex,
-                   tri->vertices[2].vertexIndex
+                   tri->vertices[2].vertexIndex,
+                   tri->faces[2].index
             );
         }
     }
@@ -769,7 +816,9 @@ int is_empty(struct Node *stack) {
     return stack->item == -1;
 }
 
-// Breadth First Search
+// ---------------------------------------------------------
+
+// Graph
 
 /*
  * Initialise Graph
@@ -785,15 +834,15 @@ struct Graph *init_graph(int maxVertices, bool directed) {
     g->nedges = 0;
     g->directed = directed;
 
-    g->edges = NEW_ARRAY(maxVertices, EdgeNode *);
+    g->edges = NEW_ARRAY(maxVertices, struct EdgeNode *);
     g->degree = NEW_ARRAY(maxVertices, int);
-    g->vertexData = NEW_ARRAY(maxVertices, CuspNode *);
+    g->vertexData = NEW_ARRAY(maxVertices, struct CuspNode *);
 
     for (i = 0; i < maxVertices; i++) {
         g->degree[i] = 0;
         g->edges[i] = NULL;
 
-        g->vertexData[i] = malloc(sizeof( CuspNode ));
+        g->vertexData[i] = malloc(sizeof( struct CuspNode ));
         g->vertexData[i]->adjTri[0] = 0;
         g->vertexData[i]->adjTri[1] = 0;
         g->vertexData[i]->adjTri[2] = 0;
@@ -813,12 +862,13 @@ struct Graph *init_graph(int maxVertices, bool directed) {
  * Free the memory of the graph data structure
  */
 
-void free_graph(struct Graph *g) {
+void free_graph(struct Graph *g, bool vertexData) {
     int i;
     struct EdgeNode *edge;
 
     for (i = 0; i < g->nvertices; i++) {
-        free(g->vertexData[i]);
+        if (vertexData)
+            free(g->vertexData[i]);
 
         while (g->edges[i] != NULL) {
             if (g->edges[i]->next == NULL) {
@@ -845,9 +895,9 @@ void free_graph(struct Graph *g) {
  */
 
 int insert_edge(struct Graph *g, int x, int y, bool directed) {
-    EdgeNode *p;
+    struct EdgeNode *p;
 
-    p = malloc(sizeof( EdgeNode ));
+    p = malloc(sizeof( struct EdgeNode ));
     p->y = y;
     p->next = g->edges[x];
 
@@ -918,6 +968,108 @@ int edge_exists(struct Graph *g, int v1, int v2) {
     return FALSE;
 }
 
+// Graph Splitting
+
+/*
+ * Split Along Path
+ *
+ * Given a graph graph1, add to each vertex 3 valence vertices and then join the
+ * valence vertices such that there does not exist an edge crossing the path.
+ * We identify valence vertices by the vertex of the cusp triangle they are
+ * adjacent to.
+ */
+
+struct Graph *split_along_path(struct Graph *graph1, int *path, int pathLen) {
+    struct Graph *graph2 = init_graph(4 * graph1->nvertices, graph1->directed);
+
+    init_vertices(graph1, graph2);
+    add_non_path_edges(graph1, graph2, path, pathLen);
+    add_path_edges(graph1, graph2, path, pathLen);
+
+    free_graph(graph1, FALSE);
+
+    return graph1;
+}
+
+/*
+ * Initialise Vertices
+ *
+ * Set the vertex data for the valence vertices.
+ */
+
+void init_vertices(struct Graph *graph1, struct Graph *graph2) {
+    int i, j;
+
+    for (i = 0; i < graph1->nvertices; i++)
+        for (j = 0; j < 4; j++)
+            graph2->vertexData[4 * i + j] = graph1->vertexData[i];
+}
+
+/*
+ * Add Non Path Edges
+ *
+ * For vertices not in the path, each of the valence vertices connects
+ * to the central vertex and to the valence vertices of adjacent vertices
+ */
+
+void add_non_path_edges(struct Graph *graph1, struct Graph *graph2, int *path, int pathLen) {
+    int i, j;
+
+    for (i = 0; i < graph1->nvertices; i++) {
+        if (inclusion(path, pathLen, i)) {
+            continue;
+        }
+
+        for (j = 1; j < 3; j++)
+            insert_edge(graph2, 4 * i, 4 * i + j, graph2->directed);
+    }
+}
+
+/*
+ * Add Path Edges
+ *
+ * For vertices on the path, we consider the two cases of the vertex connecting to
+ * two vertices on the path (in the middle) or connecting to one vertex (end points).
+ * In the latter case we treat them the same as vertices not on the path.
+ */
+
+void add_path_edges(struct Graph *graph1, struct Graph *graph2, int *path, int pathLen) {
+    int i;
+
+    for (i = 0; i < pathLen; i++) {
+        if (i == 0 || i == pathLen - 1) {
+            // Case 1: deg 1 in the path
+
+        } else {
+            // Case 2: deg 2 in the path
+
+        }
+    }
+}
+
+/*
+ * Inclusion
+ *
+ * Check if the target is in the array
+ */
+
+bool inclusion(int *array, int arrayLen, int target) {
+    int i;
+
+    for (i = 0; i < arrayLen; i++) {
+        if (array[i] == target) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+// ---------------------------------------------------------------
+
+// Breadth First Search
+
 /*
  * Initialise Search
  *
@@ -943,7 +1095,7 @@ void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent
 void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *parent) {
     struct Queue q;
     int v, y;
-    EdgeNode *p;
+    struct EdgeNode *p;
 
     initialise_queue(&q, 10);
     enqueue(&q, start);

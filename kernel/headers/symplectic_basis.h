@@ -14,31 +14,35 @@
  * Graph
  */
 
-typedef struct EdgeNode {
+struct EdgeNode {
     int y;
     struct EdgeNode *next;
-} EdgeNode;
+};
 
-typedef struct CuspNode {
-    struct CuspTriangle *tri;
-    int tetIndex;
-    int tetVertex;
-    int dist[3];        // Distance to cuspVertex
-    int adjTri[3];      // Indicates the cusp triangle sides that can be reached
-} CuspNode;
-
-typedef struct Graph {
+struct Graph {
     struct EdgeNode **edges;
     struct CuspNode **vertexData;
     int *degree;
     int nvertices;
     int nedges;
     int directed;
-} Graph;
+};
 
 /**
  * Cusp Triangulation
  */
+
+struct CuspNode {
+    struct CuspTriangle *tri;
+    int tetIndex;
+    int tetVertex;
+    int dist[3];        // Distance to cuspVertex
+    int adjTri[3];      // Indicates the cusp triangle sides that can be reached
+};
+
+struct CuspFace {
+    int index;
+};
 
 struct CuspVertex {
     int edgeIndex;
@@ -52,6 +56,7 @@ struct CuspTriangle {
     Tetrahedron *tet;
     int tetVertex;
     struct CuspVertex vertices[3];
+    struct CuspFace faces[3];
     struct CuspTriangle *neighbours[4];
 };
 
@@ -78,14 +83,22 @@ struct Node {
 
 // Graph
 struct Graph *init_graph(int maxVertices, bool directed);
-void free_graph(struct Graph *);
+void free_graph(struct Graph *, bool);
 int insert_edge(struct Graph *, int, int, bool);
 int edge_exists(struct Graph *, int, int);
+
+// Graph Splitting
+struct Graph *split_along_path(struct Graph *, int *, int);
+void init_vertices(struct Graph *, struct Graph *);
+void add_non_path_edges(struct Graph *, struct Graph *, int *, int);
+void add_path_edges(struct Graph *, struct Graph *, int *, int);
+bool inclusion(int *, int, int);
 
 // Dual Graph
 struct CuspTriangle **init_cusp_triangulation(Triangulation *);
 void cusp_vertex_index(struct CuspTriangle **);
 void walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
+void label_cusp_faces(struct CuspTriangle **);
 void free_cusp_triangulation(struct CuspTriangle **);
 int **get_symplectic_equations(Triangulation *, int, int **);
 void construct_dual_graph(struct Graph *, struct CuspTriangle **);
