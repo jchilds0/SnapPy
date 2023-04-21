@@ -21,7 +21,7 @@ struct EdgeNode {
 
 struct Graph {
     struct EdgeNode **edges;
-    struct CuspNode **vertexData;
+    int *vertexData;
     int *degree;
     int nvertices;
     int nedges;
@@ -81,59 +81,71 @@ struct Node {
     struct Node *next;
 };
 
+extern void             find_standard_basepoint(Triangulation *manifold, Cusp *cusp);
+
 // Graph
-struct Graph *init_graph(int maxVertices, bool directed);
-void free_graph(struct Graph *, bool);
-int insert_edge(struct Graph *, int, int, bool);
-int edge_exists(struct Graph *, int, int);
+struct Graph            *init_graph(int maxVertices, bool directed);
+void                    free_graph(struct Graph *);
+int                     insert_edge(struct Graph *, int, int, bool);
+void                    delete_edge(struct Graph *, int, int, bool);
+int                     edge_exists(struct Graph *, int, int);
 
 // Graph Splitting
-struct Graph *split_along_path(struct Graph *, int *, int);
-void init_vertices(struct Graph *, struct Graph *);
-void add_non_path_edges(struct Graph *, struct Graph *, int *, int);
-void add_path_edges(struct Graph *, struct Graph *, int *, int);
-bool inclusion(int *, int, int);
+struct Graph            *split_along_path(struct Graph *, int *, int);
+void                    init_vertices(struct Graph *, struct Graph *, int *, int);
+void                    add_non_path_edges(struct Graph *, struct Graph *, int *, int);
+void                    add_path_edges(struct Graph *, struct Graph *, int *, int);
+bool                    inclusion(int *, int, int);
+struct CuspNode         *duplicate(struct CuspNode *);
 
 // Dual Graph
-struct CuspTriangle **init_cusp_triangulation(Triangulation *);
-void cusp_vertex_index(struct CuspTriangle **);
-void walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
-void label_cusp_faces(struct CuspTriangle **);
-void free_cusp_triangulation(struct CuspTriangle **);
-int **get_symplectic_equations(Triangulation *, int, int **);
-void construct_dual_graph(struct Graph *, struct CuspTriangle **);
-int insert_triangle_edge(struct Graph *, int, int, struct CuspTriangle *, struct CuspTriangle *);
-int is_equal(struct CuspNode *, struct CuspNode *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
-void init_vertex(struct CuspNode *, struct CuspNode *, struct CuspTriangle *, struct CuspTriangle *, int, int, int, int, int, int);
-int is_center_vertex(struct CuspNode *);
-int flow(struct CuspTriangle *, int);
-int visited(int **, int *, int, int);
-struct CuspTriangle *find_cusp_triangle(struct CuspTriangle **, int, int);
-void print_debug_info(struct CuspTriangle **, struct Graph *, int);
-void remove_extra_edges(struct Graph *);
-void add_misc_edges(struct Graph *);
-void label_triangulation_edges(Triangulation *);
+struct CuspTriangle     **init_cusp_triangulation(Triangulation *);
+void                    cusp_vertex_index(struct CuspTriangle **);
+void                    walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
+void                    label_cusp_faces(struct CuspTriangle **);
+void                    free_cusp_triangulation(struct CuspTriangle **);
+int                     **get_symplectic_equations(Triangulation *, int, int, int);
+void                    construct_dual_graph(Triangulation *, struct Graph *, struct CuspTriangle **, struct CuspNode **);
+int                     insert_triangle_edge(struct Graph *, int, int, struct CuspTriangle *, struct CuspTriangle *,
+        struct CuspNode **);
+int                     is_equal(struct CuspNode *, struct CuspNode *, struct CuspTriangle *, struct CuspTriangle *,
+        int, int, int, int, int, int);
+void                    init_vertex(struct CuspNode *, struct CuspNode *, struct CuspTriangle *, struct CuspTriangle *,
+        int, int, int, int, int, int);
+int                     is_center_vertex(struct CuspNode *);
+int                     flow(struct CuspTriangle *, int);
+int                     visited(int **, int *, int, int);
+struct CuspTriangle     *find_cusp_triangle(struct CuspTriangle **, int, int);
+void                    print_debug_info(struct CuspTriangle **, struct Graph *, struct CuspNode **, int **, int *, int);
+void                    label_triangulation_edges(Triangulation *);
+struct Graph            *construct_dual_curves(struct Graph *, struct CuspTriangle **, struct CuspNode **,
+        int, int **, int *);
+void                    find_index(struct Graph *, struct CuspNode **, int, int *, int *);
+void                    remove_extra_edges(struct Graph *, struct CuspNode **, int **, int, int);
+void                    add_edges_from_array(struct Graph *, int **, int);
+void                    find_holonomies(struct Graph *, int **, int **, int *);
+void                    find_path_holonomy(struct Graph *, int *, int *, int);
 
 // Queue
-void initialise_queue(struct Queue *, int);
-struct Queue *enqueue(struct Queue *, int);
-int dequeue(struct Queue *);
-void resize_queue(struct Queue *);
-int empty_queue(struct Queue *);
-void free_queue(struct Queue *);
+void                    initialise_queue(struct Queue *, int);
+struct Queue            *enqueue(struct Queue *, int);
+int                     dequeue(struct Queue *);
+void                    resize_queue(struct Queue *);
+int                     empty_queue(struct Queue *);
+void                    free_queue(struct Queue *);
 
 // Stack
-void push(struct Node *, int);
-int pop(struct Node *);
-int is_empty(struct Node *);
+void                    push(struct Node *, int);
+int                     pop(struct Node *);
+int                     is_empty(struct Node *);
 
 /**
  * Graph for Breadth First Search
  */
 
-void init_search(struct Graph *, bool *, bool *, int *);
-void bfs(struct Graph *, int, bool *, bool *, int *);
-void process_vertex_early(int);
-void process_edge(int, int);
-void process_vertex_late(int);
-void find_path(int, int, int *, int *, int);
+void                    init_search(struct Graph *, bool *, bool *, int *);
+void                    bfs(struct Graph *, int, bool *, bool *, int *);
+void                    process_vertex_early(int);
+void                    process_edge(int, int);
+void                    process_vertex_late(int);
+void                    find_path(int, int, int *, int *, int, int *);
