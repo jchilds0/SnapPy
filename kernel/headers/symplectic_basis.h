@@ -102,7 +102,6 @@ bool                    inclusion(int *, int, int);
 struct CuspTriangle     **init_cusp_triangulation(Triangulation *);
 void                    cusp_vertex_index(struct CuspTriangle **);
 void                    walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
-void                    label_cusp_faces(struct CuspTriangle **);
 void                    free_cusp_triangulation(struct CuspTriangle **);
 int                     **get_symplectic_equations(Triangulation *, int, int, int);
 void                    construct_dual_graph(Triangulation *, struct Graph *, struct CuspTriangle **, struct CuspNode **);
@@ -120,8 +119,6 @@ void                    label_triangulation_edges(Triangulation *);
 struct Graph            *construct_dual_curves(struct Graph *, struct CuspTriangle **, struct CuspNode **,
         int, int **, int *);
 void                    find_index(struct Graph *, struct CuspNode **, int, int *, int *);
-void                    remove_extra_edges(struct Graph *, struct CuspNode **, int **, int, int);
-void                    add_edges_from_array(struct Graph *, int **, int);
 void                    find_holonomies(struct Graph *, struct CuspNode **, int **, int **, int *);
 void                    find_path_holonomy(struct Graph *, struct CuspNode **, int *, int *, int);
 int                     inside_vertex(struct CuspNode *, int, int, int);
