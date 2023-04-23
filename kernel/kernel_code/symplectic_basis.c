@@ -10,8 +10,8 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
-#include "addl_code.h"                  // compile snappy
-//#include "../addl_code/addl_code.h"     // compile kernel
+//#include "addl_code.h"                  // compile snappy
+#include "../addl_code/addl_code.h"     // compile kernel
 
 #define atleast_two(a, b, c)    (a && b) || (a && c) || (b && c)
 
@@ -272,13 +272,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     graph1 = construct_dual_curves(graph1, pTriangle, vertexData, e0, dualCurve, dualCurveLen);
     find_holonomies(graph1, vertexData, symp_eqns, dualCurve, dualCurveLen);
 
-//    print_debug_info(pTriangle, graph1, vertexData, dualCurve, dualCurveLen, 5);
-
-//    // Dual Curve Equations
-//    for (i = 0; i < num_rows; i ++) {
-//        for (j = 0; j < 3 * T; j ++)
-//            symp_eqns[i][j] = i + j;
-//    }
+    print_debug_info(pTriangle, graph1, vertexData, dualCurve, dualCurveLen, 5);
 
     free_graph(graph1);
     free_cusp_triangulation(pTriangle);
@@ -366,15 +360,15 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
 
 
         for (i = 0; i < 3; i++) {
-//            if (indices[i] == -1) {
-//                printf("Inserting edge from triangle (%d, %d) to triangle (%d, %d) failed\n",
-//                       node->tri->tet->index,
-//                       node->tetVertex,
-//                       adjTri[i]->tet->index,
-//                       adjTri[i]->tetVertex
-//                );
-//                print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 2);
-//            }
+            if (indices[i] == -1) {
+                printf("Inserting edge from triangle (%d, %d) to triangle (%d, %d) failed\n",
+                       node->tri->tet->index,
+                       node->tetVertex,
+                       adjTri[i]->tet->index,
+                       adjTri[i]->tetVertex
+                );
+                print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 2);
+            }
 
             if (!visited[indices[i]] && indices[i] != -2)
                 push(&stack, indices[i]);
@@ -756,8 +750,6 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
         if (i == e0)
             continue;
 
-        //remove_extra_edges(g, i, e0);
-
         find_index(g, vertexData, i, &startIndex, &startDualIndex);
         find_index(g, vertexData, e0, &endIndex, &endDualIndex);
 
@@ -770,7 +762,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, path, pathLen);
-//        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
+        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
 
         // Reallocate memory
         my_free(processed);
@@ -790,9 +782,8 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, path, pathLen);
-//        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
+        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
 
-        //add_edges_from_array(g, edges);
         // Re allocate memory
         my_free(processed);
         my_free(discovered);
@@ -849,83 +840,6 @@ void find_index(struct Graph *g, struct CuspNode **vertexData, int edgeClass, in
                 return;
             }
         }
-    }
-}
-
-/* Remove Extra Edges
- *
- * Remove edges associated to the curves that dive into the
- * manifold since we can only do this once.
- */
-
-void remove_extra_edges(struct Graph *g, struct CuspNode **vertexData, int **retval, int startEdgeClass, int endEdgeClass) {
-    int i, j, startCuspVertex, endCuspVertex, startIndex, endIndex, startDualIndex, endDualIndex;
-
-    // Find the indices of the start and end cusp vertices
-    for (i = 0; i < g->nvertices; i++) {
-        for (j = 0; j < 3; j++) {
-            if (vertexData[g->vertexData[i]]->tri->vertices[j].edgeIndex == startEdgeClass &&
-            vertexData[g->vertexData[i]]->tri->vertices[j].vertexIndex == 0) {
-                startIndex = i;
-                startCuspVertex = j;
-            }
-
-            if (vertexData[g->vertexData[i]]->tri->vertices[j].edgeIndex == endEdgeClass &&
-            vertexData[g->vertexData[i]]->tri->vertices[j].vertexIndex == 0) {
-                endIndex = i;
-                endCuspVertex = j;
-            }
-        }
-    }
-
-    // Find the corresponding start and end vertices for the second half of the dual curve
-    for (i = 0; i < g->nvertices; i++) {
-        for (j = 0; j < 3; j++) {
-            if (vertexData[g->vertexData[i]]->tri->vertices[j].edgeIndex == startEdgeClass &&
-            vertexData[g->vertexData[i]]->tri->vertices[j].vertexIndex == 1 &&
-            vertexData[g->vertexData[i]]->tetVertex == startCuspVertex &&
-            j == vertexData[g->vertexData[startIndex]]->tetVertex) {
-                startDualIndex = i;
-            }
-
-            if (vertexData[g->vertexData[i]]->tri->vertices[j].edgeIndex == endEdgeClass &&
-                vertexData[g->vertexData[i]]->tri->vertices[j].vertexIndex == 1 &&
-                vertexData[g->vertexData[i]]->tetVertex == endCuspVertex &&
-                j == vertexData[g->vertexData[endIndex]]->tetVertex) {
-                endDualIndex = j;
-            }
-        }
-    }
-
-    /*
-     * The dual cusp triangle is linked to the start one as follows:
-     * tri->tetVertex = dualTriCuspVertex
-     * triCuspVertex = dualTri->tetVertex
-     */
-
-    int startVertex1, startVertex2, endVertex1, endVertex2;
-
-    startVertex1 = (int) remaining_face[vertexData[g->vertexData[startIndex]]->tetVertex]
-            [edgesThreeToFour[vertexData[g->vertexData[startIndex]]->tetVertex][startCuspVertex]];
-    startVertex1 = (int) remaining_face[edgesThreeToFour[vertexData[g->vertexData[startIndex]]->tetVertex][startCuspVertex]]
-            [vertexData[g->vertexData[startIndex]]->tetVertex];
-    endVertex1 = (int) remaining_face[vertexData[g->vertexData[endIndex]]->tetVertex]
-            [edgesThreeToFour[vertexData[g->vertexData[endIndex]]->tetVertex][endCuspVertex]];
-    endVertex1 = (int) remaining_face[edgesThreeToFour[vertexData[g->vertexData[endIndex]]->tetVertex][endCuspVertex]]
-            [vertexData[g->vertexData[endIndex]]->tetVertex];
-}
-
-/* Add Edges
- *
- * Add the edges from an array back to the graph
- * Used to undo remove extra edges.
- */
-
-void add_edges_from_array(struct Graph *graph1, int **edges, int numEdges) {
-    int i;
-
-    for (i = 0; i < numEdges; i++) {
-        insert_edge(graph1, edges[i][0], edges[i][1], graph1->directed);
     }
 }
 
@@ -1405,7 +1319,7 @@ void process_vertex_early(int v) {
 }
 
 void process_edge(int x, int y) {
-//    printf("    Processed edge (%d, %d)\n", x, y);
+    printf("    Processed edge (%d, %d)\n", x, y);
 }
 
 void process_vertex_late(int v) {
