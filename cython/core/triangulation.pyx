@@ -3041,17 +3041,18 @@ cdef class Triangulation():
         """
         cdef int **c_eqns;
         cdef int **g_eqns;
-        cdef int num_rows, num_cols, dual_rows
-        cdef int* eqn
+        cdef int num_rows, num_cols, dual_rows;
+        cdef int* eqn;
 
         if self.c_triangulation is NULL:
             raise ValueError('The Triangulation is empty.')
 
+        eqns = []
         # Edge Equations
-        c_eqns = get_gluing_equations(self.c_triangulation, &num_rows, &num_cols)
-        eqns = [ [ c_eqns[i][j] for j in range(num_cols) ] for i in range(num_rows) ]
+        # c_eqns = get_gluing_equations(self.c_triangulation, &num_rows, &num_cols)
+        # eqns = [ [ c_eqns[i][j] for j in range(num_cols) ] for i in range(num_rows) ]
 
-        free_gluing_equations(c_eqns, num_rows)
+        # free_gluing_equations(c_eqns, num_rows)
 
         # Cusp Equations
         for i in range(self.num_cusps()):
@@ -3067,7 +3068,7 @@ cdef class Triangulation():
                 free_cusp_equation(eqn)
 
         # Dual Curve Equations
-        g_eqns = get_symplectic_basis(self.c_triangulation, &dual_rows)
+        g_eqns = get_symplectic_basis(self.c_triangulation, &dual_rows, &num_cols)
 
         for i in range(dual_rows):
             eqns.append([g_eqns[i][j] for j in range(num_cols)])
