@@ -36,8 +36,8 @@
 #ifndef _SnapPea_
 #define _SnapPea_
 
-#include "../real_type/real_type.h"          // compile kernel
-//#include "real_type.h"                         // compile snappy
+//#include "../real_type/real_type.h"          // compile kernel
+#include "real_type.h"                         // compile snappy
 
 #include "kernel_namespace.h"
 

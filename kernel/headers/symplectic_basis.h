@@ -97,7 +97,6 @@ void                    init_vertices(struct Graph *, struct Graph *, int *, int
 void                    add_non_path_edges(struct Graph *, struct Graph *, int *, int);
 void                    add_path_edges(struct Graph *, struct Graph *, int *, int);
 bool                    inclusion(int *, int, int);
-struct CuspNode         *duplicate(struct CuspNode *);
 
 // Dual Graph
 struct CuspTriangle     **init_cusp_triangulation(Triangulation *);
@@ -115,7 +114,6 @@ void                    init_vertex(struct CuspNode *, struct CuspNode *, struct
         int, int, int, int, int, int);
 int                     is_center_vertex(struct CuspNode *);
 int                     flow(struct CuspTriangle *, int);
-int                     visited(int **, int *, int, int);
 struct CuspTriangle     *find_cusp_triangle(struct CuspTriangle **, int, int);
 void                    print_debug_info(struct CuspTriangle **, struct Graph *, struct CuspNode **, int **, int *, int);
 void                    label_triangulation_edges(Triangulation *);
