@@ -10,8 +10,8 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
-//#include "addl_code.h"                  // SnapPy compiling
-#include "../addl_code/addl_code.h"     // kernel compiling
+#include "addl_code.h"                  // compile snappy
+//#include "../addl_code/addl_code.h"     // compile kernel
 
 #define atleast_two(a, b, c)    (a && b) || (a && c) || (b && c)
 
@@ -762,6 +762,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
         find_index(g, vertexData, e0, &endIndex, &endDualIndex);
 
         // Find path using bfs
+        init_search(g, processed, discovered, parent);
         bfs(g, startIndex, processed, discovered, parent);
         find_path(startIndex, endIndex, parent, path, 0, &pathLen);
         dualCurves[2 * i] = path;
@@ -781,6 +782,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
         path = NEW_ARRAY(g->nvertices, int);
 
         // Repeat for the other half of the curve
+        init_search(g, processed, discovered, parent);
         bfs(g, startDualIndex, processed, discovered, parent);
         find_path(startDualIndex, endDualIndex, parent, path, 0, &pathLen);
         dualCurves[2 * i + 1] = path;
@@ -1338,22 +1340,6 @@ bool inclusion(int *array, int arrayLen, int target) {
     return FALSE;
 }
 
-struct CuspNode *duplicate(struct CuspNode *node) {
-    int i;
-    struct CuspNode *newNode = NEW_STRUCT(struct CuspNode);
-
-    newNode->tri = node->tri;
-    newNode->tetIndex = node->tetIndex;
-    newNode->tetVertex = node->tetVertex;
-
-    for (i = 0; i < 3; i++) {
-        newNode->dist[i] = node->dist[i];
-        newNode->adjTri[i] = node->dist[i];
-    }
-
-    return newNode;
-}
-
 
 // ---------------------------------------------------------------
 
@@ -1368,7 +1354,7 @@ struct CuspNode *duplicate(struct CuspNode *node) {
 void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent) {
     int i;
 
-    for (i = 0; i <= g->nvertices; i ++) {
+    for (i = 0; i < g->nvertices; i ++) {
         processed[i] = false;
         discovered[i] = false;
         parent[i] = -1;
@@ -1419,7 +1405,7 @@ void process_vertex_early(int v) {
 }
 
 void process_edge(int x, int y) {
-    printf("    Processed edge (%d, %d)\n", x, y);
+//    printf("    Processed edge (%d, %d)\n", x, y);
 }
 
 void process_vertex_late(int v) {
