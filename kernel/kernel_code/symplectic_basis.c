@@ -10,7 +10,8 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
-#include "../addl_code/addl_code.h"
+//#include "addl_code.h"                  // SnapPy compiling
+#include "../addl_code/addl_code.h"     // kernel compiling
 
 #define atleast_two(a, b, c)    (a && b) || (a && c) || (b && c)
 
@@ -85,7 +86,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
     struct CuspTriangle **pTriangle = NEW_ARRAY(numCuspTriangles, struct CuspTriangle *);
 
     for (i = 0; i < numCuspTriangles; i++)
-        pTriangle[i] = malloc(sizeof( struct CuspTriangle ));
+        pTriangle[i] = NEW_STRUCT(struct CuspTriangle);
 
     label_triangulation_edges(manifold);
 
@@ -120,7 +121,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
 
     cusp_vertex_index(pTriangle);
     //label_cusp_faces(pTriangle);
-    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 4);
+    //print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 4);
     return pTriangle;
 }
 
@@ -149,7 +150,9 @@ void label_triangulation_edges(Triangulation *manifold) {
  */
 
 void cusp_vertex_index(struct CuspTriangle **pTriangle) {
-    int i, j, currentIndex[numEdgeClasses];
+    int i, j;
+
+    int *currentIndex = NEW_ARRAY(numEdgeClasses, int);
     
     for (i = 0; i < numEdgeClasses; i++) 
         currentIndex[i] = 0;
@@ -165,6 +168,8 @@ void cusp_vertex_index(struct CuspTriangle **pTriangle) {
             currentIndex[pTriangle[i]->vertices[j].edgeIndex]++;
         }
     }
+
+    my_free(currentIndex);
 }
 
 /*
@@ -200,7 +205,7 @@ void free_cusp_triangulation(struct CuspTriangle **pTriangle) {
     int i;
 
     for (i = 0; i < numCuspTriangles; i++)
-        free(pTriangle[i]);
+        my_free(pTriangle[i]);
 
     my_free(pTriangle);
 }
@@ -254,23 +259,26 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
         vertexData[i]->dist[2] = -1;
         vertexData[i]->tetVertex = -1;
         vertexData[i]->tetIndex = -1;
+        vertexData[i]->adjNodes[0] = -1;
+        vertexData[i]->adjNodes[1] = -1;
+        vertexData[i]->adjNodes[2] = -1;
     }
 
     construct_dual_graph(manifold, graph1, pTriangle, vertexData);
-    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 0);
-    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 2);
-    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 3);
+//    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 0);
+//    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 2);
+//    print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 3);
 
     graph1 = construct_dual_curves(graph1, pTriangle, vertexData, e0, dualCurve, dualCurveLen);
-    find_holonomies(graph1, symp_eqns, dualCurve, dualCurveLen);
+    find_holonomies(graph1, vertexData, symp_eqns, dualCurve, dualCurveLen);
 
-    print_debug_info(pTriangle, graph1, vertexData, dualCurve, dualCurveLen, 5);
+//    print_debug_info(pTriangle, graph1, vertexData, dualCurve, dualCurveLen, 5);
 
-    // Dual Curve Equations
-    for (i = 0; i < num_rows; i ++) {
-        for (j = 0; j < 3 * T; j ++)
-            symp_eqns[i][j] = i + j;
-    }
+//    // Dual Curve Equations
+//    for (i = 0; i < num_rows; i ++) {
+//        for (j = 0; j < 3 * T; j ++)
+//            symp_eqns[i][j] = i + j;
+//    }
 
     free_graph(graph1);
     free_cusp_triangulation(pTriangle);
@@ -318,7 +326,7 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
     struct Node stack;
     stack.item = -1;
 
-    int visited[graph1->nvertices];
+    int *visited = NEW_ARRAY(graph1->nvertices, int);
 
     for (i = 0; i < graph1->nvertices; i++)
         visited[i] = 0;
@@ -358,15 +366,15 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
 
 
         for (i = 0; i < 3; i++) {
-            if (indices[i] == -1) {
-                printf("Inserting edge from triangle (%d, %d) to triangle (%d, %d) failed\n",
-                       node->tri->tet->index,
-                       node->tetVertex,
-                       adjTri[i]->tet->index,
-                       adjTri[i]->tetVertex
-                );
-                print_debug_info(pTriangle, graph1, NULL, NULL, NULL, 2);
-            }
+//            if (indices[i] == -1) {
+//                printf("Inserting edge from triangle (%d, %d) to triangle (%d, %d) failed\n",
+//                       node->tri->tet->index,
+//                       node->tetVertex,
+//                       adjTri[i]->tet->index,
+//                       adjTri[i]->tetVertex
+//                );
+//                print_debug_info(pTriangle, graph1, vertexData, NULL, NULL, 2);
+//            }
 
             if (!visited[indices[i]] && indices[i] != -2)
                 push(&stack, indices[i]);
@@ -377,6 +385,8 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
     
     //remove_extra_edges(graph1);
     //add_misc_edges(graph1, edges);
+
+    my_free(visited);
 }
 
 int insert_triangle_edge(struct Graph *g, int index, int face, struct CuspTriangle *x, struct CuspTriangle *y, struct CuspNode **vertexData) {
@@ -429,9 +439,8 @@ int insert_triangle_edge(struct Graph *g, int index, int face, struct CuspTriang
                     x_vertex1, x_vertex2, y_vertex1, y_vertex2, y_face, dist);
     }
 
-    // Ignore edge if it already exists
-    if (!edge_exists(g, index, i))
-        insert_edge(g, index, i, g->directed);
+    vertexData[index]->adjNodes[edgesFourToThree[x->tetVertex][face]] = i;
+    insert_edge(g, index, i, g->directed);
 
     g->vertexData[i] = i;
     return i;
@@ -676,8 +685,8 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 5) {
         // Dual Curve Paths
-        for (i = 0; i < numDualCurves; i++) {
-            printf("Vertex %d: ", i);
+        for (i = 0; i < 2 * numDualCurves; i++) {
+            printf("Curve %d: ", i);
 
             for (j = 0; j < dualCurveLen[i]; j++) {
                 printf("%d ", dualCurve[i][j]);
@@ -760,12 +769,12 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, path, pathLen);
+//        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
 
         // Reallocate memory
         my_free(processed);
         my_free(discovered);
         my_free(parent);
-        return g;
         processed = NEW_ARRAY(g->nvertices, bool);
         discovered = NEW_ARRAY(g->nvertices, bool);
         parent = NEW_ARRAY(g->nvertices, int);
@@ -779,6 +788,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, path, pathLen);
+//        print_debug_info(pTriangle, g, vertexData, dualCurves, dualCurveLen, 2);
 
         //add_edges_from_array(g, edges);
         // Re allocate memory
@@ -790,6 +800,10 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
         parent = NEW_ARRAY(g->nvertices, int);
         path = NEW_ARRAY(g->nvertices, int);
     }
+
+    my_free(processed);
+    my_free(discovered);
+    my_free(parent);
 
     return g;
 }
@@ -827,7 +841,8 @@ void find_index(struct Graph *g, struct CuspNode **vertexData, int edgeClass, in
                 vertexData[g->vertexData[i]]->tri->vertices[j].vertexIndex == 1 &&
                 vertexData[g->vertexData[i]]->tetVertex == cuspVertex &&
                 vertexData[g->vertexData[i]]->tetIndex == vertexData[g->vertexData[*index]]->tetIndex &&
-                edgesThreeToFour[vertexData[g->vertexData[i]]->tetVertex][j] == vertexData[g->vertexData[*index]]->tetVertex) {
+                edgesThreeToFour[vertexData[g->vertexData[i]]->tetVertex][j] == vertexData[g->vertexData[*index]]->tetVertex &&
+                vertexData[g->vertexData[i]]->dist[j] == 0) {
                 *dualIndex = i;
                 return;
             }
@@ -918,12 +933,12 @@ void add_edges_from_array(struct Graph *graph1, int **edges, int numEdges) {
  * Construct the symplectic equations from the dual curves
  */
 
-void find_holonomies(struct Graph *g, int **symp_eqns, int **dualCurves, int *dualCurveLen) {
+void find_holonomies(struct Graph *g, struct CuspNode **vertexData, int **symp_eqns, int **dualCurves, int *dualCurveLen) {
     int i;
 
     for (i = 0; i < numDualCurves; i++) {
-        find_path_holonomy(g, symp_eqns[i], dualCurves[2 * i], dualCurveLen[2 * i]);
-        find_path_holonomy(g, symp_eqns[i], dualCurves[2 * i + 1], dualCurveLen[2 * i + 1]);
+        find_path_holonomy(g, vertexData, symp_eqns[i], dualCurves[2 * i], dualCurveLen[2 * i]);
+        find_path_holonomy(g, vertexData, symp_eqns[i], dualCurves[2 * i + 1], dualCurveLen[2 * i + 1]);
     }
 }
 
@@ -933,8 +948,49 @@ void find_holonomies(struct Graph *g, int **symp_eqns, int **dualCurves, int *du
  * Calculate holonomies along a path and update the row.
  */
 
-void find_path_holonomy(struct Graph *g, int *row, int *path, int pathLen) {
+void find_path_holonomy(struct Graph *g, struct CuspNode **vertexData, int *row, int *path, int pathLen) {
+    int i, vertex;
+    struct CuspNode *midNode;
 
+    for (i = 0; i < pathLen; i++) {
+        if (i == 0 || i == pathLen - 1)
+            continue;
+
+        midNode = vertexData[g->vertexData[path[i]]];
+        vertex = inside_vertex(midNode,
+                               g->vertexData[path[i - 1]],
+                               g->vertexData[path[i]],
+                               g->vertexData[path[i + 1]]);
+
+        if (vertex == -1)
+            continue;
+
+        row[3 * midNode->tetIndex + edge3_between_faces[midNode->tetVertex][vertex]]++;
+    }
+}
+
+/*
+ * Inside Vertex
+ *
+ * Given three cusp nodes, which lie on adjacent cusp triangle,
+ * find the inside vertex of the path first -> mid -> last
+ */
+
+int inside_vertex(struct CuspNode *midNode, int first, int mid, int last) {
+    int i, vertex, vertex1, vertex2;
+
+    for (i = 0; i < 3; i++) {
+        vertex = edgesThreeToFour[midNode->tetVertex][i];
+
+        vertex1 = edgesFourToThree[midNode->tetVertex][(int) remaining_face[midNode->tetVertex][vertex]];
+        vertex2 = edgesFourToThree[midNode->tetVertex][(int) remaining_face[vertex][midNode->tetVertex]];
+
+        if ((midNode->adjNodes[vertex1] == first && midNode->adjNodes[vertex2] == last) ||
+        (midNode->adjNodes[vertex2] == first && midNode->adjNodes[vertex1] == last))
+            return i;
+    }
+
+    return -1;
 }
 
 // -----------------------------------------------------------
@@ -1004,7 +1060,7 @@ void resize_queue(struct Queue *q) {
 }
 
 void free_queue(struct Queue *q) {
-    free(q->array);
+    my_free(q->array);
 }
 
 /*
@@ -1012,7 +1068,7 @@ void free_queue(struct Queue *q) {
  */
 
 void push(struct Node *stack, int item) {
-    struct Node *node = malloc(sizeof( struct Node));
+    struct Node *node = NEW_STRUCT(struct Node);
     node->item = stack->item;
     node->next = stack->next;
     stack->item = item;
@@ -1024,7 +1080,7 @@ int pop(struct Node *stack) {
     struct Node *node = stack->next;
     stack->item = stack->next->item;
     stack->next = stack->next->next;
-    free(node);
+    my_free(node);
 
     return item;
 }
@@ -1045,7 +1101,7 @@ int is_empty(struct Node *stack) {
 
 struct Graph *init_graph(int maxVertices, bool directed) {
     int i;
-    struct Graph *g = malloc(sizeof( struct Graph ));
+    struct Graph *g = NEW_STRUCT(struct Graph);
 
     g->nvertices = maxVertices;
     g->nedges = 0;
@@ -1058,7 +1114,7 @@ struct Graph *init_graph(int maxVertices, bool directed) {
     for (i = 0; i < maxVertices; i++) {
         g->degree[i] = 0;
         g->edges[i] = NULL;
-        g->vertexData[i] = i;
+        g->vertexData[i] = 0;
     }
 
     return g;
@@ -1077,12 +1133,12 @@ void free_graph(struct Graph *g) {
     for (i = 0; i < g->nvertices; i++) {
         while (g->edges[i] != NULL) {
             if (g->edges[i]->next == NULL) {
-                free(g->edges[i]);
+                my_free(g->edges[i]);
                 g->edges[i] = NULL;
             } else {
                 edge = g->edges[i]->next;
                 g->edges[i]->next = edge->next;
-                free(edge);
+                my_free(edge);
             }
         }
     }
@@ -1090,7 +1146,7 @@ void free_graph(struct Graph *g) {
     my_free(g->edges);
     my_free(g->degree);
     my_free(g->vertexData);
-    free(g);
+    my_free(g);
 }
 
 /*
@@ -1100,9 +1156,11 @@ void free_graph(struct Graph *g) {
  */
 
 int insert_edge(struct Graph *g, int x, int y, bool directed) {
-    struct EdgeNode *p;
+    // Ignore edge if it already exists
+    if (edge_exists(g, x, y))
+        return x;
 
-    p = malloc(sizeof( struct EdgeNode ));
+    struct EdgeNode *p = NEW_STRUCT( struct EdgeNode);
     p->y = y;
     p->next = g->edges[x];
 
@@ -1142,7 +1200,7 @@ void delete_edge(struct Graph *g, int vertex_x, int vertex_y, bool directed) {
 
     deleted_node = node->next;
     node->next = node->next->next;
-    free(deleted_node);
+    my_free(deleted_node);
 
     if (!directed) {
         delete_edge(g, vertex_y, vertex_x, directed);
@@ -1202,11 +1260,12 @@ struct Graph *split_along_path(struct Graph *graph1, int *path, int pathLen) {
  */
 
 void init_vertices(struct Graph *graph1, struct Graph *graph2, int *array, int arrayLen) {
-    int i, j;
+    int i, j = 0;
 
     for (i = 0; i < graph1->nvertices; i++) {
         if (inclusion(array, arrayLen, i)) {
-            graph2->vertexData[graph1->nvertices + i] = graph1->vertexData[i];
+            graph2->vertexData[graph1->nvertices + j] = graph1->vertexData[i];
+            j++;
         }
 
         graph2->vertexData[i] = graph1->vertexData[i];

@@ -38,6 +38,7 @@ struct CuspNode {
     int tetVertex;
     int dist[3];        // Distance to cuspVertex
     int adjTri[3];      // Indicates the cusp triangle sides that can be reached
+    int adjNodes[3];
 };
 
 struct CuspFace {
@@ -123,8 +124,9 @@ struct Graph            *construct_dual_curves(struct Graph *, struct CuspTriang
 void                    find_index(struct Graph *, struct CuspNode **, int, int *, int *);
 void                    remove_extra_edges(struct Graph *, struct CuspNode **, int **, int, int);
 void                    add_edges_from_array(struct Graph *, int **, int);
-void                    find_holonomies(struct Graph *, int **, int **, int *);
-void                    find_path_holonomy(struct Graph *, int *, int *, int);
+void                    find_holonomies(struct Graph *, struct CuspNode **, int **, int **, int *);
+void                    find_path_holonomy(struct Graph *, struct CuspNode **, int *, int *, int);
+int                     inside_vertex(struct CuspNode *, int, int, int);
 
 // Queue
 void                    initialise_queue(struct Queue *, int);
