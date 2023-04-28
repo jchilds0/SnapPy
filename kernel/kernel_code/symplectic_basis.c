@@ -223,9 +223,9 @@ void vertex_orientation(struct CuspTriangle **pTriangle) {
 
     int zeroTri[4][4] = {
             {0, 0, 0, 0},
-            {0, 0, -1, 1},
-            {0, 1, 0, -1},
-            {0, -1, 1, 0}};
+            {0, 0, 1, -1},
+            {0, -1, 0, 1},
+            {0, 1, -1, 0}};
 
     for (i = 0; i < 4; i++)
         for (j = 0; j < 4; j++)
@@ -368,15 +368,15 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
 
     construct_dual_graph(manifold, graph1, pTriangle, pCuspRegion);
 //    print_debug_info(pTriangle, graph1, pCuspRegionIndex, NULL, NULL, 0);
-    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
+//    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
 //    print_debug_info(pTriangle, graph1, pCuspRegionIndex, NULL, NULL, 3);
-    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
+//    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
 
 
     graph1 = construct_dual_curves(graph1, pTriangle, pCuspRegion, e0, pPathEndPoint, dualCurve, dualCurveLen);
     find_holonomies(graph1, pCuspRegion, pPathEndPoint, symp_eqns, dualCurve, dualCurveLen, e0);
 
-    print_debug_info(pTriangle, graph1, pCuspRegion, dualCurve, dualCurveLen, 5);
+//    print_debug_info(pTriangle, graph1, pCuspRegion, dualCurve, dualCurveLen, 5);
 
     free_graph(graph1);
     free_cusp_triangulation(pTriangle);
@@ -939,7 +939,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, pCuspRegion, path, pathLen);
-        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+//        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
 
         // Reallocate memory
         my_free(processed);
@@ -959,7 +959,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, pCuspRegion, path, pathLen);
-        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+//        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
 
         // Re allocate memory
         my_free(processed);
@@ -1040,17 +1040,6 @@ void find_holonomies(struct Graph *g, struct CuspRegion **pCuspRegion, struct Pa
                            dualCurves[2 * i], dualCurveLen[2 * i]);
         find_path_holonomy(g, pCuspRegion, pEndPoint[2 * e0 + 1], pEndPoint[2 * i + 1],symp_eqns[i],
                            dualCurves[2 * i + 1], dualCurveLen[2 * i + 1]);
-        printf("%d: %d, %d: %d\n",
-               pEndPoint[2 * e0]->graphVertex,
-               pEndPoint[2 * e0]->face,
-               pEndPoint[2 * i]->graphVertex,
-               pEndPoint[2 * i]->face);
-        printf("%d: %d, %d: %d\n",
-               pEndPoint[2 * e0 + 1]->graphVertex,
-               pEndPoint[2 * e0 + 1]->face,
-               pEndPoint[2 * i + 1]->graphVertex,
-               pEndPoint[2 * i + 1]->face);
-
     }
 }
 
@@ -1062,7 +1051,7 @@ void find_holonomies(struct Graph *g, struct CuspRegion **pCuspRegion, struct Pa
 
 void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct PathEndPoint *endPoint0,
         struct PathEndPoint *endPoint1, int *row, int *path, int pathLen) {
-    int i, j, index, insideVertex, face, dirFace;
+    int i, j, index, insideVertex, face, dirFace, midNodeIndex;
     struct CuspRegion *midNode;
     struct PathEndPoint *endPoint;
 
@@ -1080,17 +1069,26 @@ void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct
                 continue;
             }
 
+            // End point index
             if (i == 0) {
-                midNode = pCuspRegion[g->pCuspRegionIndex[1]];
-                endPoint = endPoint0;
+                midNodeIndex = 1;
+                dirFace = -1;
             } else {
-                midNode = pCuspRegion[g->pCuspRegionIndex[pathLen - 2]];
-                endPoint = endPoint1;
+                midNodeIndex = pathLen - 2;
+                dirFace = 1;
             }
 
+            midNode = pCuspRegion[g->pCuspRegionIndex[path[midNodeIndex]]];
+
+            if (pCuspRegion[g->pCuspRegionIndex[path[i]]] == endPoint0->region)
+                endPoint = endPoint0;
+            else
+                endPoint = endPoint1;
+
+            // Find the face the next vertex lies across
             for (j = 0; j < 3; j++) {
-                if (midNode->adjNodes[j] == g->pCuspRegionIndex[path[i]]) {
-                    face = EVALUATE(midNode->tri->tet->gluing[midNode->tetVertex], edgesThreeToFour[midNode->tetVertex][j]);
+                if (endPoint->region->adjNodes[j] == g->pCuspRegionIndex[path[midNodeIndex]]) {
+                    face = edgesThreeToFour[endPoint->region->tetVertex][j];
                     break;
                 }
             }
@@ -1103,17 +1101,17 @@ void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct
                  * crosses
                  */
                 index = 3 * endPoint->region->tetIndex + edge3_between_faces[endPoint->face][face];
-                if (remaining_face[endPoint->vertex][endPoint->region->tetVertex] == face)
-                    insideVertex = edgesFourToThree[endPoint->region->tetVertex][remaining_face[endPoint->region->tetVertex][endPoint->vertex]];
+
+                if (remaining_face[endPoint->vertex][endPoint->region->tetVertex] == endPoint->vertex)
+                    insideVertex = (int) remaining_face[endPoint->region->tetVertex][endPoint->vertex];
                 else
-                    insideVertex = edgesFourToThree[endPoint->region->tetVertex][face];
-                row[index] = row[index] + pCuspRegion[g->pCuspRegionIndex[path[i]]]->tri->orientVertices[insideVertex][face];
+                    insideVertex = (int) remaining_face[endPoint->vertex][endPoint->region->tetVertex];
             } else if (face == endPoint->face){
                  /*
                   * Curve passes through the face that carries it and
                   * thus picks up no holonomy.
                   */
-                 ;
+                 continue;
             } else {
                 /*
                  * Curve picks up the holonomy for the vertex it dives through
@@ -1121,8 +1119,11 @@ void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct
                 index = 3 * endPoint0->region->tetIndex + edge3_between_faces
                         [remaining_face[endPoint->vertex][endPoint->region->tetVertex]]
                         [remaining_face[endPoint->region->tetVertex][endPoint->vertex]];
-                row[index] = row[index] + pCuspRegion[g->pCuspRegionIndex[path[i]]]->tri->orientVertices[endPoint->vertex][face];
+
+                insideVertex = endPoint->vertex;
             }
+
+            row[index] = row[index] + dirFace * pCuspRegion[g->pCuspRegionIndex[path[i]]]->tri->orientVertices[insideVertex][face];
 
             continue;
         }
@@ -1411,7 +1412,7 @@ void process_vertex_early(int v) {
 }
 
 void process_edge(int x, int y) {
-    printf("    Processed edge (%d, %d)\n", x, y);
+//    printf("    Processed edge (%d, %d)\n", x, y);
 }
 
 void process_vertex_late(int v) {
