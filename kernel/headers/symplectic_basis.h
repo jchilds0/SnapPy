@@ -47,7 +47,7 @@ struct CuspRegion {
     int tetVertex;
     int dist[3];        // Distance to cuspVertex
     int adjTri[3];      // Indicates the cusp triangle sides that can be reached
-    int adjNodes[3];
+    int adjNodes[3];    // Index of adjacent triangles
 };
 
 struct CuspFace {
@@ -103,10 +103,10 @@ void                    delete_edge(struct Graph *, int, int, bool);
 int                     edge_exists(struct Graph *, int, int);
 
 // Graph Splitting
-struct Graph            *split_along_path(struct Graph *, int *, int);
+struct Graph            *split_along_path(struct Graph *, struct CuspRegion **, int *, int);
 void                    init_vertices(struct Graph *, struct Graph *, int *, int);
 void                    add_non_path_edges(struct Graph *, struct Graph *, int *, int);
-void                    add_path_edges(struct Graph *, struct Graph *, int *, int);
+void                    add_path_edges(struct Graph *, struct Graph *, struct CuspRegion **, int *, int);
 bool                    inclusion(int *, int, int);
 
 // Dual Graph
