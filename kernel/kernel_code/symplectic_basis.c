@@ -9,8 +9,8 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
-//#include "addl_code.h"                  // compile snappy
-#include "../addl_code/addl_code.h"     // compile kernel
+#include "addl_code.h"                  // compile snappy
+//#include "../addl_code/addl_code.h"     // compile kernel
 
 #define atleast_two(a, b, c)    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 
@@ -129,7 +129,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
     cusp_vertex_index(pTriangle);
     vertex_orientation(pTriangle);
     //label_cusp_faces(pTriangle);
-    //print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 4);
+    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 4);
     return pTriangle;
 }
 
@@ -320,11 +320,6 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     struct Graph *graph1;
     struct CuspTriangle **pTriangle;
 
-    // Call fundamental group to find standard basepoint of the cusp triangulation
-    fundamental_group(manifold, FALSE, FALSE, FALSE, FALSE);
-    intersectTetIndex = manifold->cusp_list_begin.next->basepoint_tet->index;
-    intersectTetVertex = (int) manifold->cusp_list_begin.next->basepoint_vertex;
-
     int **dualCurve = NEW_ARRAY(2 * numDualCurves, int *);
     int *dualCurveLen = NEW_ARRAY(2 * numDualCurves, int);
     struct PathEndPoint **pPathEndPoint = NEW_ARRAY(2 * numDualCurves, struct PathEndPoint *);
@@ -346,6 +341,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     }
 
     pTriangle = init_cusp_triangulation(manifold);
+    find_intersection_triangle(pTriangle);
     numCuspRegions = num_cusp_regions(manifold, pTriangle);
     graph1 = init_graph(numCuspRegions, FALSE);
     struct CuspRegion **pCuspRegion = NEW_ARRAY(numCuspRegions, struct CuspRegion *);
@@ -367,10 +363,10 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     }
 
     construct_dual_graph(manifold, graph1, pTriangle, pCuspRegion);
-//    print_debug_info(pTriangle, graph1, pCuspRegionIndex, NULL, NULL, 0);
-//    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
-//    print_debug_info(pTriangle, graph1, pCuspRegionIndex, NULL, NULL, 3);
-//    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
+    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 0);
+    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
+    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 3);
+    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
 
 
     graph1 = construct_dual_curves(graph1, pTriangle, pCuspRegion, e0, pPathEndPoint, dualCurve, dualCurveLen);
@@ -395,6 +391,39 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     my_free(dualCurveLen);
 
     return symp_eqns;
+}
+
+/*
+ * Find Intersection Vertex
+ */
+
+void find_intersection_triangle(struct CuspTriangle **pTriangle) {
+    int i, j, meridian, longitiude;
+    struct CuspTriangle *tri;
+
+    for (i = 0; i < numCuspTriangles; i++) {
+        tri = pTriangle[i];
+        meridian = 0;
+        longitiude = 0;
+        for (j = 0; j < 4; j++) {
+            if (j == tri->tetVertex)
+                continue;
+
+            meridian = meridian + ABS(FLOW(tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][j]],
+                                        tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[j][tri->tetVertex]]));
+
+            longitiude = longitiude + ABS(FLOW(tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][j]],
+                                           tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[j][tri->tetVertex]]));
+        }
+
+        if (meridian == genus && longitiude == genus) {
+            intersectTetIndex = tri->tet->index;
+            intersectTetVertex = tri->tetVertex;
+            return;
+        }
+    }
+
+    uFatalError("find_intersect_triangle", "symplectic_basis.c");
 }
 
 /*
@@ -423,11 +452,11 @@ int num_cusp_regions(Triangulation *manifold, struct CuspTriangle **pTriangle) {
                  */
                 numRegions = numRegions + 2 * flow(pTriangle[i], vertex) + 1;
 
-                if (flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][0])
-                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][1])
-                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][2]) > 2 * genus)
-                    // Too many curves on intersection vertex
-                    uFatalError("num_cusp_regions", "symplectic_basis.c");
+//                if (flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][0])
+//                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][1])
+//                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][2]) > 2 * genus)
+//                    // Too many curves on intersection vertex
+//                    uFatalError("num_cusp_regions", "symplectic_basis.c");
             } else {
                 /*
                  * If we are not on the intersection triangle, we have flow
@@ -715,6 +744,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
 
     if (!flag) {
         // Gluing Info
+        printf("Triangle gluing info\n");
         for (i = 0; i < numCuspTriangles; i++) {
             for (j = 0; j < 3; j++) {
                 tri = pTriangle[i];
@@ -738,6 +768,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 1) {
         // Vertex Distance Info
+        printf("Cusp Region vertex distance info\n");
         for (i = 0; i < g->nvertices; i++) {
             if (pCuspRegion[i]->tetIndex == -1 || pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex == -1) {
                 tri = pTriangle[0];
@@ -758,6 +789,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 2) {
         // Graph Info
+        printf("Graph info\n");
         for (i = 0; i < g->nvertices; i++) {
             printf("Vertex %d (Tet Index: %d, Tet Vertex: %d) Region %d (Adj Tri: %d, %d, %d) (Dist: %d, %d, %d): ",
                    i,
@@ -779,6 +811,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 3) {
         // Homology Info
+        printf("Homology info\n");
         printf("Longitudinal\n");
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
@@ -809,6 +842,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 4) {
         // Edge indices
+        printf("Edge classes\n");
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
             printf("(Tet Index: %d, Tet Vertex: %d) Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d), "
@@ -831,6 +865,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 5) {
         // Dual Curve Paths
+        printf("Oscillating curve paths\n");
         for (i = 0; i < 2 * numDualCurves; i++) {
             printf("Curve %d: ", i);
 
@@ -841,6 +876,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         }
     } else if (flag == 6) {
         // Inside Edge Info
+        printf("Inside edge info\n");
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
             printf("(Tet Index: %d, Tet Vertex: %d) Edge label (%d, %d, %d)\n",
@@ -939,7 +975,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, pCuspRegion, path, pathLen);
-//        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
 
         // Reallocate memory
         my_free(processed);
@@ -959,7 +995,7 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Split graph
         g = split_along_path(g, pCuspRegion, path, pathLen);
-//        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
 
         // Re allocate memory
         my_free(processed);

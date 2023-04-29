@@ -116,6 +116,7 @@ void                    vertex_orientation(struct CuspTriangle **);
 void                    walk_around_vertex(struct CuspTriangle **, struct CuspTriangle *, int, int);
 void                    free_cusp_triangulation(struct CuspTriangle **);
 int                     **get_symplectic_equations(Triangulation *, int, int, int);
+void                    find_intersection_triangle(struct CuspTriangle **pTriangle);
 int                     num_cusp_regions(Triangulation *, struct CuspTriangle **);
 void                    construct_dual_graph(Triangulation *, struct Graph *, struct CuspTriangle **, struct CuspRegion **);
 void                    init_zero_vertex(struct CuspRegion *, struct CuspTriangle *);
