@@ -12,7 +12,7 @@ set(SNAPPEA_KERNEL ${PROJECT_SOURCE_DIR}/../../kernel)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 
 # Add include directories
-include_directories(${SNAPPEA_KERNEL}/headers ${SNAPPEA_KERNEL}/unix_kit ${SNAPPEA_KERNEL}/unix_kit/CuspedCensusData)
+include_directories(${SNAPPEA_KERNEL}/addl_code ${SNAPPEA_KERNEL}/headers ${SNAPPEA_KERNEL}/real_type ${SNAPPEA_KERNEL}/unix_kit ${SNAPPEA_KERNEL}/)
 
 # Add source files
 file(GLOB KERNEL_SOURCES ${SNAPPEA_KERNEL}/*/*.c)
