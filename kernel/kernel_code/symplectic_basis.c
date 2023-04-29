@@ -9,8 +9,7 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "symplectic_basis.h"
-#include "addl_code.h"                  // compile snappy
-//#include "../addl_code/addl_code.h"     // compile kernel
+#include "addl_code.h"
 
 #define atleast_two(a, b, c)    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 
