@@ -195,8 +195,7 @@
  * halfing the logarithm instead. Compute logarithm only once per edge class.
  */
 
-//#include "../addl_code/dilog.h"         // compile kernel
-#include "dilog.h"                    // compile snappy
+#include "dilog.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
