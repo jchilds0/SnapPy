@@ -36,6 +36,8 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     int i, j, e0 = 0;
     numCuspTriangles = 4 * manifold->num_tetrahedra;
 
+    peripheral_curves(manifold);
+
     // Edge Curves C_i -> gluing equations
     int **edge_eqns, edge_num_rows;
 
@@ -69,6 +71,86 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 }
 
 /*
+ * Get Symplectic Equations
+ *
+ * Setup graph and cusp triangulation, and run construct dual graph.
+ */
+static int numDualCurves, genus;
+static int intersectTetIndex, intersectTetVertex;
+
+int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols, int e0) {
+    int i, j, numCuspRegions, T = manifold -> num_tetrahedra;
+    numDualCurves = num_rows;
+    genus = (2 * manifold->num_tetrahedra - num_rows) / 2;
+
+    find_intersection_triangle(manifold);
+
+    struct CuspTriangle **pTriangle = init_cusp_triangulation(manifold);
+
+    numCuspRegions = num_cusp_regions(manifold, pTriangle);
+    struct CuspRegion **pCuspRegion = init_cusp_region(numCuspRegions);
+    struct Graph *graph1 = init_graph(numCuspRegions, FALSE);
+    struct DualCurves *pDualCurves = init_oscillating_curves(numCuspRegions, e0);
+
+    // Allocate Symplectic Equations Array
+    int **symp_eqns = NEW_ARRAY(num_rows, int *);
+
+    for (i = 0; i < num_rows; i ++) {
+        symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
+
+        for (j = 0; j < 3 * manifold->num_tetrahedra; j++)
+            symp_eqns[i][j] = 0;
+    }
+
+    construct_dual_graph(manifold, graph1, pTriangle, pCuspRegion);
+//    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, 0);
+//    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, 2);
+//    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, 3);
+//    print_debug_info(pTriangle, NULL, NULL, NULL, 6);
+
+    graph1 = construct_dual_curves(graph1, pTriangle, pCuspRegion, pDualCurves);
+    find_holonomies(graph1, pCuspRegion, pDualCurves, symp_eqns);
+
+//    print_debug_info(pTriangle, graph1, pCuspRegion, dualCurve, dualCurveLen, 5);
+
+    free_graph(graph1);
+    free_cusp_triangulation(pTriangle);
+    free_cusp_region(pCuspRegion, numCuspRegions);
+    free_oscillating_curves(pDualCurves);
+    return symp_eqns;
+}
+
+// Free memory used to find the symplectic basis
+void free_symplectic_basis(int **eqns, int num_rows) {
+    int i;
+
+    for (i = 0; i < num_rows; i++)
+        my_free(eqns[i]);
+    my_free(eqns);
+}
+
+/*
+ * Find Intersection Vertex
+ *
+ * There exists a cusp triangle containing M and L
+ * such that M and L cross the same cusp edge twice
+ * exactly once, and we set the intersection of M and
+ * L to be the interior of this triangle.
+ *
+ * To find this cusp triangle, we start where
+ * periphal_curves.c places the intersection point, the base
+ * tet and vertex. If this triangle is not suitable, we
+ * continue forward until we find a suitable triangle.
+ */
+
+void find_intersection_triangle(Triangulation *manifold) {
+    fundamental_group(manifold, FALSE, FALSE, FALSE, FALSE);
+
+    intersectTetIndex = (int) manifold->cusp_list_begin.next->basepoint_tet->index;
+    intersectTetVertex = (int) manifold->cusp_list_begin.next->basepoint_vertex;
+}
+
+/*
  * Initialise Cusp Triangulation
  *
  * Construct the pTriangle array which consists of the triangles in the cusp triangulation
@@ -90,6 +172,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
 
     for (i = 0; i < numCuspTriangles; i++) {
         pTriangle[i]->tet = tet;
+        pTriangle[i]->tetIndex = pTriangle[i]->tet->index;
         pTriangle[i]->tetVertex = i % 4;
 
         for (j = 0; j < 4; j++) {
@@ -107,11 +190,14 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
             }
         }
 
-        for (j = 0; j < 3; j++) {
+        for (j = 0; j < 4; j++) {
+            if (j == pTriangle[i]->tetVertex)
+                continue;
+
             pTriangle[i]->faces[j].index = -1;
 
             pTriangle[i]->vertices[j].v1 = pTriangle[i]->tetVertex;
-            pTriangle[i]->vertices[j].v2 = edgesThreeToFour[pTriangle[i]->tetVertex][j];
+            pTriangle[i]->vertices[j].v2 = j;
             pTriangle[i]->vertices[j].edge = pTriangle[i]->tet->edge_class[
                     edge_between_vertices[pTriangle[i]->vertices[j].v1][pTriangle[i]->vertices[j].v2]];
             pTriangle[i]->vertices[j].edgeIndex = pTriangle[i]->vertices[j].edge->index;
@@ -128,7 +214,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
     cusp_vertex_index(pTriangle);
     vertex_orientation(pTriangle);
     //label_cusp_faces(pTriangle);
-    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 4);
+    print_debug_info(pTriangle, NULL, NULL, NULL, 4);
     return pTriangle;
 }
 
@@ -144,7 +230,7 @@ void label_triangulation_edges(Triangulation *manifold) {
 
     while ((edge = edge->next)->next != NULL)
         edge->index = i++;
-    
+
     numEdgeClasses = i;
 }
 
@@ -160,17 +246,16 @@ void cusp_vertex_index(struct CuspTriangle **pTriangle) {
     int i, j;
 
     int *currentIndex = NEW_ARRAY(numEdgeClasses, int);
-    
-    for (i = 0; i < numEdgeClasses; i++) 
+
+    for (i = 0; i < numEdgeClasses; i++)
         currentIndex[i] = 0;
-    
+
     for (i = 0; i < numCuspTriangles; i++) {
-        for (j = 0; j < 3; j++) {
-            if (pTriangle[i]->vertices[j].vertexIndex != -1)
+        for (j = 0; j < 4; j++) {
+            if (j == pTriangle[i]->tetVertex || pTriangle[i]->vertices[j].vertexIndex != -1)
                 continue;
 
-            walk_around_vertex(pTriangle, pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][j],
-                               currentIndex[pTriangle[i]->vertices[j].edgeIndex]);
+            walk_around_vertex(pTriangle, pTriangle[i], j,currentIndex[pTriangle[i]->vertices[j].edgeIndex]);
 
             currentIndex[pTriangle[i]->vertices[j].edgeIndex]++;
         }
@@ -191,8 +276,8 @@ void walk_around_vertex(struct CuspTriangle **pTriangle, struct CuspTriangle *tr
     gluing_vertex = (int) remaining_face[cuspVertex][tri->tetVertex];
     outside_vertex = (int) remaining_face[tri->tetVertex][cuspVertex];
 
-    while (tri->vertices[edgesFourToThree[tri->tetVertex][cuspVertex]].vertexIndex == -1) {
-        tri->vertices[edgesFourToThree[tri->tetVertex][cuspVertex]].vertexIndex = index;
+    while (tri->vertices[cuspVertex].vertexIndex == -1) {
+        tri->vertices[cuspVertex].vertexIndex = index;
 
         // Move to the next cusp triangle
         old_cusp_vertex = cuspVertex;
@@ -202,8 +287,8 @@ void walk_around_vertex(struct CuspTriangle **pTriangle, struct CuspTriangle *tr
         cuspVertex = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_cusp_vertex);
         gluing_vertex = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_outside_vertex);
         outside_vertex = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_gluing_vertex);
-        tri = find_cusp_triangle(pTriangle, tri->neighbours[old_gluing_vertex]->tet->index,
-                                          EVALUATE(tri->tet->gluing[old_gluing_vertex], tri->tetVertex));
+        tri = find_cusp_triangle(pTriangle, tri->neighbours[old_gluing_vertex]->tetIndex,
+                                 EVALUATE(tri->tet->gluing[old_gluing_vertex], tri->tetVertex));
     }
 }
 
@@ -214,7 +299,7 @@ void walk_around_vertex(struct CuspTriangle **pTriangle, struct CuspTriangle *tr
  */
 
 void vertex_orientation(struct CuspTriangle **pTriangle) {
-    int i, j, index, adjIndex, face, vertex;
+    int i, j, index, adjIndex, face;
     struct Node indexStack, adjIndexStack, faceStack;
     indexStack.item = -1;
     adjIndexStack.item = -1;
@@ -231,7 +316,7 @@ void vertex_orientation(struct CuspTriangle **pTriangle) {
             pTriangle[0]->orientVertices[i][j] = zeroTri[i][j];
 
     for (i = 1; i < 4; i++) {
-        index = find_cusp_triangle_index(pTriangle, pTriangle[0]->neighbours[i]->tet->index, pTriangle[0]->neighbours[i]->tetVertex);
+        index = find_cusp_triangle_index(pTriangle, pTriangle[0]->neighbours[i]->tetIndex, pTriangle[0]->neighbours[i]->tetVertex);
         push(&indexStack, 0);
         push(&adjIndexStack, index);
         push(&faceStack, i);
@@ -247,20 +332,16 @@ void vertex_orientation(struct CuspTriangle **pTriangle) {
         update_orientation(pTriangle[index], pTriangle[adjIndex], face);
         pTriangle[index]->oriented = TRUE;
 
-        for (i = 0; i < 3; i++) {
-            vertex = edgesThreeToFour[pTriangle[adjIndex]->tetVertex][i];
+        for (i = 0; i < 4; i++) {
+            if (pTriangle[adjIndex]->tetVertex == i || pTriangle[adjIndex]->neighbours[i]->oriented)
+                continue;
 
-            if (!pTriangle[adjIndex]->neighbours[vertex]->oriented) {
-                push(&indexStack, adjIndex);
-                push(&adjIndexStack, find_cusp_triangle_index(pTriangle,
-                                                              pTriangle[adjIndex]->neighbours[vertex]->tet->index,
-                                                              pTriangle[adjIndex]->neighbours[vertex]->tetVertex));
-                push(&faceStack, vertex);
-            }
+            push(&indexStack, adjIndex);
+            push(&adjIndexStack, find_cusp_triangle_index(pTriangle,
+                                                          pTriangle[adjIndex]->neighbours[i]->tetIndex,
+                                                          pTriangle[adjIndex]->neighbours[i]->tetVertex));
+            push(&faceStack, i);
         }
-//        printf("Tri: (%d, %d), adj tri: (%d, %d), face: %d\n", pTriangle[index]->tet->index, pTriangle[index]->tetVertex,
-//               pTriangle[adjIndex]->tet->index, pTriangle[adjIndex]->tetVertex, face);
-//        print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
     }
 }
 
@@ -304,128 +385,6 @@ void free_cusp_triangulation(struct CuspTriangle **pTriangle) {
 }
 
 /*
- * Get Symplectic Equations
- *
- * Setup graph and cusp triangulation, and run construct dual graph.
- */
-static int numDualCurves, genus;
-static int intersectTetIndex, intersectTetVertex;
-
-
-int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols, int e0) {
-    int i, j, numCuspRegions, T = manifold -> num_tetrahedra, face0;
-    numDualCurves = num_rows;
-    genus = (2 * manifold->num_tetrahedra - num_rows) / 2;
-    struct Graph *graph1;
-    struct CuspTriangle **pTriangle;
-
-    int **dualCurve = NEW_ARRAY(2 * numDualCurves, int *);
-    int *dualCurveLen = NEW_ARRAY(2 * numDualCurves, int);
-    struct PathEndPoint **pPathEndPoint = NEW_ARRAY(2 * numDualCurves, struct PathEndPoint *);
-
-    for (i = 0; i < 2 * numDualCurves; i++) {
-        dualCurveLen[i] = 0;
-        dualCurve[i] = NEW_ARRAY(numCols, int);
-        pPathEndPoint[i] = NEW_STRUCT(struct PathEndPoint);
-    }
-
-    // Allocate Symplectic Equations Array
-    int **symp_eqns = NEW_ARRAY(num_rows, int *);
-
-    for (i = 0; i < num_rows; i ++) {
-        symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
-
-        for (j = 0; j < 3 * manifold->num_tetrahedra; j++)
-            symp_eqns[i][j] = 0;
-    }
-
-    pTriangle = init_cusp_triangulation(manifold);
-    find_intersection_triangle(pTriangle);
-    numCuspRegions = num_cusp_regions(manifold, pTriangle);
-    graph1 = init_graph(numCuspRegions, FALSE);
-    struct CuspRegion **pCuspRegion = NEW_ARRAY(numCuspRegions, struct CuspRegion *);
-
-    for (i = 0; i < numCuspRegions; i++) {
-        pCuspRegion[i] = NEW_STRUCT(struct CuspRegion);
-
-        pCuspRegion[i]->adjTri[0] = 0;
-        pCuspRegion[i]->adjTri[1] = 0;
-        pCuspRegion[i]->adjTri[2] = 0;
-        pCuspRegion[i]->dist[0] = -1;
-        pCuspRegion[i]->dist[1] = -1;
-        pCuspRegion[i]->dist[2] = -1;
-        pCuspRegion[i]->tetVertex = -1;
-        pCuspRegion[i]->tetIndex = -1;
-        pCuspRegion[i]->adjNodes[0] = -1;
-        pCuspRegion[i]->adjNodes[1] = -1;
-        pCuspRegion[i]->adjNodes[2] = -1;
-    }
-
-    construct_dual_graph(manifold, graph1, pTriangle, pCuspRegion);
-    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 0);
-    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
-    print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 3);
-    print_debug_info(pTriangle, NULL, NULL, NULL, NULL, 6);
-
-
-    graph1 = construct_dual_curves(graph1, pTriangle, pCuspRegion, e0, pPathEndPoint, dualCurve, dualCurveLen);
-    find_holonomies(graph1, pCuspRegion, pPathEndPoint, symp_eqns, dualCurve, dualCurveLen, e0);
-
-    print_debug_info(pTriangle, graph1, pCuspRegion, dualCurve, dualCurveLen, 5);
-
-    free_graph(graph1);
-    free_cusp_triangulation(pTriangle);
-
-    for (i = 0; i < numCuspRegions; i++)
-        my_free(pCuspRegion[i]);
-    my_free(pCuspRegion);
-
-    for (i = 0; i < 2 * numDualCurves; i++) {
-        my_free(dualCurve[i]);
-        my_free(pPathEndPoint[i]);
-    }
-
-    my_free(pPathEndPoint);
-    my_free(dualCurve);
-    my_free(dualCurveLen);
-
-    return symp_eqns;
-}
-
-/*
- * Find Intersection Vertex
- */
-
-void find_intersection_triangle(struct CuspTriangle **pTriangle) {
-    int i, j, meridian, longitiude;
-    struct CuspTriangle *tri;
-
-    for (i = 0; i < numCuspTriangles; i++) {
-        tri = pTriangle[i];
-        meridian = 0;
-        longitiude = 0;
-        for (j = 0; j < 4; j++) {
-            if (j == tri->tetVertex)
-                continue;
-
-            meridian = meridian + ABS(FLOW(tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][j]],
-                                        tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[j][tri->tetVertex]]));
-
-            longitiude = longitiude + ABS(FLOW(tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][j]],
-                                           tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[j][tri->tetVertex]]));
-        }
-
-        if (meridian == genus && longitiude == genus) {
-            intersectTetIndex = tri->tet->index;
-            intersectTetVertex = tri->tetVertex;
-            return;
-        }
-    }
-
-    uFatalError("find_intersect_triangle", "symplectic_basis.c");
-}
-
-/*
  * Number of Cusp Regions
  *
  * Count the number of cusp regions in the manifold to
@@ -433,14 +392,15 @@ void find_intersection_triangle(struct CuspTriangle **pTriangle) {
  */
 
 int num_cusp_regions(Triangulation *manifold, struct CuspTriangle **pTriangle) {
-    int i, j, numRegions = 0, vertex, intersectIndex;
+    int i, j, numRegions = 0, intersectIndex;
 
     intersectIndex = find_cusp_triangle_index(pTriangle, intersectTetIndex, intersectTetVertex);
 
     // number of regions for triangle without intersection point
     for (i = 0; i < numCuspTriangles; i++) {
-        for (j = 0; j < 3; j++) {
-            vertex = edgesThreeToFour[pTriangle[i]->tetVertex][j];
+        for (j = 0; j < 4; j++) {
+            if (j == pTriangle[i]->tetVertex)
+                continue;
 
             if (i == intersectIndex) {
                 /*
@@ -449,20 +409,20 @@ int num_cusp_regions(Triangulation *manifold, struct CuspTriangle **pTriangle) {
                  * it splits two regions (one above the intersection point,
                  * and one below) into 4 regions.
                  */
-                numRegions = numRegions + 2 * flow(pTriangle[i], vertex) + 1;
+                numRegions = numRegions + 2 * flow(pTriangle[i], j) + 1;
 
-//                if (flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][0])
-//                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][1])
-//                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][2]) > 2 * genus)
-//                    // Too many curves on intersection vertex
-//                    uFatalError("num_cusp_regions", "symplectic_basis.c");
+                if (flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][0])
+                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][1])
+                + flow(pTriangle[i], edgesThreeToFour[pTriangle[i]->tetVertex][2]) > 2 * genus)
+                    // Too many curves on intersection vertex
+                    uFatalError("num_cusp_regions", "symplectic_basis.c");
             } else {
                 /*
                  * If we are not on the intersection triangle, we have flow
                  * number of curves around the vertex which turn 1 regions in
                  * flow plus one region, each curve adds one region.
                  */
-                numRegions = numRegions + flow(pTriangle[i], vertex) + 1;
+                numRegions = numRegions + flow(pTriangle[i], j) + 1;
             }
         }
     }
@@ -470,13 +430,69 @@ int num_cusp_regions(Triangulation *manifold, struct CuspTriangle **pTriangle) {
     return numRegions;
 }
 
-// Free memory used to find the symplectic basis
-void free_symplectic_basis(int **eqns, int num_rows) {
+struct CuspRegion **init_cusp_region(int numCuspRegions) {
+    int i, j;
+    struct CuspRegion **pCuspRegion = NEW_ARRAY(numCuspRegions, struct CuspRegion *);
+
+    for (i = 0; i < numCuspRegions; i++) {
+        pCuspRegion[i] = NEW_STRUCT(struct CuspRegion);
+
+        pCuspRegion[i]->tetVertex = -1;
+        pCuspRegion[i]->tetIndex = -1;
+
+        for (j = 0; j < 4; j++) {
+            pCuspRegion[i]->adjTri[j] = 0;
+            pCuspRegion[i]->adjNodes[j] = -1;
+            pCuspRegion[i]->dist[j] = -1;
+        }
+    }
+
+    return pCuspRegion;
+}
+
+void free_cusp_region(struct CuspRegion **pCuspRegion, int numCuspRegions) {
     int i;
 
-    for (i = 0; i < num_rows; i++)
-        my_free(eqns[i]);
-    my_free(eqns);
+    for (i = 0; i < numCuspRegions; i++)
+        my_free(pCuspRegion[i]);
+    my_free(pCuspRegion);
+}
+
+struct DualCurves *init_oscillating_curves(int curveLen, int e0) {
+    int i, j;
+    struct DualCurves *pDualCurves = NEW_STRUCT(struct DualCurves);
+
+    pDualCurves->e0 = e0;
+
+    for (i = 0; i < 2; i++) {
+        pDualCurves->dualCurves[i] = NEW_ARRAY(numDualCurves, int *);
+        pDualCurves->dualCurvesLen[i] = NEW_ARRAY(numDualCurves, int);
+        pDualCurves->pEndPoints[i] = NEW_ARRAY(numDualCurves, struct PathEndPoint *);
+
+        for (j = 0; j < numDualCurves; j++) {
+            pDualCurves->dualCurves[i][j] = NEW_ARRAY(curveLen, int);
+            pDualCurves->dualCurvesLen[i][j] = 0;
+            pDualCurves->pEndPoints[i][j] = NEW_STRUCT(struct PathEndPoint);
+        }
+    }
+
+
+    return pDualCurves;
+}
+
+void free_oscillating_curves(struct DualCurves *pDualCurves) {
+    int i, j;
+
+    for (i = 0; i < 2; i++) {
+        my_free(pDualCurves->dualCurves[i]);
+        my_free(pDualCurves->dualCurvesLen[i]);
+        my_free(pDualCurves->pEndPoints[i]);
+
+        for (j = 0; j < numDualCurves; j++) {
+            my_free(pDualCurves->dualCurves[i][j]);
+            my_free(pDualCurves->pEndPoints[i][j]);
+        }
+    }
 }
 
 /* Construct Dual Graph
@@ -487,9 +503,9 @@ void free_symplectic_basis(int **eqns, int num_rows) {
  */
 
 void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct CuspTriangle **pTriangle, struct CuspRegion **pCuspRegion) {
-    int i, index, cuspEdge;
-    int indices[3] = { 0, 0, 0 };
-    struct CuspTriangle *adjTri[3];
+    int i, index;
+    int indices[4] = { 0, 0, 0, 0};
+    struct CuspTriangle *adjTri[4];
     struct CuspRegion *node;
 
     struct Node stack;
@@ -513,26 +529,21 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
         if (visited[index])
             continue;
 
-        for (i = 0; i < 3; i++) {
+        for (i = 0; i < 4; i++) {
+            if (i == node->tetVertex)
+                continue;
+
             if (pCuspRegion[index]->adjTri[i]) {
-                cuspEdge = edgesThreeToFour[node->tetVertex][i];
-                adjTri[i] = node->tri->neighbours[cuspEdge];
-                indices[i] = insert_triangle_edge(graph1, index, cuspEdge, node->tri, adjTri[i], pCuspRegion);
+                adjTri[i] = node->tri->neighbours[i];
+                indices[i] = insert_triangle_edge(graph1, index, i, node->tri, adjTri[i], pCuspRegion);
             } else {
                 indices[i] = -2;
             }
         }
 
-
-        for (i = 0; i < 3; i++) {
+        for (i = 0; i < 4; i++) {
             if (indices[i] == -1) {
-                printf("Inserting edge from triangle (%d, %d) to triangle (%d, %d) failed\n",
-                       node->tri->tet->index,
-                       node->tetVertex,
-                       adjTri[i]->tet->index,
-                       adjTri[i]->tetVertex
-                );
-                print_debug_info(pTriangle, graph1, pCuspRegion, NULL, NULL, 2);
+                uFatalError("construct_dual_graph", "symplectic_basis.c");
             }
 
             if (!visited[indices[i]] && indices[i] != -2)
@@ -541,9 +552,6 @@ void construct_dual_graph(Triangulation *manifold, struct Graph *graph1, struct 
 
         visited[index] = 1;
     }
-    
-    //remove_extra_edges(graph1);
-    //add_misc_edges(graph1, edges);
 
     my_free(visited);
 }
@@ -552,14 +560,14 @@ void init_zero_vertex(struct CuspRegion *vertex, struct CuspTriangle *pTri) {
     vertex->tri = pTri;
     vertex->tetVertex = 0;          // Tet Index
     vertex->tetIndex = 0;             // Tet Vertex
-    vertex->dist[0] = 0;             // dist to v1
-    vertex->dist[1] = flow(pTri, edgesThreeToFour[pTri->tetVertex][0])
-            + flow(pTri, edgesThreeToFour[pTri->tetVertex][1]);                       // dist to v2
+    vertex->dist[1] = 0;             // dist to v1
     vertex->dist[2] = flow(pTri, edgesThreeToFour[pTri->tetVertex][0])
+            + flow(pTri, edgesThreeToFour[pTri->tetVertex][1]);                       // dist to v2
+    vertex->dist[3] = flow(pTri, edgesThreeToFour[pTri->tetVertex][0])
             + flow(pTri, edgesThreeToFour[pTri->tetVertex][2]);                       // dist to v3
-    vertex->adjTri[0] = (flow(pTri, 1) == 0);
-    vertex->adjTri[1] = 1;
+    vertex->adjTri[1] = (flow(pTri, 1) == 0);
     vertex->adjTri[2] = 1;
+    vertex->adjTri[3] = 1;
 }
 
 /*
@@ -579,21 +587,20 @@ int insert_triangle_edge(struct Graph *g, int index, int face, struct CuspTriang
     y_face = EVALUATE(x->tet->gluing[face], face);
 
     // Calculate distance to vertex y_face
-    if (y->tetVertex == intersectTetVertex && y->tet->index == intersectTetIndex) {
+    if (y->tetVertex == intersectTetVertex && y->tetIndex == intersectTetIndex) {
         // Intersect vertex: cross to the closest cusp vertex and then to y_face vertex
-        dist = MIN(flow(y, y_vertex1) + pCuspRegion[index]->dist[edgesFourToThree[x->tetVertex][x_vertex1]],
-                   flow(y, y_vertex2) + pCuspRegion[index]->dist[edgesFourToThree[x->tetVertex][x_vertex2]])
-                           + flow(y, y_face);
+        dist = MIN(flow(y, y_vertex1) + pCuspRegion[index]->dist[x_vertex1],
+                   flow(y, y_vertex2) + pCuspRegion[index]->dist[x_vertex2]) + flow(y, y_face);
     } else {
         // Normal cusp triangle
         dist = flow(y, y_face);
 
-        if (pCuspRegion[index]->dist[edgesFourToThree[x->tetVertex][x_vertex1]] < flow(y, y_vertex1)) {
+        if (pCuspRegion[index]->dist[x_vertex1] < flow(y, y_vertex1)) {
             // Inside the flows around y_vertex1
-            dist += (flow(y, y_vertex1) - pCuspRegion[index]->dist[edgesFourToThree[x->tetVertex][x_vertex1]]);
+            dist += (flow(y, y_vertex1) - pCuspRegion[index]->dist[x_vertex1]);
         } else {
             // Inside the flows around y_vertex2 or center
-            dist += (flow(y, y_vertex2) - pCuspRegion[index]->dist[edgesFourToThree[x->tetVertex][x_vertex2]]);
+            dist += (flow(y, y_vertex2) - pCuspRegion[index]->dist[x_vertex2]);
         }
     }
 
@@ -617,7 +624,7 @@ int insert_triangle_edge(struct Graph *g, int index, int face, struct CuspTriang
     }
 
     // Update pCuspRegionIndex
-    pCuspRegion[index]->adjNodes[edgesFourToThree[x->tetVertex][face]] = i;
+    pCuspRegion[index]->adjNodes[face] = i;
 
     insert_edge(g, index, i, g->directed);
 
@@ -635,17 +642,23 @@ int is_equal(struct CuspRegion *xNode, struct CuspRegion *yNode, struct CuspTria
              int x_vertex1, int x_vertex2, int y_vertex1, int y_vertex2, int y_face, int dist) {
     int tetIndex, tetVertex, distTriVertex1, distTriVertex2, distTriVertex3, intersectFace;
 
-    tetIndex = y->tet->index == yNode->tetIndex;
+    /*
+     * Each cusp region is identified by the distance
+     * to each vertex of the cusp triangle, the cusp
+     * triangle it lies on (identified by tet index
+     * and tet vertex) and a final flag for handling
+     * the intersection triangle
+     */
+
+    tetIndex = y->tetIndex == yNode->tetIndex;
     tetVertex = y->tetVertex == yNode->tetVertex;
 
-    distTriVertex1 = (yNode->dist[edgesFourToThree[yNode->tetVertex][y_vertex1]] ==
-                      xNode->dist[edgesFourToThree[xNode->tetVertex][x_vertex1]]);
-    distTriVertex2 = (yNode->dist[edgesFourToThree[yNode->tetVertex][y_vertex2]] ==
-                      xNode->dist[edgesFourToThree[xNode->tetVertex][x_vertex2]]);
-    distTriVertex3 = yNode->dist[edgesFourToThree[yNode->tetVertex][y_face]] == dist;
+    distTriVertex1 = (yNode->dist[y_vertex1] == xNode->dist[x_vertex1]);
+    distTriVertex2 = (yNode->dist[y_vertex2] == xNode->dist[x_vertex2]);
+    distTriVertex3 = yNode->dist[y_face] == dist;
 
     if (yNode->tetIndex == intersectTetIndex && yNode->tetVertex == intersectTetVertex) {
-        intersectFace = yNode->adjTri[edgesFourToThree[yNode->tetVertex][y_face]];
+        intersectFace = yNode->adjTri[y_face];
     } else {
         intersectFace = TRUE;
     }
@@ -661,50 +674,61 @@ int is_equal(struct CuspRegion *xNode, struct CuspRegion *yNode, struct CuspTria
 
 void init_vertex(struct CuspRegion *xNode, struct CuspRegion *yNode, struct CuspTriangle *x, struct CuspTriangle *y,
                  int x_vertex1, int x_vertex2, int y_vertex1, int y_vertex2, int y_face, int dist) {
-    int i, cuspVertex;
+    int i;
 
     yNode->tri = y;
-    yNode->tetIndex = y->tet->index;
+    yNode->tetIndex = y->tetIndex;
     yNode->tetVertex = y->tetVertex;
-    yNode->dist[edgesFourToThree[y->tetVertex][y_vertex1]] = xNode->dist[edgesFourToThree[x->tetVertex][x_vertex1]];
-    yNode->dist[edgesFourToThree[y->tetVertex][y_vertex2]] = xNode->dist[edgesFourToThree[x->tetVertex][x_vertex2]];
-    yNode->dist[edgesFourToThree[y->tetVertex][y_face]] = dist;
+    yNode->dist[y_vertex1] = xNode->dist[x_vertex1];
+    yNode->dist[y_vertex2] = xNode->dist[x_vertex2];
+    yNode->dist[y_face] = dist;
 
     // add faces which can be reached
     if (y->tetVertex == intersectTetVertex && yNode->tetIndex == intersectTetIndex) {
         // Vertex lies on triangle with intersection
+
         if (atleast_two(!yNode->dist[0], !yNode->dist[1], !yNode->dist[2])) {
             // Center vertex, add to all adj tri's
-            yNode->adjTri[0] = 1;
-            yNode->adjTri[1] = 1;
-            yNode->adjTri[2] = 1;
+
+            for (i = 0; i < 4; i++)
+                yNode->adjTri[i] = 1;
+
         } else if (!yNode->dist[0] || !yNode->dist[1] || !yNode->dist[2]){
             // Can reach two edges
-            for (i = 0; i < 3; i++) {
-                cuspVertex = edgesThreeToFour[yNode->tetVertex][i];
+
+            for (i = 0; i < 4; i++) {
+                if (i == yNode->tetVertex)
+                    continue;
+
                 if (!yNode->dist[i]) {
-                    yNode->adjTri[edgesFourToThree[yNode->tetVertex][remaining_face[yNode->tetVertex][cuspVertex]]] = 1;
-                    yNode->adjTri[edgesFourToThree[yNode->tetVertex][remaining_face[cuspVertex][yNode->tetVertex]]] = 1;
+                    yNode->adjTri[remaining_face[yNode->tetVertex][i]] = 1;
+                    yNode->adjTri[remaining_face[i][yNode->tetVertex]] = 1;
                 }
             }
         } else {
             // Can reach one edge
+
             yNode->adjTri[edgesFourToThree[yNode->tetVertex][y_face]] = 1;
         }
     } else {
         // Normal cusp triangle
+
         if (is_center_vertex(yNode)) {
             // Center vertex, add to all adj tri's
-            yNode->adjTri[0] = 1;
-            yNode->adjTri[1] = 1;
-            yNode->adjTri[2] = 1;
+
+            for (i = 0; i < 4; i++)
+                yNode->adjTri[i] = 1;
+
         } else {
             // Can reach two edges
-            for (i = 0; i < 3; i++) {
-                cuspVertex = edgesThreeToFour[yNode->tetVertex][i];
-                if (yNode->dist[i] <= flow(yNode->tri, cuspVertex)) {
-                    yNode->adjTri[edgesFourToThree[yNode->tetVertex][remaining_face[yNode->tetVertex][cuspVertex]]] = 1;
-                    yNode->adjTri[edgesFourToThree[yNode->tetVertex][remaining_face[cuspVertex][yNode->tetVertex]]] = 1;
+
+            for (i = 0; i < 4; i++) {
+                if (i == yNode->tetVertex)
+                    continue;
+
+                if (yNode->dist[i] <= flow(yNode->tri, i)) {
+                    yNode->adjTri[remaining_face[yNode->tetVertex][i]] = 1;
+                    yNode->adjTri[remaining_face[i][yNode->tetVertex]] = 1;
                 }
             }
         }
@@ -719,13 +743,16 @@ void init_vertex(struct CuspRegion *xNode, struct CuspRegion *yNode, struct Cusp
  */
 
 int is_center_vertex(struct CuspRegion *y) {
-    int dist1, dist2, dist3;
+    int i, dist[4] = {1, 1, 1, 1};
 
-    dist1 = (flow(y->tri, edgesThreeToFour[y->tetVertex][0]) <= y->dist[0]);
-    dist2 = (flow(y->tri, edgesThreeToFour[y->tetVertex][1]) <= y->dist[1]);
-    dist3 = (flow(y->tri, edgesThreeToFour[y->tetVertex][2]) <= y->dist[2]);
+    for (i = 0; i < 4; i ++) {
+        if (i == y->tetVertex)
+            continue;
 
-    return dist1 && dist2 && dist3;
+        dist[i] = (flow(y->tri, i) <= y->dist[i]);
+    }
+
+    return dist[0] && dist[1] && dist[2] && dist[3];
 }
 
 /*
@@ -735,8 +762,8 @@ int is_center_vertex(struct CuspRegion *y) {
  */
 
 void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct CuspRegion **pCuspRegion,
-        int **dualCurve, int *dualCurveLen, int flag) {
-    int i, j, x_vertex1, x_vertex2, y_vertex1, y_vertex2;
+                      struct DualCurves *pDualCurves, int flag) {
+    int i, j, k, x_vertex1, x_vertex2, y_vertex1, y_vertex2, v1, v2, v3;
 
     struct CuspTriangle *tri;
     struct EdgeNode *edge ;
@@ -745,21 +772,24 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         // Gluing Info
         printf("Triangle gluing info\n");
         for (i = 0; i < numCuspTriangles; i++) {
-            for (j = 0; j < 3; j++) {
+            for (j = 0; j < 4; j++) {
+                if (j == pTriangle[i]->tetVertex)
+                    continue;
+
                 tri = pTriangle[i];
-                x_vertex1 = (int) remaining_face[tri->tetVertex][edgesThreeToFour[tri->tetVertex][j]];
-                x_vertex2 = (int) remaining_face[edgesThreeToFour[tri->tetVertex][j]][tri->tetVertex];
-                y_vertex1 = EVALUATE(tri->tet->gluing[edgesThreeToFour[tri->tetVertex][j]], x_vertex1);
-                y_vertex2 = EVALUATE(tri->tet->gluing[edgesThreeToFour[tri->tetVertex][j]], x_vertex2);
+                x_vertex1 = (int) remaining_face[tri->tetVertex][j];
+                x_vertex2 = (int) remaining_face[j][tri->tetVertex];
+                y_vertex1 = EVALUATE(tri->tet->gluing[j], x_vertex1);
+                y_vertex2 = EVALUATE(tri->tet->gluing[j], x_vertex2);
 
                 printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d glues to "
                        "(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d. (%d -> %d, %d -> %d)\n",
-                       tri->tet->index,               // Tet Index
+                       tri->tetIndex,               // Tet Index
                        tri->tetVertex,                // Tet Vertex
-                       edgesThreeToFour[tri->tetVertex][j],      // Cusp Edge
-                       tri->tet->neighbor[edgesThreeToFour[tri->tetVertex][j]]->index,                              // Tet Index
-                       EVALUATE(tri->tet->gluing[edgesThreeToFour[tri->tetVertex][j]], tri->tetVertex),             // Tet Vertex
-                       EVALUATE(tri->tet->gluing[edgesThreeToFour[tri->tetVertex][j]], edgesThreeToFour[tri->tetVertex][j]),   // Cusp Edge
+                       j,      // Cusp Edge
+                       tri->tet->neighbor[j]->index,                              // Tet Index
+                       EVALUATE(tri->tet->gluing[j], tri->tetVertex),             // Tet Vertex
+                       EVALUATE(tri->tet->gluing[j], j),   // Cusp Edge
                        x_vertex1, y_vertex1,
                        x_vertex2, y_vertex2
                        );
@@ -779,28 +809,29 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
                    pCuspRegion[g->pCuspRegionIndex[i]]->tetIndex,
                    pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex,
                    edgesThreeToFour[tri->tetVertex][0],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[0],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][0]],
                    edgesThreeToFour[tri->tetVertex][1],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[1],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][1]],
                    edgesThreeToFour[tri->tetVertex][2],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[2]
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][2]]
             );
         }
     } else if (flag == 2) {
         // Graph Info
         printf("Graph info\n");
         for (i = 0; i < g->nvertices; i++) {
+            tri = pCuspRegion[g->pCuspRegionIndex[i]]->tri;
             printf("Vertex %d (Tet Index: %d, Tet Vertex: %d) Region %d (Adj Tri: %d, %d, %d) (Dist: %d, %d, %d): ",
                    i,
-                   pCuspRegion[g->pCuspRegionIndex[i]]->tetIndex,
-                   pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex,
+                   tri->tetIndex,
+                   tri->tetVertex,
                    g->pCuspRegionIndex[i],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[0],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[1],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[2],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[0],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[1],
-                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[2]
+                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[edgesThreeToFour[tri->tetVertex][0]],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[edgesThreeToFour[tri->tetVertex][1]],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->adjTri[edgesThreeToFour[tri->tetVertex][2]],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][0]],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][1]],
+                   pCuspRegion[g->pCuspRegionIndex[i]]->dist[edgesThreeToFour[tri->tetVertex][2]]
                    );
             edge = g->edge_list_begin[i];
             while ((edge = edge->next)->next != NULL) {
@@ -811,32 +842,32 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
     } else if (flag == 3) {
         // Homology Info
         printf("Homology info\n");
-        printf("Longitudinal\n");
-        for (i = 0; i < numCuspTriangles; i++) {
-            tri = pTriangle[i];
-            printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d: %d, Cusp Edge %d: %d, Cusp Edge %d: %d\n",
-                   tri->tet->index,
-                   tri->tetVertex,
-                   edgesThreeToFour[tri->tetVertex][0],
-                   tri->tet->curve[0][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][0]],
-                   edgesThreeToFour[tri->tetVertex][1],
-                   tri->tet->curve[0][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][1]],
-                   edgesThreeToFour[tri->tetVertex][2],
-                   tri->tet->curve[0][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][2]]
-                );
-        }
         printf("Meridian\n");
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
             printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d: %d, Cusp Edge %d: %d, Cusp Edge %d: %d\n",
-                   tri->tet->index,
+                   tri->tetIndex,
                    tri->tetVertex,
                    edgesThreeToFour[tri->tetVertex][0],
-                   tri->tet->curve[1][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][0]],
+                   tri->tet->curve[M][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][0]],
                    edgesThreeToFour[tri->tetVertex][1],
-                   tri->tet->curve[1][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][1]],
+                   tri->tet->curve[M][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][1]],
                    edgesThreeToFour[tri->tetVertex][2],
-                   tri->tet->curve[1][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][2]]
+                   tri->tet->curve[M][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][2]]
+                );
+        }
+        printf("Longitude\n");
+        for (i = 0; i < numCuspTriangles; i++) {
+            tri = pTriangle[i];
+            printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d: %d, Cusp Edge %d: %d, Cusp Edge %d: %d\n",
+                   tri->tetIndex,
+                   tri->tetVertex,
+                   edgesThreeToFour[tri->tetVertex][0],
+                   tri->tet->curve[L][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][0]],
+                   edgesThreeToFour[tri->tetVertex][1],
+                   tri->tet->curve[L][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][1]],
+                   edgesThreeToFour[tri->tetVertex][2],
+                   tri->tet->curve[L][right_handed][tri->tetVertex][edgesThreeToFour[tri->tetVertex][2]]
                 );
         }
     } else if (flag == 4) {
@@ -844,33 +875,30 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         printf("Edge classes\n");
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
+            v1 = edgesThreeToFour[tri->tetVertex][0];
+            v2 = edgesThreeToFour[tri->tetVertex][1];
+            v3 = edgesThreeToFour[tri->tetVertex][2];
+
             printf("(Tet Index: %d, Tet Vertex: %d) Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d), "
                    "Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d), Vertex %d: (Edge Class: %d, Edge Index: %d, Face: %d)\n",
-                   tri->tet->index,
-                   tri->tetVertex,
-                   edgesThreeToFour[tri->tetVertex][0],
-                   tri->vertices[0].edgeIndex,
-                   tri->vertices[0].vertexIndex,
-                   tri->faces[0].index,
-                   edgesThreeToFour[tri->tetVertex][1],
-                   tri->vertices[1].edgeIndex,
-                   tri->vertices[1].vertexIndex,
-                   tri->faces[1].index,
-                   edgesThreeToFour[tri->tetVertex][2],
-                   tri->vertices[2].edgeIndex,
-                   tri->vertices[2].vertexIndex,
-                   tri->faces[2].index
+                   tri->tetIndex, tri->tetVertex,
+                   v1, tri->vertices[v1].edgeIndex, tri->vertices[v1].vertexIndex, tri->faces[v1].index,
+                   v2, tri->vertices[v2].edgeIndex, tri->vertices[v2].vertexIndex, tri->faces[v2].index,
+                   v3, tri->vertices[v3].edgeIndex, tri->vertices[v3].vertexIndex, tri->faces[v3].index
             );
         }
     } else if (flag == 5) {
         // Dual Curve Paths
         printf("Oscillating curve paths\n");
-        for (i = 0; i < 2 * numDualCurves; i++) {
-            printf("Curve %d: ", i);
+        for (i = 0; i < numDualCurves; i++) {
+            for (j = 0; j < 2; j++) {
+                printf("Curve %d: ", i);
 
-            for (j = 0; j < dualCurveLen[i]; j++) {
-                printf("%d ", dualCurve[i][j]);
+                for (k = 0; k < pDualCurves->dualCurves[j][i][k]; j++) {
+                    printf("%d ", pDualCurves->dualCurves[j][i][k]);
+                }
             }
+
             printf("\n");
         }
     } else if (flag == 6) {
@@ -879,7 +907,7 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         for (i = 0; i < numCuspTriangles; i++) {
             tri = pTriangle[i];
             printf("(Tet Index: %d, Tet Vertex: %d) Edge label (%d, %d, %d)\n",
-                   tri->tet->index,               // Tet Index
+                   tri->tetIndex,               // Tet Index
                    tri->tetVertex,                // Tet Vertex
                    edge3_between_faces[edgesThreeToFour[tri->tetVertex][1]][edgesThreeToFour[tri->tetVertex][2]],
                    edge3_between_faces[edgesThreeToFour[tri->tetVertex][0]][edgesThreeToFour[tri->tetVertex][2]],
@@ -900,12 +928,12 @@ int flow(struct CuspTriangle *tri, int vertex) {
     int mflow, lflow, retval;
 
     // Contribution from meridian curves
-    mflow = FLOW(tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
-                 tri->tet->curve[0][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
+    mflow = FLOW(tri->tet->curve[M][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
+                 tri->tet->curve[M][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
 
     // Contribution from longitudinal curves
-    lflow = FLOW(tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
-                 tri->tet->curve[1][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
+    lflow = FLOW(tri->tet->curve[L][right_handed][tri->tetVertex][remaining_face[tri->tetVertex][vertex]],
+                 tri->tet->curve[L][right_handed][tri->tetVertex][remaining_face[vertex][tri->tetVertex]]);
 
     retval = ABS(mflow) + ABS(lflow);
     return retval;
@@ -921,7 +949,7 @@ struct CuspTriangle *find_cusp_triangle(struct CuspTriangle **pTriangle, int tet
     int i;
 
     for (i = 0; i < numCuspTriangles; i++) {
-        if (tetIndex == pTriangle[i]->tet->index && tetVertex == pTriangle[i]->tetVertex)
+        if (tetIndex == pTriangle[i]->tetIndex && tetVertex == pTriangle[i]->tetVertex)
             return pTriangle[i];
     }
 
@@ -938,7 +966,7 @@ int find_cusp_triangle_index(struct CuspTriangle **pTriangle, int tetIndex, int 
     int i;
 
     for (i = 0; i < numCuspTriangles; i++) {
-        if (tetIndex == pTriangle[i]->tet->index && tetVertex == pTriangle[i]->tetVertex)
+        if (tetIndex == pTriangle[i]->tetIndex && tetVertex == pTriangle[i]->tetVertex)
             return i;
     }
 
@@ -950,31 +978,36 @@ int find_cusp_triangle_index(struct CuspTriangle **pTriangle, int tetIndex, int 
  */
 
 struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTriangle, struct CuspRegion **pCuspRegion,
-        int e0, struct PathEndPoint **pEndPoint, int **dualCurves, int *dualCurveLen) {
-    int i, startIndex, endIndex, startDualIndex, endDualIndex, pathLen;
+        struct DualCurves *pDualCurves) {
+    int i, pathLen;
     bool *processed = NEW_ARRAY(g->nvertices, bool);
     bool *discovered = NEW_ARRAY(g->nvertices, bool);
     int *parent = NEW_ARRAY(g->nvertices, int);
     int *path = NEW_ARRAY(g->nvertices, int);
 
-    find_index(g, pCuspRegion, e0, pEndPoint[2 * e0], pEndPoint[2 * e0 + 1]);
+    find_index(g, pCuspRegion, pDualCurves->e0, pDualCurves->pEndPoints[0][pDualCurves->e0],
+               pDualCurves->pEndPoints[1][pDualCurves->e0]);
 
     for (i = 0; i < numDualCurves; i++) {
-        if (i == e0)
+        if (i == pDualCurves->e0)
             continue;
 
-        find_index(g, pCuspRegion, i, pEndPoint[2 * i], pEndPoint[2 * i + 1]);
+        find_index(g, pCuspRegion, i, pDualCurves->pEndPoints[0][i], pDualCurves->pEndPoints[1][i]);
 
         // Find path using bfs
         init_search(g, processed, discovered, parent);
-        bfs(g, pEndPoint[2 * e0]->graphVertex, processed, discovered, parent);
-        find_path(pEndPoint[2 * e0]->graphVertex, pEndPoint[2 * i]->graphVertex, parent, path, 0, &pathLen);
-        dualCurves[2 * i] = path;
-        dualCurveLen[2 * i] = pathLen;
+        bfs(g, pDualCurves->pEndPoints[0][pDualCurves->e0]->graphVertex, processed, discovered, parent);
+        find_path(
+                pDualCurves->pEndPoints[0][pDualCurves->e0]->graphVertex,
+                pDualCurves->pEndPoints[0][i]->graphVertex, parent,
+                pDualCurves->dualCurves[0][i],
+                0,
+                &pDualCurves->dualCurvesLen[0][i]
+                );
 
         // Split graph
-        g = split_along_path(g, pCuspRegion, path, pathLen);
-        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+        g = split_along_path(g, pCuspRegion, pDualCurves->dualCurves[0][i], pDualCurves->dualCurvesLen[0][i]);
+        print_debug_info(pTriangle, g, pCuspRegion, pDualCurves, 2);
 
         // Reallocate memory
         my_free(processed);
@@ -987,14 +1020,18 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
         // Repeat for the other half of the curve
         init_search(g, processed, discovered, parent);
-        bfs(g, pEndPoint[2 * e0 + 1]->graphVertex, processed, discovered, parent);
-        find_path(pEndPoint[2 * e0 + 1]->graphVertex, pEndPoint[2 * i + 1]->graphVertex, parent, path, 0, &pathLen);
-        dualCurves[2 * i + 1] = path;
-        dualCurveLen[2 * i + 1] = pathLen;
+        bfs(g, pDualCurves->pEndPoints[1][pDualCurves->e0]->graphVertex, processed, discovered, parent);
+        find_path(
+                pDualCurves->pEndPoints[1][pDualCurves->e0]->graphVertex,
+                pDualCurves->pEndPoints[1][i]->graphVertex, parent,
+                pDualCurves->dualCurves[1][i],
+                0,
+                &pDualCurves->dualCurvesLen[1][i]
+        );
 
         // Split graph
-        g = split_along_path(g, pCuspRegion, path, pathLen);
-        print_debug_info(pTriangle, g, pCuspRegion, dualCurves, dualCurveLen, 2);
+        g = split_along_path(g, pCuspRegion, pDualCurves->dualCurves[1][i], pDualCurves->dualCurvesLen[1][i]);
+        print_debug_info(pTriangle, g, pCuspRegion, pDualCurves, 2);
 
         // Re allocate memory
         my_free(processed);
@@ -1022,15 +1059,20 @@ struct Graph *construct_dual_curves(struct Graph *g, struct CuspTriangle **pTria
 
 void find_index(struct Graph *g, struct CuspRegion **pCuspRegion, int edgeClass, struct PathEndPoint *endPoint0, struct PathEndPoint *endPoint1) {
     int i, j;
+    struct CuspRegion *pRegion;
     bool found = FALSE;
 
     for (i = 0; i < g->nvertices; i++) {
-        for (j = 0; j < 3; j++) {
-            if (pCuspRegion[g->pCuspRegionIndex[i]]->tri->vertices[j].edgeIndex == edgeClass &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->tri->vertices[j].vertexIndex == 0 &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->dist[j] == 0) {
+        pRegion = pCuspRegion[g->pCuspRegionIndex[i]];
+        for (j = 0; j < 4; j++) {
+            if (j == pRegion->tetVertex)
+                continue;
+
+            if (pRegion->tri->vertices[j].edgeIndex == edgeClass &&
+                pRegion->tri->vertices[j].vertexIndex == 0 &&
+                pRegion->dist[j] == 0) {
                 endPoint0->region = pCuspRegion[g->pCuspRegionIndex[i]];
-                endPoint0->vertex = edgesThreeToFour[pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex][j];
+                endPoint0->vertex = j;
                 endPoint0->face = (int) remaining_face[endPoint0->region->tetVertex][endPoint0->vertex];
                 endPoint0->graphVertex = i;
                 found = TRUE;
@@ -1043,15 +1085,20 @@ void find_index(struct Graph *g, struct CuspRegion **pCuspRegion, int edgeClass,
     }
 
     for (i = 0; i < g->nvertices; i++) {
-        for (j = 0; j < 3; j++) {
-            if (pCuspRegion[g->pCuspRegionIndex[i]]->tri->vertices[j].edgeIndex == edgeClass &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->tri->vertices[j].vertexIndex == 1 &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->tetIndex == endPoint0->region->tetIndex &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex == endPoint0->vertex &&
-                edgesThreeToFour[pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex][j] == endPoint0->region->tetVertex &&
-                pCuspRegion[g->pCuspRegionIndex[i]]->dist[j] == 0) {
-                endPoint1->region = pCuspRegion[g->pCuspRegionIndex[i]];
-                endPoint1->vertex = edgesThreeToFour[pCuspRegion[g->pCuspRegionIndex[i]]->tetVertex][j];
+        pRegion = pCuspRegion[g->pCuspRegionIndex[i]];
+
+        for (j = 0; j < 4; j++) {
+            if (j == pRegion->tetVertex)
+                continue;
+
+            if (pRegion->tri->vertices[j].edgeIndex == edgeClass &&
+                pRegion->tri->vertices[j].vertexIndex == 1 &&
+                pRegion->tetIndex == endPoint0->region->tetIndex &&
+                pRegion->tetVertex == endPoint0->vertex &&
+                j == endPoint0->region->tetVertex &&
+                pRegion->dist[j] == 0) {
+                endPoint1->region = pRegion;
+                endPoint1->vertex = j;
                 endPoint1->face = (int) remaining_face[endPoint0->vertex][endPoint0->region->tetVertex];
                 endPoint1->graphVertex = i;
                 return;
@@ -1066,18 +1113,17 @@ void find_index(struct Graph *g, struct CuspRegion **pCuspRegion, int edgeClass,
  * Construct the symplectic equations from the dual curves
  */
 
-void find_holonomies(struct Graph *g, struct CuspRegion **pCuspRegion, struct PathEndPoint **pEndPoint,
-        int **symp_eqns, int **dualCurves, int *dualCurveLen, int e0) {
+void find_holonomies(struct Graph *g, struct CuspRegion **pCuspRegion, struct DualCurves *pDualCurves, int **symp_eqns) {
     int i;
 
     for (i = 0; i < numDualCurves; i++) {
-        if (i == e0)
+        if (i == pDualCurves->e0)
             continue;
 
-        find_path_holonomy(g, pCuspRegion, pEndPoint[2 * i], pEndPoint[2 * e0], symp_eqns[i],
-                           dualCurves[2 * i], dualCurveLen[2 * i]);
-        find_path_holonomy(g, pCuspRegion, pEndPoint[2 * i + 1], pEndPoint[2 * e0 + 1],symp_eqns[i],
-                           dualCurves[2 * i + 1], dualCurveLen[2 * i + 1]);
+        find_path_holonomy(g, pCuspRegion, pDualCurves->pEndPoints[0][i], pDualCurves->pEndPoints[0][pDualCurves->e0],
+                           symp_eqns[i], pDualCurves->dualCurves[0][i], pDualCurves->dualCurvesLen[0][i]);
+        find_path_holonomy(g, pCuspRegion, pDualCurves->pEndPoints[1][i], pDualCurves->pEndPoints[1][pDualCurves->e0],
+                           symp_eqns[i], pDualCurves->dualCurves[1][i], pDualCurves->dualCurvesLen[1][i]);
     }
 }
 
@@ -1124,9 +1170,12 @@ void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct
                 endPoint = pathEndPoint;
 
             // Find the face the next vertex lies across
-            for (j = 0; j < 3; j++) {
+            for (j = 0; j < 4; j++) {
+                if (j == endPoint->region->tetVertex)
+                    continue;
+
                 if (endPoint->region->adjNodes[j] == g->pCuspRegionIndex[path[midNodeIndex]]) {
-                    face = edgesThreeToFour[endPoint->region->tetVertex][j];
+                    face = j;
                     break;
                 }
             }
@@ -1188,21 +1237,22 @@ void find_path_holonomy(struct Graph *g, struct CuspRegion **pCuspRegion, struct
  */
 
 void inside_vertex(struct CuspRegion *midNode, int first, int mid, int last, int *insideVertex, int *face) {
-    int i, vertex, vertex1, vertex2;
+    int i, vertex1, vertex2;
 
-    for (i = 0; i < 3; i++) {
-        vertex = edgesThreeToFour[midNode->tetVertex][i];
+    for (i = 0; i < 4; i++) {
+        if (i == midNode->tetVertex)
+            continue;
 
-        vertex1 = edgesFourToThree[midNode->tetVertex][(int) remaining_face[midNode->tetVertex][vertex]];
-        vertex2 = edgesFourToThree[midNode->tetVertex][(int) remaining_face[vertex][midNode->tetVertex]];
+        vertex1 = (int) remaining_face[midNode->tetVertex][i];
+        vertex2 = (int) remaining_face[i][midNode->tetVertex];
 
         if (midNode->adjNodes[vertex1] == first && midNode->adjNodes[vertex2] == last) {
-            *insideVertex = vertex;
-            *face = (int) edgesThreeToFour[midNode->tetVertex][vertex1];
+            *insideVertex = i;
+            *face = vertex1;
             return;
         } else if (midNode->adjNodes[vertex2] == first && midNode->adjNodes[vertex1] == last) {
-            *insideVertex = vertex;
-            *face = (int) edgesThreeToFour[midNode->tetVertex][vertex2];
+            *insideVertex = i;
+            *face = vertex2;
             return;
         }
     }
@@ -1286,7 +1336,7 @@ void add_non_path_edges(struct Graph *graph1, struct Graph *graph2, int *path, i
 void add_path_edges(struct Graph *graph1, struct Graph *graph2, struct CuspRegion **pCuspRegion, int *path, int pathLen) {
     int i, j, xLeftVertex, xRightVertex, yLeftVertex, yRightVertex, face;
     struct EdgeNode *edge;
-    struct CuspRegion *xRegion, *yRegion;
+    struct CuspRegion *xRegion;
     bool left = FALSE;
 
     if (pathLen == 0) {
@@ -1298,11 +1348,13 @@ void add_path_edges(struct Graph *graph1, struct Graph *graph2, struct CuspRegio
 
         if (i != pathLen - 1) {
             xRegion = pCuspRegion[graph1->pCuspRegionIndex[path[i]]];
-            yRegion = pCuspRegion[graph1->pCuspRegionIndex[path[i + 1]]];
 
-            for (j = 0; j < 3; j++) {
+            for (j = 0; j < 4; j++) {
+                if (j == xRegion->tetVertex)
+                    continue;
+
                 if (xRegion->adjNodes[j] == graph1->pCuspRegionIndex[path[i + 1]]) {
-                    face = edgesThreeToFour[xRegion->tetVertex][j];
+                    face = j;
                     break;
                 }
             }
