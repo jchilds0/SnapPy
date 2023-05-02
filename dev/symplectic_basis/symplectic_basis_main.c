@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 void printMatrix(int**, int, int);
-void mergeRows(Triangulation *);
 
 int main(void) {
     int **eqns, num_rows, num_cols;
