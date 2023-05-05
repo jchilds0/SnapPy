@@ -36,8 +36,8 @@ struct Node {
 */
 
 struct CuspVertex {
+    int edgeClass;
     int edgeIndex;
-    int vertexIndex;
     EdgeClass *edge;
     int v1;
     int v2;
@@ -57,10 +57,10 @@ struct CuspRegion {
     struct CuspTriangle *tri;
     int tetIndex;
     int tetVertex;
-    int dist[4];                /** number of curves between the region and a vertex */
-    int dive[4][4];             /** can a curve carried by this edge dive into this vertex? */
+    int curve[4][4];            /** looking at face, number of curves between the region and vertex */
     int adjTri[4];              /** does the region meet this edge of the cusp triangle */
     int adjRegions[4];          /** index of the adjacent regions */
+    int dive[4][4];             /** can we dive along the face into this vertex */
 };
 
 struct DualCurves {
@@ -75,7 +75,6 @@ struct DualCurves {
 struct PathEndPoint {
     int face;                       // face containg the short rectangle carrying the curve
     int vertex;                     // vertex we dive through the manifold along
-    int graphVertex;                // vertex of the graph
     int regionIndex;
     struct CuspRegion *region;
 };
@@ -111,6 +110,7 @@ void                    walk_around_vertex(struct CuspTriangle **, struct CuspTr
 void                    free_cusp_triangulation(struct CuspTriangle **);
 struct CuspRegion       **init_cusp_region(struct CuspTriangle **);
 void                    free_cusp_region(struct CuspRegion **);
+void                    init_region(struct CuspRegion *, struct CuspTriangle *, int [4], int [4]);
 int                     find_adj_region_index(struct CuspRegion **pCuspRegion, struct CuspRegion *region, int face);
 void                    update_adj_regions(struct CuspRegion **);
 struct DualCurves       **init_oscillating_curves(int);
@@ -124,10 +124,13 @@ void                    print_debug_info(struct CuspTriangle **, struct Graph *,
 void                    label_triangulation_edges(Triangulation *);
 void                    construct_dual_curves(struct CuspTriangle **, struct CuspRegion **, struct DualCurves **, int);
 void                    find_path_endpoints(struct Graph *, struct CuspRegion **, int, struct PathEndPoint *, struct PathEndPoint *);
+int                     find_exit_region(struct CuspRegion **, int, int, int, int, int, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int, int);
 void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, int);
+void                    update_cusp_triangle_endpoints(struct CuspRegion **, struct CuspRegion *, struct PathEndPoint *, int);
 void                    copy_region(struct CuspRegion *, struct CuspRegion *);
+int                     dist(struct CuspRegion *, int);
 void                    find_holonomies(struct CuspRegion **, struct DualCurves **, int, int **);
 void                    find_path_holonomy(struct CuspRegion **, struct DualCurves *, int, int *);
 void                    inside_vertex(struct CuspRegion *, struct EdgeNode *, int *, int *);
