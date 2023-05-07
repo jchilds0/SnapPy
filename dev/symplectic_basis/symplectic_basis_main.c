@@ -19,11 +19,14 @@ int main(void) {
 
     int count = 1;
     int numTet[] = {5};
-    int index[][2] = {{4, 5}};
+    int index[][2] = {{1, 30}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
             theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, j);
+
+            if (get_orientability(theTriangulation) == nonorientable_manifold)
+                continue;
 
             printf("Num Tet: %d Index: %d\n", numTet[i], j);
             if (theTriangulation != NULL) {
