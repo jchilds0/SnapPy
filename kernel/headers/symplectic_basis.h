@@ -128,9 +128,9 @@ struct CuspRegion       **construct_dual_curves(struct CuspTriangle **, struct C
 void                    find_path_endpoints(struct Graph *, struct CuspRegion **, struct DualCurves *, int, int, int);
 void                    update_path_info(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
-struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int, int);
+struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int);
 void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, int);
-void                    update_cusp_triangle_endpoints(struct CuspRegion **, struct CuspRegion *, struct PathEndPoint *, int);
+void                    update_cusp_triangle_endpoints(struct CuspRegion **, struct CuspRegion *, struct PathEndPoint *, struct EdgeNode *);
 void                    copy_region(struct CuspRegion *, struct CuspRegion *);
 int                     dist(struct CuspRegion *, int);
 void                    find_holonomies(struct CuspRegion **, struct DualCurves **, int, int **);
