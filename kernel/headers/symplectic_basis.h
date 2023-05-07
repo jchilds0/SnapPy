@@ -63,6 +63,13 @@ struct CuspRegion {
     int dive[4][4];             /** can we dive along the face into this vertex */
 };
 
+struct PathEndPoint {
+    int face;                       // face containg the short rectangle carrying the curve
+    int vertex;                     // vertex we dive through the manifold along
+    int regionIndex;
+    struct CuspRegion *region;
+};
+
 struct DualCurves {
     struct EdgeNode *curves[2][2];
     struct PathEndPoint *endpoints[2][2];
@@ -72,15 +79,10 @@ struct DualCurves {
  * Graph
  */
 
-struct PathEndPoint {
-    int face;                       // face containg the short rectangle carrying the curve
-    int vertex;                     // vertex we dive through the manifold along
-    int regionIndex;
-    struct CuspRegion *region;
-};
-
 struct EdgeNode {
     int y;
+    int face;
+    int insideVertex;
     struct EdgeNode *next;
     struct EdgeNode *prev;
 };
@@ -122,9 +124,9 @@ int                     flow(struct CuspTriangle *, int);
 int                     find_cusp_triangle_index(struct CuspTriangle **, int, int);
 void                    print_debug_info(struct CuspTriangle **, struct Graph *, struct CuspRegion **, struct DualCurves **, int);
 void                    label_triangulation_edges(Triangulation *);
-void                    construct_dual_curves(struct CuspTriangle **, struct CuspRegion **, struct DualCurves **, int);
-void                    find_path_endpoints(struct Graph *, struct CuspRegion **, int, struct PathEndPoint *, struct PathEndPoint *);
-int                     find_exit_region(struct CuspRegion **, int, int, int, int, int, int);
+struct CuspRegion       **construct_dual_curves(struct CuspTriangle **, struct CuspRegion **, struct DualCurves **, int);
+void                    find_path_endpoints(struct Graph *, struct CuspRegion **, struct DualCurves *, int, int, int);
+void                    update_path_info(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int, int);
 void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, int);
