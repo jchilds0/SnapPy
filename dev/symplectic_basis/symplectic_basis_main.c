@@ -14,17 +14,26 @@
 void printMatrix(int**, int, int);
 
 int main(void) {
-    int **eqns, num_rows, num_cols;
+    int i, j, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
+    int count = 1;
+    int numTet[] = {5};
+    int index[][2] = {{4, 5}};
 
-    if (theTriangulation != NULL) {
-        eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
-        printMatrix(eqns, num_cols, num_rows);
-        free_symplectic_basis(eqns, num_rows);
-    } else
-        printf("Couldn't read census manifold.\n");
+    for (i = 0; i < count; i++) {
+        for (j = index[i][0]; j < index[i][1]; j++) {
+            theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, j);
+
+            printf("Num Tet: %d Index: %d\n", numTet[i], j);
+            if (theTriangulation != NULL) {
+                eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
+                printMatrix(eqns, num_cols, num_rows);
+                free_symplectic_basis(eqns, num_rows);
+            } else
+                printf("Couldn't read census manifold.\n");
+        }
+    }
 
     return 0;
 }
