@@ -81,7 +81,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  */
 static int numCuspTriangles, numCuspRegions, numDualCurves, numEdgeClasses, genus;
 static int intersectTetIndex, intersectTetVertex;
-static int debug = TRUE;
+static int debug = FALSE;
 
 int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols, int e0) {
     int i, j, T = manifold -> num_tetrahedra;
@@ -1104,7 +1104,7 @@ void update_path_info(struct CuspRegion **pCuspRegion, struct DualCurves *path, 
 
     while ((node = node->next)->next->next != NULL) {
         inside_vertex(pCuspRegion[node->y], node, &insideVertex, &face);
-        node->insideVertex = insideVertex;
+        node->insideVertex = insideVertex == -1 ? face : insideVertex;
         node->face = face;
     }
 
@@ -1200,7 +1200,7 @@ struct CuspRegion **update_cusp_regions(struct CuspRegion **pCuspRegion, struct 
 
     // interior edges
     while ((node = node->next)->next->next != NULL) {
-        update_cusp_triangle(newCuspRegion, newCuspRegion[node->y], node->insideVertex);
+        update_cusp_triangle(newCuspRegion, newCuspRegion[node->y], node);
         newCuspRegion[index] = update_cusp_region_node(newCuspRegion[node->y], node,
                                                        path->endpoints[curveNum][START], 0);
         index++;
@@ -1259,13 +1259,12 @@ struct CuspRegion *update_cusp_region_node(struct CuspRegion *region, struct Edg
         region->adjTri[vertex2] = 0;
     } else if (node->face == endPoint->face) {
         // curve passes through the face that carries it
-        newRegion->curve[endPoint->face][node->insideVertex]++;
-        newRegion->dive[endPoint->face][node->insideVertex] = 0;
+        newRegion->curve[endPoint->face][endPoint->face == vertex1 ? vertex2 : vertex1]++;
+        newRegion->dive[endPoint->face][endPoint->face == vertex1 ? vertex2 : vertex1] = 0;
         newRegion->adjTri[endPoint->vertex] = 0;
-        newRegion->adjTri[node->insideVertex] = 0;
+        newRegion->adjTri[endPoint->face == vertex1 ? vertex2 : vertex1] = 0;
 
         region->curve[endPoint->face][endPoint->vertex]++;
-        region->dive[endPoint->face][endPoint->vertex] = 0;
     } else {
         // Curve goes around the vertex
         newRegion->curve[node->face][endPoint->face]++;
@@ -1301,69 +1300,65 @@ void copy_region(struct CuspRegion *region1, struct CuspRegion *region2) {
     }
 }
 
-void update_cusp_triangle(struct CuspRegion **pCuspRegion, struct CuspRegion *region, int insideVertex) {
-    int i, vertex1, vertex2;
+void update_cusp_triangle(struct CuspRegion **pCuspRegion, struct CuspRegion *region, struct EdgeNode *node) {
+    int i, face1, face2;
 
-    vertex1 = (int) remaining_face[region->tetVertex][insideVertex];
-    vertex2 = (int) remaining_face[insideVertex][region->tetVertex];
+    face1 = (int) remaining_face[region->tetVertex][node->insideVertex];
+    face2 = (int) remaining_face[node->insideVertex][region->tetVertex];
 
     for (i = 0; i < numCuspRegions; i++) {
+        // is the region initialised?
         if (pCuspRegion[i] == NULL || pCuspRegion[i]->tetIndex == -1)
             continue;
 
+        // which triangle are we in?
         if (pCuspRegion[i]->tetIndex != region->tetIndex || pCuspRegion[i]->tetVertex != region->tetVertex)
             continue;
 
-        if (dist(pCuspRegion[i], insideVertex) > dist(region, insideVertex)) {
-            pCuspRegion[i]->curve[vertex1][insideVertex]++;
-            pCuspRegion[i]->curve[vertex2][insideVertex]++;
-        } else if (dist(pCuspRegion[i], insideVertex) == dist(region, insideVertex))
-            continue;
-        else {
-            pCuspRegion[i]->curve[vertex2][vertex1]++;
-            pCuspRegion[i]->curve[vertex1][vertex2]++;
-        }
+        if (pCuspRegion[i]->curve[face1][node->insideVertex] > region->curve[face1][node->insideVertex])
+            pCuspRegion[i]->curve[face1][node->insideVertex]++;
+        else if (pCuspRegion[i]->curve[face1][node->insideVertex] < region->curve[face1][node->insideVertex])
+            pCuspRegion[i]->curve[face1][face2]++;
+
+        if (pCuspRegion[i]->curve[face2][node->insideVertex] > region->curve[face2][node->insideVertex])
+            pCuspRegion[i]->curve[face2][node->insideVertex]++;
+        else if (pCuspRegion[i]->curve[face2][node->insideVertex] < region->curve[face2][node->insideVertex])
+            pCuspRegion[i]->curve[face2][face1]++;
     }
 }
 
 void update_cusp_triangle_endpoints(struct CuspRegion **pCuspRegion, struct CuspRegion *region, struct PathEndPoint *endPoint, struct EdgeNode *node) {
-    int i, vertex1, vertex2;
+    int i, face1, face2;
 
-    vertex1 = (int) remaining_face[region->tetVertex][endPoint->vertex];
-    vertex2 = (int) remaining_face[endPoint->vertex][region->tetVertex];
+    face1 = (int) remaining_face[region->tetVertex][endPoint->vertex];
+    face2 = (int) remaining_face[endPoint->vertex][region->tetVertex];
 
     for (i = 0; i < numCuspRegions; i++) {
         if (pCuspRegion[i] == NULL || pCuspRegion[i]->tetIndex == -1)
             continue;
 
+        // which triangle are we in?
         if (pCuspRegion[i]->tetIndex != region->tetIndex || pCuspRegion[i]->tetVertex != region->tetVertex)
             continue;
 
         if (node->face == endPoint->vertex) {
             // curve passes through the face opposite the vertex it dives through
-            if (dist(pCuspRegion[i], vertex1) > dist(region, vertex1)) {
-                pCuspRegion[i]->curve[node->face][vertex1]++;
-                pCuspRegion[i]->dive[node->face][vertex1] = 0;
-
-            } else if (dist(pCuspRegion[i], vertex1) == dist(region, vertex1))
-                continue;
-            else {
-                pCuspRegion[i]->curve[node->face][vertex2]++;
-                pCuspRegion[i]->dive[node->face][vertex2] = 0;
+            if (pCuspRegion[i]->curve[endPoint->vertex][face1] > region->curve[endPoint->vertex][face1]) {
+                pCuspRegion[i]->curve[node->face][face1]++;
+                pCuspRegion[i]->dive[node->face][face1] = 0;
+            } else if (pCuspRegion[i]->curve[endPoint->vertex][face1] < region->curve[endPoint->vertex][face1]) {
+                pCuspRegion[i]->curve[node->face][face2]++;
+                pCuspRegion[i]->dive[node->face][face2] = 0;
             }
             continue;
         }
 
         // Curve goes around the vertex or passes through the face that carries it
-        if (dist(pCuspRegion[i], endPoint->vertex) > dist(region, endPoint->vertex)) {
-            // Endpoint edge case
+        if (pCuspRegion[i]->curve[node->face][endPoint->vertex] > region->curve[node->face][endPoint->vertex]) {
             pCuspRegion[i]->curve[node->face][endPoint->vertex]++;
             pCuspRegion[i]->dive[node->face][endPoint->vertex] = 0;
-        } else if (dist(pCuspRegion[i], endPoint->vertex) == dist(region, endPoint->vertex))
-            continue;
-        else {
-            pCuspRegion[i]->curve[node->face][node->face == vertex1 ? vertex2 : vertex1]++;
-            pCuspRegion[i]->dive[node->face][node->face == vertex1 ? vertex2 : vertex1] = 0;
+        } else if (pCuspRegion[i]->curve[node->face][endPoint->vertex] < region->curve[node->face][endPoint->vertex]) {
+            pCuspRegion[i]->curve[node->face][node->face == face1 ? face2 : face1]++;
         }
     }
 
@@ -1473,7 +1468,7 @@ void find_path_holonomy(struct CuspRegion **pCuspRegion, struct DualCurves *curv
 
         midNode = pCuspRegion[node->y];
 
-        if (node->insideVertex == -1) {
+        if (node->insideVertex == node->face) {
             printf("didn't find inside vertex\n");
             continue;
         }
@@ -1512,7 +1507,19 @@ void inside_vertex(struct CuspRegion *midNode, struct EdgeNode *node, int *insid
         }
     }
 
-    *insideVertex = -1;
+    for (i = 0; i < 4; i++) {
+        if (i == midNode->tetVertex)
+            continue;
+
+        if (midNode->adjRegions[i] == node->next->y || midNode->adjRegions[i] == node->prev->y) {
+            *insideVertex = -1;
+            *face = i;
+            return;
+        }
+    }
+
+    // where does the next node go?
+    uFatalError("inside_vertex", "symplectic_basis");
 }
 
 // ---------------------------------------------------------------
