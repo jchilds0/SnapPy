@@ -129,7 +129,7 @@ void                    find_path_endpoints(struct Graph *, struct CuspRegion **
 void                    update_path_info(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int);
-void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, int);
+void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, struct EdgeNode *);
 void                    update_cusp_triangle_endpoints(struct CuspRegion **, struct CuspRegion *, struct PathEndPoint *, struct EdgeNode *);
 void                    copy_region(struct CuspRegion *, struct CuspRegion *);
 int                     dist(struct CuspRegion *, int);
