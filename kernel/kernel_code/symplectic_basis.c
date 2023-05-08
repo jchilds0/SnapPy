@@ -885,6 +885,9 @@ void print_debug_info(struct CuspTriangle **pTriangle, struct Graph *g, struct C
         // end point info
         printf("EndPoint Info\n");
         for (i = 0; i < numDualCurves; i++) {
+            if (i == 0)
+                continue;
+
             path = pDualCurves[i];
             for (j = 0; j < 2; j++) {
                 for (k = 0; k < 2; k++) {
@@ -950,6 +953,8 @@ struct CuspRegion **construct_dual_curves(struct CuspTriangle **pTriangle, struc
     struct Graph *graph1 = construct_dual_graph(pCuspRegion);
 
     print_debug_info(pTriangle, graph1, pCuspRegion, pDualCurves, 7);
+    find_path_endpoints_e0(graph1, pCuspRegion, pDualCurves[e0], NULL, e0, 0);
+    find_path_endpoints_e0(graph1, pCuspRegion, pDualCurves[e0], NULL, e0, 1);
 
     for (i = 0; i < numDualCurves; i++) {
         if (i == e0)
@@ -958,7 +963,7 @@ struct CuspRegion **construct_dual_curves(struct CuspTriangle **pTriangle, struc
 
         // which half of the curve
         for (j = 0; j < 2; j++) {
-            find_path_endpoints(graph1, pCuspRegion, pDualCurves[i], e0, j, START);
+            find_path_endpoints_e0(graph1, pCuspRegion, pDualCurves[e0], pDualCurves[i], e0, j);
             find_path_endpoints(graph1, pCuspRegion, pDualCurves[i], i, j, FINISH);
             processed = NEW_ARRAY(graph1->nVertices, bool);
             discovered = NEW_ARRAY(graph1->nVertices, bool);
@@ -992,6 +997,82 @@ struct CuspRegion **construct_dual_curves(struct CuspTriangle **pTriangle, struc
 
     my_free(graph1);
     return pCuspRegion;
+}
+
+void find_path_endpoints_e0(struct Graph *g, struct CuspRegion **pCuspRegion, struct DualCurves *pathE0,
+        struct DualCurves *path, int edgeClass, int curveNum) {
+    int i, vertex, face1, face2, face;
+    struct CuspRegion *pRegion;
+
+    // which cusp region
+    for (i = 0; i < g->nVertices; i++) {
+        if (g->pRegion[i] == NULL)
+            continue;
+
+        pRegion = g->pRegion[i];
+        // which vertex to dive through
+        for (vertex = 0; vertex < 4; vertex++) {
+            if (vertex == pRegion->tetVertex)
+                continue;
+
+            // does the vertex belong to the correct class
+            if (pRegion->tri->vertices[vertex].edgeClass != edgeClass ||
+                pRegion->tri->vertices[vertex].edgeIndex != curveNum) {
+                continue;
+            }
+
+            if (path == NULL) {
+                if (curveNum == 0) {
+                    // find a valid region and face to dive through
+                    face1 = (int) remaining_face[pRegion->tetVertex][vertex];
+                    face2 = (int) remaining_face[vertex][pRegion->tetVertex];
+
+                    if (pRegion->dive[face1][vertex])
+                        face = face1;
+                    else if (pRegion->dive[face2][vertex])
+                        face = face2;
+                    else
+                        continue;
+                } else {
+                    if (pRegion->tetIndex != pathE0->endpoints[0][START]->region->tetIndex ||
+                        pRegion->tetVertex != pathE0->endpoints[0][START]->vertex ||
+                        vertex != pathE0->endpoints[0][START]->region->tetVertex)
+                        continue;
+
+                    face = pathE0->endpoints[0][START]->face;
+
+                    if (!pRegion->dive[face][vertex])
+                        continue;
+                }
+
+                path = pathE0;
+            } else if (curveNum == 0 || curveNum == 1) {
+                // make the endpoint consistent with e0
+                // find the region corresponding to curve 0
+                if (pRegion->tetIndex != pathE0->endpoints[curveNum][START]->region->tetIndex ||
+                    pRegion->tetVertex != pathE0->endpoints[curveNum][START]->region->tetVertex ||
+                    vertex != pathE0->endpoints[curveNum][START]->vertex)
+                    continue;
+
+                face = pathE0->endpoints[curveNum][START]->face;
+
+                if (!pRegion->dive[face][vertex])
+                    continue;
+            } else {
+                // invalid curveNum
+                uFatalError("find_path_endpoints_e0", "symplectic_basis");
+            }
+
+            path->endpoints[curveNum][START]->region = pRegion;
+            path->endpoints[curveNum][START]->vertex = vertex;
+            path->endpoints[curveNum][START]->face = face;
+            path->endpoints[curveNum][START]->regionIndex = i;
+            return;
+        }
+    }
+
+    // didn't find valid path endpoints
+    uFatalError("find_path_endpoints_e0", "symplectic_basis");
 }
 
 /*
