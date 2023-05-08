@@ -125,6 +125,7 @@ int                     find_cusp_triangle_index(struct CuspTriangle **, int, in
 void                    print_debug_info(struct CuspTriangle **, struct Graph *, struct CuspRegion **, struct DualCurves **, int);
 void                    label_triangulation_edges(Triangulation *);
 struct CuspRegion       **construct_dual_curves(struct CuspTriangle **, struct CuspRegion **, struct DualCurves **, int);
+void                    find_path_endpoints_e0(struct Graph *, struct CuspRegion **, struct DualCurves *, struct DualCurves *, int, int);
 void                    find_path_endpoints(struct Graph *, struct CuspRegion **, struct DualCurves *, int, int, int);
 void                    update_path_info(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
@@ -132,7 +133,6 @@ struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct Edg
 void                    update_cusp_triangle(struct CuspRegion **, struct CuspRegion *, struct EdgeNode *);
 void                    update_cusp_triangle_endpoints(struct CuspRegion **, struct CuspRegion *, struct PathEndPoint *, struct EdgeNode *);
 void                    copy_region(struct CuspRegion *, struct CuspRegion *);
-int                     dist(struct CuspRegion *, int);
 void                    find_holonomies(struct CuspRegion **, struct DualCurves **, int, int **);
 void                    find_path_holonomy(struct CuspRegion **, struct DualCurves *, int, int *);
 void                    inside_vertex(struct CuspRegion *, struct EdgeNode *, int *, int *);
