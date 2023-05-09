@@ -1,9 +1,5 @@
 /*
- *	unix_cusped_census_main.c
  *
- *	The main() in this file illustrates the use of the unix-style
- *	GetCuspedCensusManifold().  It reads all the manifolds of
- *	5 or fewer tetrahedra and prints their volumes.
  */
 
 #include "SnapPea.h"
@@ -19,12 +15,12 @@ int main(void) {
 
     int count = 1;
     int numTet[] = {5};
-    int index[][2] = {{1, 300}};
+    int index[][2] = {{37, 200}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
-            if (j == 37 || j == 76 || j == 85 || j == 94 || j == 95 || j == 99 || j == 102 || j == 121)
-                continue;
+//            if (j == 37 || j == 76 || j == 85 || j == 94 || j == 95 || j == 99 || j == 102 || j == 121)
+//                continue;
 
             theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, j);
 

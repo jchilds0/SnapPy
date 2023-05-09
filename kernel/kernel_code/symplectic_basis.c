@@ -39,7 +39,7 @@ int edgesFourToThree[4][4] = {{9, 0, 1, 2},
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
     int i, j, e0 = 0;
 
-//    peripheral_curves(manifold);
+    peripheral_curves(manifold);
 
     // Edge Curves C_i -> gluing equations
     int **edge_eqns, edge_num_rows;
@@ -81,7 +81,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  */
 static int numCuspTriangles, numCuspRegions, numDualCurves, numEdgeClasses, genus;
 static int intersectTetIndex, intersectTetVertex;
-static int debug = FALSE;
+static int debug = TRUE;
 
 int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols, int e0) {
     int i, j, T = manifold -> num_tetrahedra;
@@ -197,7 +197,7 @@ struct CuspTriangle **init_cusp_triangulation(Triangulation *manifold) {
             pTriangle[i]->vertices[j].edge          = pTriangle[i]->tet->edge_class[
                     edge_between_vertices[pTriangle[i]->vertices[j].v1][pTriangle[i]->vertices[j].v2]];
             pTriangle[i]->vertices[j].edgeClass     = pTriangle[i]->vertices[j].edge->index;
-            pTriangle[i]->vertices[j].edgeIndex   = -1;
+            pTriangle[i]->vertices[j].edgeIndex     = -1;
         }
 
         if (i % 4 == 3) {
@@ -1185,7 +1185,7 @@ void update_path_info(struct CuspRegion **pCuspRegion, struct DualCurves *path, 
 
     while ((node = node->next)->next->next != NULL) {
         inside_vertex(pCuspRegion[node->y], node, &insideVertex, &face);
-        node->insideVertex = insideVertex == -1 ? face : insideVertex;
+        node->insideVertex = insideVertex;
         node->face = face;
     }
 
@@ -1707,7 +1707,7 @@ void initialise_queue(struct Queue *q, int size) {
 
 struct Queue *enqueue(struct Queue *q, int i) {
     // Queue is full
-    if ( q->size == q->len ) {
+    if ( q->size - 1 == q->len ) {
         resize_queue(q);
         q = enqueue(q, i);
     } else {
