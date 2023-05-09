@@ -14,17 +14,17 @@ int main(void) {
     Triangulation *theTriangulation;
 
     int count = 1;
-    int numTet[] = {5};
-    int index[][2] = {{37, 200}};
+    int numTet[] = {7};
+    int index[][2] = {{1, 3552}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
-//            if (j == 37 || j == 76 || j == 85 || j == 94 || j == 95 || j == 99 || j == 102 || j == 121)
-//                continue;
-
             theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, j);
 
             if (get_orientability(theTriangulation) == nonorientable_manifold)
+                continue;
+
+            if (get_num_cusps(theTriangulation) != 1)
                 continue;
 
             printf("Num Tet: %d Index: %d\n", numTet[i], j);
