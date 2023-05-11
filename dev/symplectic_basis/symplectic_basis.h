@@ -99,7 +99,6 @@ struct Graph {
 // Graph
 struct Graph            *init_graph(int maxVertices, bool directed);
 void                    free_graph(struct Graph *);
-void                    reduce_graph_size(struct Graph *);
 int                     insert_edge(struct Graph *, int, int, bool);
 void                    delete_edge(struct Graph *, int, int, bool);
 int                     edge_exists(struct Graph *, int, int);
@@ -125,8 +124,7 @@ int                     find_cusp_triangle_index(struct CuspTriangle **, int, in
 void                    print_debug_info(struct CuspTriangle **, struct Graph *, struct CuspRegion **, struct DualCurves **, int);
 void                    label_triangulation_edges(Triangulation *);
 struct CuspRegion       **construct_dual_curves(struct CuspTriangle **, struct CuspRegion **, struct DualCurves **, int);
-void                    find_path_endpoints_e0(struct Graph *, struct CuspRegion **, struct DualCurves *, struct DualCurves *, int, int);
-void                    find_path_endpoints(struct Graph *, struct CuspRegion **, struct DualCurves *, int, int, int);
+void                    find_path_endpoints(struct Graph *, struct PathEndPoint *, struct PathEndPoint *, int, int, bool);
 void                    update_path_info(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       **update_cusp_regions(struct CuspRegion **, struct DualCurves *, int);
 struct CuspRegion       *update_cusp_region_node(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int);
