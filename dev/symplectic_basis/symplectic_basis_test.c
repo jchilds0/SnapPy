@@ -2,160 +2,81 @@
 // Created by joshu on 19/03/2023.
 //
 
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include "kernel.h"
 #include "kernel_namespace.h"
-#include "SnapPea.h"
-#include "symplectic_basis.h"
 #include "unix_cusped_census.h"
 #include "../addl_code/addl_code.h"
 
-void testQueue(void);
 void testDual(void);
+int omega(int *, int *, int);
 
 int main() {
     printf("Testing Symplectic Basis: \n");
     testDual();
 }
 
-void testQueue(void) {
-    int i, j;
-    char *tests[] = {"Enqueue", "Dequeue", "Circular", "Resize", "Empty"};
+void testDual(void) {
+    int **basis, dual_rows, dual_cols, i, j, k;
+    Triangulation *theTriangulation;
 
-    struct Queue q, p;
+    int failed[] = {0, 0, 0};
+    int count[] = {0, 0, 0};
+    int index[][3] = {{5, 0, 110},
+                      {6, 0, 950},
+                      {7, 0, 3550}
+    };
+    int **passed = NEW_ARRAY(3, int *);
+    passed[0] = NEW_ARRAY(index[0][2] - index[0][1], int);
+    passed[1] = NEW_ARRAY(index[1][2] - index[1][1], int);
+    passed[2] = NEW_ARRAY(index[2][2] - index[2][1], int);
 
-    for (i = 0; i < 5; i++) {
-        printf("    %s: ", tests[i]);
+    for (i = 0; i < 3; i++)
+        for (j = 0; j < index[i][2] - index[i][1]; j++)
+            passed[i][j] = 1;
 
-        initialise_queue(&q, 10);
-        initialise_queue(&p, 3);
+    for (i = 0; i < 3; i++) {
+        for (j = index[i][1]; j < index[i][2]; j++) {
+            theTriangulation = GetCuspedCensusManifold("", index[i][0], oriented_manifold, j);
 
-        int index[] = {0, 0, 0, 0};
+            if (get_orientability(theTriangulation) == nonorientable_manifold)
+                continue;
 
-        if (i == 0) {
-            // Enqueue
-            enqueue(&q, 0);
-            enqueue(&q, 0);
-            enqueue(&q, 1);
-            enqueue(&q, 0);
+            if (get_num_cusps(theTriangulation) != 1)
+                continue;
 
-            index[0] = dequeue(&q);
-            index[1] = dequeue(&q);
-            index[2] = dequeue(&q);
-            index[3] = dequeue(&q);
+//            printf("Num Tet: %d Index %d\n", index[i][0], j);
 
-            if (index[0] == 0 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
-                printf("Passed");
-            } else {
-                printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
+            basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
+
+            for (k = 0; k < dual_rows / 2; k ++) {
+                if (ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols)) == 2) {
+//                    printf("Passed\n");
+                    continue;
+                }
+
+//                printf("Failed\n");
+                passed[i][j - index[i][1]] = 0;
+                failed[i]++;
+                break;
             }
-        } else if (i == 1) {
-            // Dequeue
-            enqueue(&q, 0);
-            enqueue(&q, 0);
-            enqueue(&q, 1);
-            enqueue(&q, 0);
 
-            index[0] = dequeue(&q);
-            index[1] = dequeue(&q);
-            index[2] = dequeue(&q);
-            index[3] = dequeue(&q);
-
-            if (index[0] == 0 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
-                printf("Passed");
-            } else {
-                printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
-            }
-        } else if (i == 2) {
-            // Circular
-            for (j = 0; j < 9; j++)
-                enqueue(&q, 0);
-
-            for (j = 0; j < 8; j++)
-                dequeue(&q);
-
-            enqueue(&q, 1);
-            enqueue(&q, 0);
-            enqueue(&q, 1);
-
-            index[0] = dequeue(&q);
-            index[1] = dequeue(&q);
-            index[2] = dequeue(&q);
-            index[3] = dequeue(&q);
-
-            if (index[0] == 0 && index[1] == 1 && index[2] == 0 && index[3] == 1) {
-                printf("Passed");
-            } else {
-                printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
-            }
-        } else if (i == 3) {
-            // Resize
-            p = *enqueue(&p, 1);
-            p = *enqueue(&p, 0);
-            p = *enqueue(&p, 1);
-            p = *enqueue(&p, 0);
-
-            index[0] = dequeue(&p);
-            index[1] = dequeue(&p);
-            index[2] = dequeue(&p);
-            index[3] = dequeue(&p);
-
-            if (index[0] == 1 && index[1] == 0 && index[2] == 1 && index[3] == 0) {
-                printf("Passed");
-            } else {
-                printf("Failed - Queue returned [%d, %d, %d, %d]", index[0], index[1], index[2], index[3]);
-            }
-        } else if (i == 4) {
-            enqueue(&p, 0);
-            enqueue(&p, 0);
-            dequeue(&p);
-            enqueue(&p, 0);
-            enqueue(&p, 0);
-            dequeue(&p);
-            dequeue(&p);
-            dequeue(&p);
-
-            if (empty_queue(&q) && empty_queue(&p)) {
-                printf("Passed");
-            } else if (empty_queue(&q)){
-                printf("Failed - Queue p not empty");
-            } else if (empty_queue(&p)){
-                printf("Failed - Queue q not empty");
-            } else {
-                printf("Failed");
-            }
+            count[i]++;
         }
-        printf("\n");
+    }
 
-        free_queue(&p);
-        free_queue(&q);
+    for (i = 0; i < 3; i++) {
+        printf("(Num. of Tet %d) Failed: %d out of %d tests\n", index[i][0], failed[i], count[i]);
     }
 }
 
-void testDual(void) {
-    int eqns[4][6] = {{2, 1, 0, 1, 0, 2},
-                      {0, 1, 2, 3, 4, 5},
-                      {0, 1, 2, 1, 2, 0},
-                      {1, 2, 3, 4, 5, 6}};
-    int **basis, dual_rows, dual_cols, i, j, correct;
-    Triangulation *theTriangulation;
+int omega(int *v1, int *v2, int numCols) {
+    int i, yyval = 0;
 
-    theTriangulation = GetCuspedCensusManifold("", 5, oriented_manifold, 4);
-    basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
-    correct = 1;
-
-    for (i = 0; i < dual_rows; i ++) {
-        for (j = 0; j < dual_cols; j ++) {
-            if (basis[i][j] != eqns[i][j]) {
-                printf("Symplectic Basis (5, 4): Incorrect entry (%d, %d)\n", i, j);
-                correct = 0;
-            }
-        }
+    for (i = 0; i < numCols / 3; i++) {
+        yyval += ((v1[3 * i] - v1[3 * i + 2]) * (v2[3 * i + 1] - v2[3 * i + 2])
+                  - (v1[3 * i + 1] - v1[3 * i + 2]) * (v2[3 * i] - v2[3 * i + 2]));
     }
 
-    if (correct) {
-        printf("Symplectic Basis (5, 4): Passed\n");
-    }
+    return yyval;
 }
