@@ -45,7 +45,7 @@ void testDual(void) {
             if (get_num_cusps(theTriangulation) != 1)
                 continue;
 
-//            printf("Num Tet: %d Index %d\n", index[i][0], j);
+//            printf("Num Tet: %d Index: %d ", index[i][0], j);
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
 
@@ -55,12 +55,12 @@ void testDual(void) {
                     continue;
                 }
 
-//                printf("Failed\n");
+//                printf("Failed");
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
                 break;
             }
-
+//            printf("\n");
             count[i]++;
         }
     }
