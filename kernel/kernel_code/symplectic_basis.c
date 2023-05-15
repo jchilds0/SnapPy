@@ -141,6 +141,8 @@ struct Graph {
 
 struct EndMultiGraph {
     int                     e0;                     /** base edge class */
+    int                     *parents;               /** parents array for even path len */
+    int                     *inter;                 /** inter array for even path len */
     struct Graph            *multi_graph;           /** tree with extra edge of cusps */
     struct Graph            *double_graph;          /** double of the multi graph for finding paths of even length */
 };
@@ -206,20 +208,22 @@ void                    free_queue(struct Queue *);
  * Graph for Breadth First Search
  */
 
-void                    init_search(struct Graph *, bool *, bool *, int *);
-void                    bfs(struct Graph *, int, bool *, bool *, int *);
+void                    init_search(struct Graph *, bool *, bool *, int *, int *);
+void                    bfs(struct Graph *, int, bool *, bool *, int *, int *);
 void                    find_path(int, int, int *, struct EdgeNode *);
 
 /**
  * Spanning Tree for End Multi Graph
  */
 
-struct EndMultiGraph    *end_multi_graph(Triangulation *);
+struct EndMultiGraph    *init_end_multi_graph(Triangulation *);
+void                    free_end_multi_graph(struct EndMultiGraph *);
 void                    spanning_tree(struct Graph *, struct Graph *, int, int *);
 void                    cusp_graph(Triangulation *, struct Graph *);
 void                    add_odd_cycle_edge(struct Graph *, int *);
 int                     find_path_len(int, int, int *, int);
 void                    construct_double_graph(struct Graph *, struct Graph *);
+void                    find_even_len_path(struct EndMultiGraph *, int, int, struct EdgeNode *);
 
 int edgesThreeToFour[4][3] = {{1, 2, 3},
                               {0, 2, 3},
@@ -276,23 +280,22 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 static int debug = FALSE;
 
 int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols) {
-    int i, j, e0;
+    int i, j;
     struct ManifoldBoundary **cusps     = NEW_ARRAY(manifold->num_cusps, struct ManifoldBoundary *);
     struct Cusp *cusp                   = manifold->cusp_list_begin.next;
-    struct Graph *end_graph             = init_graph(manifold->num_cusps, FALSE);
-    struct EndMultiGraph *multiGraph    = end_multi_graph(manifold);
+    struct EndMultiGraph *multiGraph    = init_end_multi_graph(manifold);
 
     label_triangulation_edges(manifold);
     for (i = 0; i < manifold->num_cusps; i++) {
-        cusps[i] = init_boundary(manifold, cusp, e0);
+        cusps[i] = init_boundary(manifold, cusp, multiGraph->e0);
         cusp = cusp->next;
     }
 
-    print_debug_info(cusps, e0, 0);       // Gluing
-    print_debug_info(cusps, e0, 3);       // Homology
-    print_debug_info(cusps, e0, 4);       // Edge classes
-    print_debug_info(cusps, e0, 6);       // Inside Edge
-    print_debug_info(cusps, e0, 2);       // Regions
+    print_debug_info(cusps, multiGraph->e0, 0);       // Gluing
+    print_debug_info(cusps, multiGraph->e0, 3);       // Homology
+    print_debug_info(cusps, multiGraph->e0, 4);       // Edge classes
+    print_debug_info(cusps, multiGraph->e0, 6);       // Inside Edge
+    print_debug_info(cusps, multiGraph->e0, 2);       // Regions
 
     // Allocate Symplectic Equations Array
     int **symp_eqns = NEW_ARRAY(num_rows, int *);
@@ -304,15 +307,15 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
             symp_eqns[i][j] = 0;
     }
 
-    construct_oscillating_curves(manifold, cusps, e0);
-    calculate_holonomy(manifold, cusps, e0, symp_eqns);
+    construct_oscillating_curves(manifold, cusps, multiGraph->e0);
+    calculate_holonomy(manifold, cusps, multiGraph->e0, symp_eqns);
 
-    print_debug_info(cusps, e0, 1);
-    print_debug_info(cusps, e0, 5);
+    print_debug_info(cusps, multiGraph->e0, 1);
+    print_debug_info(cusps, multiGraph->e0, 5);
 
     free_boundary(cusps, manifold->num_cusps);
     my_free(cusps);
-    free_graph(end_graph);
+    free_end_multi_graph(multiGraph);
     return symp_eqns;
 }
 
@@ -1280,8 +1283,8 @@ void construct_oscillating_curves(Triangulation *manifold, struct ManifoldBounda
             parent = NEW_ARRAY(boundary->dual_graph->nVertices, int);
 
             // Find path using bfs
-            init_search(boundary->dual_graph, processed, discovered, parent);
-            bfs(boundary->dual_graph, path->endpoints[j][START]->regionIndex, processed, discovered, parent);
+            init_search(boundary->dual_graph, processed, discovered, parent, NULL);
+            bfs(boundary->dual_graph, path->endpoints[j][START]->regionIndex, processed, discovered, parent, NULL);
             find_path(
                     path->endpoints[j][START]->regionIndex,
                     path->endpoints[j][FINISH]->regionIndex, parent, path->curves[j][START]);
@@ -1880,13 +1883,16 @@ void inside_vertex(struct CuspRegion *midNode, struct EdgeNode *node) {
  * Initialise default values for bfs arrays
  */
 
-void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent) {
+void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent, int *inter) {
     int i;
 
     for (i = 0; i < g->nVertices; i ++) {
         processed[i] = false;
         discovered[i] = false;
         parent[i] = -1;
+
+        if (inter != NULL)
+            inter[i] = -1;
     }
 }
 
@@ -1894,7 +1900,7 @@ void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent
  * Graph search algorithm starting at vertex 'start'.
  */
 
-void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *parent) {
+void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *parent, int *inter) {
     struct Queue q;
     int v, y;
     struct EdgeNode *p;
@@ -1915,6 +1921,9 @@ void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *par
                 enqueue(&q, y);
                 discovered[y] = true;
                 parent[y] = v;
+
+                if (inter != NULL)
+                    inter[y] = p->intermediate;
             }
         }
     }
@@ -2136,16 +2145,6 @@ int edge_exists(struct Graph *g, int v1, int v2) {
 
 // -------------------------------------------------------
 
-// End Multi Graph
-
-struct EndMultiGraph *end_multi_graph(Triangulation *manifold) {
-    int start = 0, i;
-
-    struct EndMultiGraph *multiGraph = NEW_STRUCT( struct EndMultiGraph );
-    struct Graph *g = init_graph(manifold->num_cusps, FALSE);
-    cusp_graph(manifold, g);
-
-
 //    printf("--------------------------\n");
 //    printf("Cusp Graph Info\n");
 //
@@ -2160,40 +2159,44 @@ struct EndMultiGraph *end_multi_graph(Triangulation *manifold) {
 //
 //    printf("--------------------------\n");
 
+// End Multi Graph
+
+struct EndMultiGraph *init_end_multi_graph(Triangulation *manifold) {
+    int start = 0, i;
+
+    struct EndMultiGraph *multiGraph = NEW_STRUCT( struct EndMultiGraph );
+    struct Graph *g = init_graph(manifold->num_cusps, FALSE);
+    cusp_graph(manifold, g);
+
+    multiGraph->e0 = 0;
     multiGraph->multi_graph = init_graph(g->nVertices, g->directed);
     int *parent = NEW_ARRAY(multiGraph->multi_graph->nVertices, int);
     spanning_tree(g, multiGraph->multi_graph, start, parent);
 
-//    printf("Cusp graph spanning tree\n");
-//
-//    for (i = 0; i < graph1->nVertices; i++) {
-//        printf("(Cusp Index: %d) ", i);
-//        edge = graph1->edge_list_begin[i];
-//        while ((edge = edge->next)->next != NULL) {
-//            printf("%d ", edge->y);
-//        }
-//        printf("\n");
-//    }
-//
-//    printf("--------------------------\n");
-
     add_odd_cycle_edge(multiGraph->multi_graph, parent);
 
-//    printf("Cusp graph with cycle\n");
-//
-//    for (i = 0; i < graph1->nVertices; i++) {
-//        printf("(Cusp Index: %d) ", i);
-//        edge = graph1->edge_list_begin[i];
-//        while ((edge = edge->next)->next != NULL) {
-//            printf("%d ", edge->y);
-//        }
-//        printf("\n");
-//    }
-//
-//    printf("--------------------------\n");
-
+    // construct double graph
     multiGraph->double_graph = init_graph(multiGraph->multi_graph->nVertices, multiGraph->multi_graph->directed);
     construct_double_graph(multiGraph->multi_graph, multiGraph->double_graph);
+
+    // initialise parent and inter arrays for path finding
+    bool *processed = NEW_ARRAY(multiGraph->double_graph->nVertices, bool);
+    bool *discovered = NEW_ARRAY(multiGraph->double_graph->nVertices, bool);
+    multiGraph->inter = NEW_ARRAY(multiGraph->double_graph->nVertices, int);
+    multiGraph->parents = NEW_ARRAY(multiGraph->double_graph->nVertices, int);
+    init_search(multiGraph->double_graph, processed, discovered, multiGraph->parents, multiGraph->inter);
+    bfs(multiGraph->double_graph, start, processed, discovered, multiGraph->parents, multiGraph->inter);
+
+    return multiGraph;
+}
+
+void free_end_multi_graph(struct EndMultiGraph *multiGraph) {
+    my_free(multiGraph->parents);
+    my_free(multiGraph->inter);
+    free_graph(multiGraph->double_graph);
+    free_graph(multiGraph->multi_graph);
+
+    my_free(multiGraph);
 }
 
 void cusp_graph(Triangulation *manifold, struct Graph *g) {
@@ -2225,8 +2228,8 @@ void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *p
     bool *discovered = NEW_ARRAY(graph1->nVertices, bool);
 
     // Find path using bfs
-    init_search(graph1, processed, discovered, parent);
-    bfs(graph1, start, processed, discovered, parent);
+    init_search(graph1, processed, discovered, parent, NULL);
+    bfs(graph1, start, processed, discovered, parent, NULL);
 
     for (i = 0; i < graph1->nVertices; i++) {
         if (parent[i] == -1)
@@ -2287,14 +2290,17 @@ void construct_double_graph(struct Graph *g1, struct Graph *g2) {
  */
 
 void find_even_len_path(struct EndMultiGraph *multiGraph, int start, int end, struct EdgeNode *node) {
-    struct EdgeNode *new_node = NEW_STRUCT(struct EdgeNode);
+    struct EdgeNode *new_node = NEW_STRUCT( struct EdgeNode );
 
     INSERT_AFTER(new_node, node);
 
     if ((start == end) || (end == -1)) {
         new_node->y = start;
     } else {
-        find_path(start, parents[end], parents, node);
+        struct EdgeNode *new_inter_node = NEW_STRUCT( struct EdgeNode );
+        INSERT_AFTER(new_inter_node, node);
+        find_even_len_path(multiGraph, start, multiGraph->parents[end], node);
         new_node->y = end;
+        new_inter_node->y = multiGraph->inter[end];
     }
 }
