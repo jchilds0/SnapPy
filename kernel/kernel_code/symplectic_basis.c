@@ -125,6 +125,7 @@ struct EdgeNode {
     int                     nextFace;               /** face the path crosses to the next node */
     int                     prevFace;               /** face the path crosses to the prev node */
     int                     insideVertex;           /** inside vertex of the path */
+    int                     intermediate;           /** (end multi graph) which vertex lies between two vertices */
     struct EdgeNode         *next;                  /** next node in doubly linked list */
     struct EdgeNode         *prev;                  /** prev node in doubly linked list */
 };
@@ -138,6 +139,12 @@ struct Graph {
     int                     directed;               /** is the graph directed */
 };
 
+struct EndMultiGraph {
+    int                     e0;                     /** base edge class */
+    struct Graph            *multi_graph;           /** tree with extra edge of cusps */
+    struct Graph            *double_graph;          /** double of the multi graph for finding paths of even length */
+};
+
 // Graph
 struct Graph            *init_graph(int, bool);
 void                    free_graph(struct Graph *);
@@ -146,7 +153,7 @@ void                    delete_edge(struct Graph *, int, int, bool);
 int                     edge_exists(struct Graph *, int, int);
 
 // Symplectic Basis
-int                     **get_symplectic_equations(Triangulation *, int, int, int);
+int                     **get_symplectic_equations(Triangulation *, int, int);
 
 struct ManifoldBoundary *init_boundary(Triangulation *, Cusp *, int);
 void                    free_boundary(struct ManifoldBoundary **, int);
@@ -157,6 +164,8 @@ struct CuspTriangle     *find_cusp_triangle(struct CuspTriangle *, struct CuspTr
 void                    label_cusp_vertex_indices(struct CuspTriangle *, struct CuspTriangle *, int);
 void                    walk_around_cusp_vertex(struct CuspTriangle *, int, int);
 void                    init_cusp_region(struct ManifoldBoundary *);
+int                     init_intersect_cusp_region(struct ManifoldBoundary *, struct CuspTriangle *, int);
+int                     init_normal_cusp_region(struct ManifoldBoundary *, struct CuspTriangle *, int);
 void                    set_cusp_region_data(struct CuspRegion *, struct CuspTriangle *, int [4], int [4], int);
 void                    update_adj_region_data(struct CuspRegion *, struct CuspRegion *);
 struct CuspRegion       *find_adj_region(struct CuspRegion *, struct CuspRegion *, struct CuspRegion *, int);
@@ -205,11 +214,12 @@ void                    find_path(int, int, int *, struct EdgeNode *);
  * Spanning Tree for End Multi Graph
  */
 
-struct Graph            *spanning_tree(struct Graph *, int, int *);
-struct Graph            *end_multi_graph(struct Graph *, int);
-void                    add_odd_cycle(struct Graph *, int *);
+struct EndMultiGraph    *end_multi_graph(Triangulation *);
+void                    spanning_tree(struct Graph *, struct Graph *, int, int *);
+void                    cusp_graph(Triangulation *, struct Graph *);
+void                    add_odd_cycle_edge(struct Graph *, int *);
 int                     find_path_len(int, int, int *, int);
-void                    find_even_path(int, int, int *, struct EdgeNode *);
+void                    construct_double_graph(struct Graph *, struct Graph *);
 
 int edgesThreeToFour[4][3] = {{1, 2, 3},
                               {0, 2, 3},
@@ -223,7 +233,7 @@ int edgesThreeToFour[4][3] = {{1, 2, 3},
  */
 
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
-    int i, j, e0 = 0;
+    int i, j;
 
     peripheral_curves(manifold);
 
@@ -238,7 +248,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     symp_num_rows = edge_num_rows;
 
     // Get Symplectic Equations
-    symp_eqns = get_symplectic_equations(manifold, symp_num_rows, *num_cols, e0);
+    symp_eqns = get_symplectic_equations(manifold, symp_num_rows, *num_cols);
 
     // Construct return array
     *num_rows = edge_num_rows + symp_num_rows - 2;
@@ -246,7 +256,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 
     j = 0;
     for (i = 0; i < edge_num_rows; i++) {
-        if (i == e0) {
+        if (i == 0) {
             continue;
         }
 
@@ -265,10 +275,12 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  */
 static int debug = FALSE;
 
-int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols, int e0) {
-    int i, j;
-    struct ManifoldBoundary **cusps = NEW_ARRAY(manifold->num_cusps, struct ManifoldBoundary *);
-    struct Cusp *cusp = manifold->cusp_list_begin.next;
+int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols) {
+    int i, j, e0;
+    struct ManifoldBoundary **cusps     = NEW_ARRAY(manifold->num_cusps, struct ManifoldBoundary *);
+    struct Cusp *cusp                   = manifold->cusp_list_begin.next;
+    struct Graph *end_graph             = init_graph(manifold->num_cusps, FALSE);
+    struct EndMultiGraph *multiGraph    = end_multi_graph(manifold);
 
     label_triangulation_edges(manifold);
     for (i = 0; i < manifold->num_cusps; i++) {
@@ -300,6 +312,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
 
     free_boundary(cusps, manifold->num_cusps);
     my_free(cusps);
+    free_graph(end_graph);
     return symp_eqns;
 }
 
@@ -587,7 +600,7 @@ void walk_around_cusp_vertex(struct CuspTriangle *tri, int cuspVertex, int index
  */
 
 void init_cusp_region(struct ManifoldBoundary *boundary) {
-    int j, k, l, index = 0, vertex1, vertex2, vertex3, dist[4], adjTri[4];
+    int index = 0;
     struct CuspTriangle *tri;
 
     // Header and tailer nodes.
@@ -601,171 +614,186 @@ void init_cusp_region(struct ManifoldBoundary *boundary) {
     for (tri = boundary->cusp_triangle_begin->next; tri != boundary->cusp_triangle_end; tri = tri->next) {
         // Intersection vertex doesn't have a center
         if (tri->tetIndex == boundary->intersectTetIndex && tri->tetVertex == boundary->intersectTetVertex) {
-            // which vertex are we inside the flow of
-            for (j = 0; j < 4; j++) {
-                if (j == tri->tetVertex) {
-                    continue;
-                }
+            index = init_intersect_cusp_region(boundary, tri, index);
+            continue;
+        }
 
-                vertex1 = (int) remaining_face[tri->tetVertex][j];
-                vertex2 = (int) remaining_face[j][tri->tetVertex];
+        index = init_normal_cusp_region(boundary, tri, index);
+    }
 
-                for (k = 1; k < flow(tri, j); k++) {
-                    for (l = 0; l < 2; l++) {
-                        dist[vertex1]           = k;
-                        dist[vertex2]           = MIN(dist[vertex1], 2 * flow(tri, j) - dist[vertex1])
-                                + flow(tri, vertex2) + flow(tri, vertex1);
-                        dist[j]                 = flow(tri, j) - dist[vertex1] + flow(tri, vertex1);
-                        dist[tri->tetVertex]    = -1;
+    update_adj_region_data(boundary->cusp_region_begin, boundary->cusp_region_end);
+    boundary->numCuspRegions = index;
+}
 
-                        adjTri[vertex1]         = 1;
-                        adjTri[vertex2]         = 0;
-                        adjTri[j]               = 0;
-                        adjTri[tri->tetVertex]  = -1;
+int init_intersect_cusp_region(struct ManifoldBoundary *boundary, struct CuspTriangle *tri, int index) {
+    int i, curveNum, vertex, vertex1, vertex2, vertex3;
+    int adjTri[4], dist[4];
 
-                        set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
-                        index++;
+    // which vertex are we inside the flow of
+    for (vertex = 0; vertex < 4; vertex++) {
+        if (vertex == tri->tetVertex) {
+            continue;
+        }
 
-                        // Swap vertices
-                        vertex1 = (int) remaining_face[j][tri->tetVertex];
-                        vertex2 = (int) remaining_face[tri->tetVertex][j];
-                    }
-                }
+        vertex1 = (int) remaining_face[tri->tetVertex][vertex];
+        vertex2 = (int) remaining_face[vertex][tri->tetVertex];
 
-                // Region in the middle of face j
-                if (flow(tri, vertex1) && flow(tri, vertex2)) {
-                    dist[vertex1]           = flow(tri, vertex2);
-                    dist[vertex2]           = flow(tri, vertex1);
-                    dist[j]                 = MIN(flow(tri, vertex1) + dist[vertex1],
-                                                  flow(tri, vertex2) + dist[vertex2]) + flow(tri, j);
-                    dist[tri->tetVertex]    = -1;
-
-                    adjTri[vertex1]         = 0;
-                    adjTri[vertex2]         = 0;
-                    adjTri[j]               = 1;
-                    adjTri[tri->tetVertex]  = -1;
-
-                    set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
-                    index++;
-                }
-            }
-
-            // Region of dist 0 to j
-            vertex1 = edgesThreeToFour[tri->tetVertex][0];
-            vertex2 = edgesThreeToFour[tri->tetVertex][1];
-            vertex3 = edgesThreeToFour[tri->tetVertex][2];
-
-            // Case 1; two regions
-            // !!Double check!!
-            if (atleast_two(!flow(tri, vertex1), !flow(tri, vertex2), !flow(tri, vertex3))) {
-                dist[vertex1]           = flow(tri, vertex1);
-                dist[vertex2]           = flow(tri, vertex2);
-                dist[vertex3]           = flow(tri, vertex3);
+        for (i = 1; i < flow(tri, vertex); i++) {
+            for (curveNum = 0; curveNum < 2; curveNum++) {
+                dist[vertex1]           = i;
+                dist[vertex2]           = MIN(dist[vertex1], 2 * flow(tri, vertex) - dist[vertex1])
+                                          + flow(tri, vertex2) + flow(tri, vertex1);
+                dist[vertex]            = flow(tri, vertex) - dist[vertex1] + flow(tri, vertex1);
                 dist[tri->tetVertex]    = -1;
 
                 adjTri[vertex1]         = 1;
-                adjTri[vertex2]         = 1;
-                adjTri[vertex3]         = 1;
+                adjTri[vertex2]         = 0;
+                adjTri[vertex]          = 0;
                 adjTri[tri->tetVertex]  = -1;
 
                 set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
                 index++;
 
-                // Find vertex with non zero flow
-                for (j = 0; j < 4; j++) {
-                    if (j == tri->tetVertex)
-                        continue;
-
-                    if (flow(tri, j)) {
-                        vertex1 = j;
-                        vertex2 = (int) remaining_face[tri->tetVertex][vertex1];
-                        vertex3 = (int) remaining_face[vertex1][tri->tetVertex];
-                        break;
-                    }
-                }
-                dist[vertex1]           = 0;
-                dist[vertex2]           = flow(tri, vertex1);
-                dist[vertex3]           = flow(tri, vertex1);
-                dist[tri->tetVertex]    = -1;
-
-                adjTri[vertex1]         = 0;
-                adjTri[vertex2]         = 1;
-                adjTri[vertex3]         = 1;
-                adjTri[tri->tetVertex]  = 0;
-
-                set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
-                index++;
-            } else {
-                // Case 2: three regions
-                for (j = 0; j < 4; j++) {
-                    if (j == tri->tetVertex)
-                        continue;
-
-                    vertex1 = (int) remaining_face[tri->tetVertex][j];
-                    vertex2 = (int) remaining_face[j][tri->tetVertex];
-
-                    dist[j]                 = 0;
-                    dist[vertex1]           = flow(tri, j) + flow(tri, vertex1);
-                    dist[vertex2]           = flow(tri, j) + flow(tri, vertex2);
-                    dist[tri->tetVertex]    = -1;
-
-                    adjTri[j]               = 0;
-                    adjTri[vertex1]         = 1;
-                    adjTri[vertex2]         = 1;
-                    adjTri[tri->tetVertex]  = 0;
-
-                    set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
-                    index++;
-                }
+                // Swap vertices
+                vertex1 = (int) remaining_face[vertex][tri->tetVertex];
+                vertex2 = (int) remaining_face[tri->tetVertex][vertex];
             }
-
-            continue;
         }
 
-        // which vertex are we inside the flow of
-        for (j = 0; j < 4; j++) {
-            vertex1 = (int) remaining_face[tri->tetVertex][j];
-            vertex2 = (int) remaining_face[j][tri->tetVertex];
+        // Region in the middle of face vertex
+        if (flow(tri, vertex1) && flow(tri, vertex2)) {
+            dist[vertex1]           = flow(tri, vertex2);
+            dist[vertex2]           = flow(tri, vertex1);
+            dist[vertex]            = MIN(flow(tri, vertex1) + dist[vertex1],
+                                          flow(tri, vertex2) + dist[vertex2]) + flow(tri, vertex);
+            dist[tri->tetVertex]    = -1;
 
-            if (j == tri->tetVertex) {
-                continue;
-            }
+            adjTri[vertex1]         = 0;
+            adjTri[vertex2]         = 0;
+            adjTri[vertex]          = 1;
+            adjTri[tri->tetVertex]  = -1;
 
-            for (k = 0; k < flow(tri, j); k++) {
-                dist[j]                 = k;
-                dist[vertex1]           = flow(tri, vertex1) + (flow(tri, j) - dist[j]);
-                dist[vertex2]           = flow(tri, vertex2) + (flow(tri, j) - dist[j]);
-                dist[tri->tetVertex]    = -1;
-
-                adjTri[j]               = 0;
-                adjTri[vertex1]         = 1;
-                adjTri[vertex2]         = 1;
-                adjTri[tri->tetVertex]  = 0;
-
-                set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
-                index++;
-            }
-
+            set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
+            index++;
         }
+    }
 
-        // Center vertex
-        for (j = 0; j < 4; j++) {
-            if (j == tri->tetVertex)
-                continue;
+    // Region of dist 0 to vertex
+    vertex1 = edgesThreeToFour[tri->tetVertex][0];
+    vertex2 = edgesThreeToFour[tri->tetVertex][1];
+    vertex3 = edgesThreeToFour[tri->tetVertex][2];
 
-            dist[j] = flow(tri, j);
-            adjTri[j] = 1;
-        }
+    // Case 1; two regions
+    if (atleast_two(!flow(tri, vertex1), !flow(tri, vertex2), !flow(tri, vertex3))) {
+        dist[vertex1]           = flow(tri, vertex1);
+        dist[vertex2]           = flow(tri, vertex2);
+        dist[vertex3]           = flow(tri, vertex3);
+        dist[tri->tetVertex]    = -1;
 
-        dist[tri->tetVertex] = -1;
-        adjTri[tri->tetVertex] = 0;
+        adjTri[vertex1]         = 1;
+        adjTri[vertex2]         = 1;
+        adjTri[vertex3]         = 1;
+        adjTri[tri->tetVertex]  = -1;
 
         set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
         index++;
+
+        // Find vertex with non zero flow
+        for (vertex = 0; vertex < 4; vertex++) {
+            if (vertex == tri->tetVertex)
+                continue;
+
+            if (flow(tri, vertex)) {
+                vertex1 = vertex;
+                vertex2 = (int) remaining_face[tri->tetVertex][vertex1];
+                vertex3 = (int) remaining_face[vertex1][tri->tetVertex];
+                break;
+            }
+        }
+        dist[vertex1]           = 0;
+        dist[vertex2]           = flow(tri, vertex1);
+        dist[vertex3]           = flow(tri, vertex1);
+        dist[tri->tetVertex]    = -1;
+
+        adjTri[vertex1]         = 0;
+        adjTri[vertex2]         = 1;
+        adjTri[vertex3]         = 1;
+        adjTri[tri->tetVertex]  = 0;
+
+        set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
+        index++;
+    } else {
+        // Case 2: three regions
+        for (vertex = 0; vertex < 4; vertex++) {
+            if (vertex == tri->tetVertex)
+                continue;
+
+            vertex1 = (int) remaining_face[tri->tetVertex][vertex];
+            vertex2 = (int) remaining_face[vertex][tri->tetVertex];
+
+            dist[vertex]            = 0;
+            dist[vertex1]           = flow(tri, vertex) + flow(tri, vertex1);
+            dist[vertex2]           = flow(tri, vertex) + flow(tri, vertex2);
+            dist[tri->tetVertex]    = -1;
+
+            adjTri[vertex]          = 0;
+            adjTri[vertex1]         = 1;
+            adjTri[vertex2]         = 1;
+            adjTri[tri->tetVertex]  = 0;
+
+            set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
+            index++;
+        }
     }
 
-    update_adj_region_data(boundary->cusp_region_begin, boundary->cusp_region_end);
-    boundary->numCuspRegions = index;
+    return index;
+}
+
+int init_normal_cusp_region(struct ManifoldBoundary *boundary, struct CuspTriangle *tri, int index) {
+    int i, vertex, vertex1, vertex2;
+    int dist[4], adjTri[4];
+
+    // which vertex are we inside the flow of
+    for (vertex = 0; vertex < 4; vertex++) {
+        if (vertex == tri->tetVertex) {
+            continue;
+        }
+
+        vertex1 = (int) remaining_face[tri->tetVertex][vertex];
+        vertex2 = (int) remaining_face[vertex][tri->tetVertex];
+
+        for (i = 0; i < flow(tri, vertex); i++) {
+            dist[vertex] = i;
+            dist[vertex1] = flow(tri, vertex1) + (flow(tri, vertex) - dist[vertex]);
+            dist[vertex2] = flow(tri, vertex2) + (flow(tri, vertex) - dist[vertex]);
+            dist[tri->tetVertex] = -1;
+
+            adjTri[vertex] = 0;
+            adjTri[vertex1] = 1;
+            adjTri[vertex2] = 1;
+            adjTri[tri->tetVertex] = 0;
+
+            set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
+            index++;
+        }
+
+    }
+
+    // Center vertex
+    for (vertex = 0; vertex < 4; vertex++) {
+        if (vertex == tri->tetVertex)
+            continue;
+
+        dist[vertex] = flow(tri, vertex);
+        adjTri[vertex] = 1;
+    }
+
+    dist[tri->tetVertex] = -1;
+    adjTri[tri->tetVertex] = 0;
+
+    set_cusp_region_data(boundary->cusp_region_end, tri, dist, adjTri, index);
+    index++;
+    return index;
 }
 
 /*
@@ -2110,22 +2138,89 @@ int edge_exists(struct Graph *g, int v1, int v2) {
 
 // End Multi Graph
 
-struct Graph *end_multi_graph(struct Graph *graph1, int start) {
-    int *parent = NEW_ARRAY(graph1->nVertices, int);
-    struct Graph *graph2 = spanning_tree(graph1, start, parent);
-    add_odd_cycle(graph2, parent);
+struct EndMultiGraph *end_multi_graph(Triangulation *manifold) {
+    int start = 0, i;
 
-    return graph2;
+    struct EndMultiGraph *multiGraph = NEW_STRUCT( struct EndMultiGraph );
+    struct Graph *g = init_graph(manifold->num_cusps, FALSE);
+    cusp_graph(manifold, g);
+
+
+//    printf("--------------------------\n");
+//    printf("Cusp Graph Info\n");
+//
+//    for (i = 0; i < graph1->nVertices; i++) {
+//        printf("(Cusp Index: %d) ", i);
+//        edge = graph1->edge_list_begin[i];
+//        while ((edge = edge->next)->next != NULL) {
+//            printf("%d ", edge->y);
+//        }
+//        printf("\n");
+//    }
+//
+//    printf("--------------------------\n");
+
+    multiGraph->multi_graph = init_graph(g->nVertices, g->directed);
+    int *parent = NEW_ARRAY(multiGraph->multi_graph->nVertices, int);
+    spanning_tree(g, multiGraph->multi_graph, start, parent);
+
+//    printf("Cusp graph spanning tree\n");
+//
+//    for (i = 0; i < graph1->nVertices; i++) {
+//        printf("(Cusp Index: %d) ", i);
+//        edge = graph1->edge_list_begin[i];
+//        while ((edge = edge->next)->next != NULL) {
+//            printf("%d ", edge->y);
+//        }
+//        printf("\n");
+//    }
+//
+//    printf("--------------------------\n");
+
+    add_odd_cycle_edge(multiGraph->multi_graph, parent);
+
+//    printf("Cusp graph with cycle\n");
+//
+//    for (i = 0; i < graph1->nVertices; i++) {
+//        printf("(Cusp Index: %d) ", i);
+//        edge = graph1->edge_list_begin[i];
+//        while ((edge = edge->next)->next != NULL) {
+//            printf("%d ", edge->y);
+//        }
+//        printf("\n");
+//    }
+//
+//    printf("--------------------------\n");
+
+    multiGraph->double_graph = init_graph(multiGraph->multi_graph->nVertices, multiGraph->multi_graph->directed);
+    construct_double_graph(multiGraph->multi_graph, multiGraph->double_graph);
+}
+
+void cusp_graph(Triangulation *manifold, struct Graph *g) {
+    int vertex1, vertex2;
+    Tetrahedron *tet;
+
+    // which tet
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        // which vertex
+        for (vertex1 = 0; vertex1 < 4; vertex1++) {
+            // which vertex of the cusp triangle at vertex1
+            for (vertex2 = 0; vertex2 < 4; vertex2++) {
+                if (vertex1 == vertex2)
+                    continue;
+
+                insert_edge(g, tet->cusp[vertex1]->index, tet->cusp[vertex2]->index, g->directed);
+            }
+        }
+    }
 }
 
 /*
  * Find a spanning tree of graph1
  */
 
-struct Graph *spanning_tree(struct Graph *graph1, int start, int *parent) {
+void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *parent) {
     int i;
-
-    struct Graph *graph2 = init_graph(graph1->nVertices, graph1->directed);
     bool *processed = NEW_ARRAY(graph1->nVertices, bool);
     bool *discovered = NEW_ARRAY(graph1->nVertices, bool);
 
@@ -2139,8 +2234,6 @@ struct Graph *spanning_tree(struct Graph *graph1, int start, int *parent) {
 
         insert_edge(graph2, i, parent[i], graph2->directed);
     }
-
-    return graph2;
 }
 
 /*
@@ -2164,9 +2257,44 @@ int find_path_len(int start, int end, int *parents, int pathLen) {
 }
 
 /*
- * Find a path of even length from start to end
+ * Create a new graph g2 which consists of the
+ * vertices of g1, and an edge uv from u to v iff
+ * u and v share a neighbour
  */
 
-void find_even_path(int start, int end, int *parents, struct EdgeNode *node) {
+void construct_double_graph(struct Graph *g1, struct Graph *g2) {
+    int v1, v2;
+    struct EdgeNode *node;
 
+    for (v1 = 0; v1 < g1->nVertices; v1++) {
+        for (v2 = 0; v2 < g1->nVertices; v2++) {
+            if (v1 == v2)
+                continue;
+
+            for (node = g1->edge_list_begin[v1]->next; node != g1->edge_list_end[v1]; node = node->next) {
+                if (edge_exists(g1, node->y, v2)) {
+                    insert_edge(g2, v1, v2, g2->directed);
+                    g2->edge_list_begin[v1]->next->intermediate = node->y;
+                    g2->edge_list_begin[v2]->next->intermediate = node->y;
+                }
+            }
+        }
+    }
+}
+
+/*
+ *
+ */
+
+void find_even_len_path(struct EndMultiGraph *multiGraph, int start, int end, struct EdgeNode *node) {
+    struct EdgeNode *new_node = NEW_STRUCT(struct EdgeNode);
+
+    INSERT_AFTER(new_node, node);
+
+    if ((start == end) || (end == -1)) {
+        new_node->y = start;
+    } else {
+        find_path(start, parents[end], parents, node);
+        new_node->y = end;
+    }
 }
