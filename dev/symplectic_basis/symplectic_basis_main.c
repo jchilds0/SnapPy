@@ -14,8 +14,8 @@ int main(void) {
     Triangulation *theTriangulation;
 
     int count = 1;
-    int numTet[] = {5};
-    int index[][2] = {{1, 30}};
+    int numTet[] = {7};
+    int index[][2] = {{1, 10}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
