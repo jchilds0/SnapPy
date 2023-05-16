@@ -12,7 +12,6 @@
 #include "symplectic_basis.h"
 
 #define atleast_two(a, b, c)                    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
-#define orientate_vertex(tri, vertex, face)       ((face) == remaining_face[vertex][(tri)->tetVertex] ? 1 : -1)
 
 #define FIRST                   0
 #define SECOND                  1
@@ -1188,7 +1187,7 @@ void find_path_endpoints(struct Graph *g, struct PathEndPoint *path1, struct Pat
  */
 
 void update_path_info(struct Graph *g, struct DualCurves *path, int curveNum) {
-    int i, face, vertex1, vertex2;
+    int face;
     struct EdgeNode *node = path->curves[curveNum][START];
 
     // path len 0
@@ -1570,7 +1569,7 @@ void update_cusp_triangle_endpoints(struct CuspRegion *cusp_region_start, struct
  */
 
 void calculate_holonomy(Triangulation *manifold, int e0, int **symp_eqns) {
-    int i, curve, curveNum, v, f, ff;
+    int curve, curveNum, v, f, ff;
     Tetrahedron *tet;
 
     // which tet
@@ -1912,7 +1911,7 @@ int edge_exists(struct Graph *g, int v1, int v2) {
 // End Multi Graph
 
 struct EndMultiGraph *init_end_multi_graph(Triangulation *manifold) {
-    int start = 0, i;
+    int start = 0;
 
     struct EndMultiGraph *multiGraph = NEW_STRUCT( struct EndMultiGraph );
     struct Graph *g = init_graph(manifold->num_cusps, FALSE);

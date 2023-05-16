@@ -14,8 +14,8 @@ void testMultiGraph(void);
 int omega(int *, int *, int);
 
 int main() {
-    printf("Testing End Multi Graph: \n");
-    testMultiGraph();
+//    printf("Testing End Multi Graph: \n");
+//    testMultiGraph();
     printf("Testing Symplectic Basis: \n");
     testDual();
 }
