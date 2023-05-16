@@ -6,14 +6,28 @@
 #include "kernel.h"
 #include "kernel_namespace.h"
 #include "unix_cusped_census.h"
-#include "../addl_code/addl_code.h"
+#include "addl_code.h"
+#include "symplectic_basis.h"
 
 void testDual(void);
+void testMultiGraph(void);
 int omega(int *, int *, int);
 
 int main() {
+    printf("Testing End Multi Graph: \n");
+    testMultiGraph();
     printf("Testing Symplectic Basis: \n");
     testDual();
+}
+
+void testMultiGraph(void) {
+    int i, j, numCusps = 0, index;
+    Triangulation *theTriangulation;
+    struct EndMultiGraph *multiGraph;
+
+    theTriangulation = GetCuspedCensusManifold("", 7, oriented_manifold, 3227);
+
+    multiGraph = init_end_multi_graph(theTriangulation);
 }
 
 void testDual(void) {
@@ -66,7 +80,7 @@ void testDual(void) {
     }
 
     for (i = 0; i < 3; i++) {
-        printf("(Num. of Tet %d) Failed: %d out of %d tests\n", index[i][0], failed[i], count[i]);
+        printf("    (Num. of Tet %d) Failed: %d out of %d tests\n", index[i][0], failed[i], count[i]);
     }
 }
 
