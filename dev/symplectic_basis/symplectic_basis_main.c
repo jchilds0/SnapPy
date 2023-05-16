@@ -4,7 +4,7 @@
 
 #include "SnapPea.h"
 #include "unix_cusped_census.h"
-#include "../addl_code/addl_code.h"
+#include "addl_code.h"
 #include <stdio.h>
 
 void printMatrix(int**, int, int);
@@ -14,8 +14,8 @@ int main(void) {
     Triangulation *theTriangulation;
 
     int count = 1;
-    int numTet[] = {7};
-    int index[][2] = {{1, 10}};
+    int numTet[] = {5};
+    int index[][2] = {{4, 5}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
