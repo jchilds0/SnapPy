@@ -31,7 +31,7 @@ int edgesThreeToFour[4][3] = {{1, 2, 3},
  */
 
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
-    int i, j;
+    int i, j, k, l;
 
     peripheral_curves(manifold);
 
@@ -51,7 +51,13 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
         if (tet->extra != NULL)
             uFatalError("get_symplectic_basis", "symplectic_basis");
 
-        tet->extra = NEW_ARRAY(manifold->num_cusps, struct extra);
+        tet->extra = NEW_ARRAY(manifold->num_tetrahedra, Extra);
+
+        for (i = 0; i < manifold->num_tetrahedra; i++)
+            for (j = 0; j < 2; j++)
+                for (k = 0; k < 4; k++)
+                    for (l = 0; l < 4; l++)
+                        tet->extra[i].curve[j][k][l] = 0;
     }
 
     symp_eqns = get_symplectic_equations(manifold, symp_num_rows, *num_cols);
@@ -116,7 +122,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     }
 
     construct_oscillating_curves(manifold, cusps, multiGraph->e0);
-    calculate_holonomy(manifold, cusps, multiGraph->e0, symp_eqns);
+    calculate_holonomy(manifold, multiGraph->e0, symp_eqns);
 
     print_debug_info(cusps, multiGraph->e0, 8);
     print_debug_info(cusps, multiGraph->e0, 5);
@@ -1198,61 +1204,71 @@ void update_path_info(struct Graph *g, struct DualCurves *path, int curveNum) {
                 path->endpoints[curveNum][FINISH]->vertex != face)
                 break;
 
-        node->insideVertex = face;
-        g->pRegion[node->y]->tri->tet->extra->curve[curveNum][g->pRegion[node->y]->tetVertex]
-        [path->endpoints[curveNum][START]->vertex]++;
+        g->pRegion[node->y]->tri->tet->extra[path->edgeClass].curve[curveNum][g->pRegion[node->y]->tetVertex]
+        [path->endpoints[curveNum][FINISH]->face]++;
 
-        g->pRegion[node->y]->tri->tet->extra->curve[curveNum][g->pRegion[node->y]->tetVertex]
-        [path->endpoints[curveNum][FINISH]->vertex]--;
+        g->pRegion[node->y]->tri->tet->extra[path->edgeClass].curve[curveNum][g->pRegion[node->y]->tetVertex]
+        [path->endpoints[curveNum][START]->face]--;
+
+        node->insideVertex = face;
         return;
     }
 
+
     // Set Header node
-    for (i = 0; i < 4; i++) {
-        if (i == g->pRegion[node->y]->tetVertex || !g->pRegion[node->y]->adjTri[i])
-            continue;
+    update_path_endpoint_info(g->pRegion[node->y], node, path->endpoints[curveNum][START], path->edgeClass, curveNum, START);
 
-        if (g->pRegion[node->y]->adjRegions[i]->index == node->next->y) {
-            node->nextFace = i;
-            node->prevFace = -1;
-        }
-    }
-
-    vertex1 = (int) remaining_face[g->pRegion[node->y]->tetVertex][path->endpoints[curveNum][START]->vertex];
-    vertex2 = (int) remaining_face[path->endpoints[curveNum][START]->vertex][g->pRegion[node->y]->tetVertex];
-
-    if (node->nextFace == path->endpoints[curveNum][START]->vertex) {
-        node->insideVertex = path->endpoints[curveNum][START]->face == vertex1 ? vertex2 : vertex1;
-    } else if (node->nextFace == path->endpoints[curveNum][START]->face) {
-        node->insideVertex = -1;
-    } else {
-        node->insideVertex = path->endpoints[curveNum][START]->vertex;
-    }
-
-    for (node = node->next; node->next->next != NULL; node = node->next)
+    for (node = node->next; node->next->next != NULL; node = node->next) {
         inside_vertex(g->pRegion[node->y], node);
 
+        g->pRegion[node->y]->tri->tet->extra[path->edgeClass].curve[curveNum][g->pRegion[node->y]->tetVertex][node->nextFace]++;
+        g->pRegion[node->y]->tri->tet->extra[path->edgeClass].curve[curveNum][g->pRegion[node->y]->tetVertex][node->prevFace]--;
+    }
+
     // Set Tail node
+    update_path_endpoint_info(g->pRegion[node->y], node, path->endpoints[curveNum][FINISH], path->edgeClass, curveNum, FINISH);
+}
+
+void update_path_endpoint_info(struct CuspRegion *pRegion, struct EdgeNode *node, struct PathEndPoint *endPoint,
+        int edgeClass, int curveNum, int pos) {
+    int i, vertex1, vertex2;
+
+    struct EdgeNode *nextNode;
+
+    if (pos == START)
+        nextNode = node->next;
+    else
+        nextNode = node->prev;
+
     for (i = 0; i < 4; i++) {
-        if (i == g->pRegion[node->y]->tetVertex || !g->pRegion[node->y]->adjTri[i])
+        if (i == pRegion->tetVertex || !pRegion->adjTri[i])
             continue;
 
-        if (g->pRegion[node->y]->adjRegions[i]->index == node->prev->y) {
+        if (pRegion->adjRegions[i]->index == nextNode->y) {
             node->prevFace = i;
-            node->nextFace = -1;
+            node->nextFace = i;
         }
     }
 
-    vertex1 = (int) remaining_face[g->pRegion[node->y]->tetVertex][path->endpoints[curveNum][FINISH]->vertex];
-    vertex2 = (int) remaining_face[path->endpoints[curveNum][FINISH]->vertex][g->pRegion[node->y]->tetVertex];
+    if (pos == START)
+        node->prevFace = endPoint->face;
+    else
+        node->nextFace = endPoint->face;
 
-    if (node->prevFace == path->endpoints[curveNum][FINISH]->vertex) {
-        node->insideVertex = path->endpoints[curveNum][FINISH]->face == vertex1 ? vertex2 : vertex1;
-    } else if (node->prevFace == path->endpoints[curveNum][FINISH]->face) {
+    vertex1 = (int) remaining_face[pRegion->tetVertex][endPoint->vertex];
+    vertex2 = (int) remaining_face[endPoint->vertex][pRegion->tetVertex];
+
+    if (node->prevFace == endPoint->vertex) {
+        node->insideVertex = endPoint->face == vertex1 ? vertex2 : vertex1;
+    } else if (node->prevFace == endPoint->face) {
         node->insideVertex = -1;
     } else {
-        node->insideVertex = path->endpoints[curveNum][FINISH]->vertex;
+        node->insideVertex = endPoint->vertex;
     }
+
+    pRegion->tri->tet->extra[edgeClass].curve[curveNum][pRegion->tetVertex][node->nextFace]++;
+    pRegion->tri->tet->extra[edgeClass].curve[curveNum][pRegion->tetVertex][node->prevFace]--;
+
 }
 
 /*
@@ -1306,7 +1322,7 @@ void split_cusp_regions_along_path(struct ManifoldBoundary *boundary, struct Dua
      * of the curve and newRegion to the left of the curve.
      */
     update_cusp_triangle_endpoints(boundary->cusp_region_begin, boundary->cusp_region_end,
-                                   g->pRegion[node->y], path->endpoints[curveNum][START], node);
+                                   g->pRegion[node->y], path->endpoints[curveNum][START], node, START);
     newRegion = update_cusp_region(g->pRegion[node->y], node,
                                    path->endpoints[curveNum][START], index, -1);
     INSERT_BEFORE(newRegion, boundary->cusp_region_end);
@@ -1324,7 +1340,7 @@ void split_cusp_regions_along_path(struct ManifoldBoundary *boundary, struct Dua
 
     // update last region
     update_cusp_triangle_endpoints(boundary->cusp_region_begin, boundary->cusp_region_end,
-                                   g->pRegion[node->y], path->endpoints[curveNum][FINISH], node);
+                                   g->pRegion[node->y], path->endpoints[curveNum][FINISH], node, FINISH);
     newRegion = update_cusp_region(g->pRegion[node->y], node,
                                    path->endpoints[curveNum][FINISH], index, 1);
     INSERT_BEFORE(newRegion, boundary->cusp_region_end);
@@ -1502,14 +1518,14 @@ void update_cusp_triangle(struct CuspRegion *cusp_region_start, struct CuspRegio
  */
 
 void update_cusp_triangle_endpoints(struct CuspRegion *cusp_region_start, struct CuspRegion *cusp_region_end, struct CuspRegion *region,
-        struct PathEndPoint *endPoint, struct EdgeNode *node) {
+        struct PathEndPoint *endPoint, struct EdgeNode *node, int pos) {
     int face, face1, face2;
     struct CuspRegion *pRegion;
 
     face1 = (int) remaining_face[region->tetVertex][endPoint->vertex];
     face2 = (int) remaining_face[endPoint->vertex][region->tetVertex];
 
-    if (node->prevFace == -1) {
+    if (pos == START) {
         face = node->nextFace;
     } else {
         face = node->prevFace;
@@ -1553,99 +1569,36 @@ void update_cusp_triangle_endpoints(struct CuspRegion *cusp_region_start, struct
  * Construct the symplectic equations from the dual curves
  */
 
-void calculate_holonomy(Triangulation *manifold, struct ManifoldBoundary **cusps, int e0, int **symp_eqns) {
-    int i;
-    struct DualCurves *path;
+void calculate_holonomy(Triangulation *manifold, int e0, int **symp_eqns) {
+    int i, curve, curveNum, v, f, ff;
+    Tetrahedron *tet;
 
-    // which cusp are we looking at
-    for (i = 0; i < manifold->num_cusps; i++) {
+    // which tet
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
 
-        // which curve on this cusp
-        for (path = cusps[i]->dual_curve_begin->next; path != cusps[i]->dual_curve_end; path = path->next) {
-            if (path->edgeClass == e0)
+        // which curve
+        for (curve = 0; curve < manifold->num_tetrahedra; curve++) {
+            if (curve == e0)
                 continue;
 
-            find_path_holonomy(cusps[i]->dual_graph, path, FIRST, symp_eqns[path->edgeClass]);
-            find_path_holonomy(cusps[i]->dual_graph, path, SECOND, symp_eqns[path->edgeClass]);
-        }
-    }
-}
+            // which half of the curve
+            for (curveNum = 0; curveNum < 2; curveNum++) {
 
-/*
- * Calculate holonomies along a path and update the row.
- */
+                // which tet v
+                for (v = 0; v < 4; v++) {
 
-void find_path_holonomy(struct Graph *g, struct DualCurves *curve, int curveNum, int *row) {
-    int i, index, dirFace, face;
-    struct EdgeNode *node = curve->curves[curveNum][START];
-    struct PathEndPoint *endPoint, *pathStartPoint = curve->endpoints[curveNum][START], *pathEndPoint = curve->endpoints[curveNum][FINISH];
+                    for (f = 0; f < 4; f++) {
+                        if (f == v)
+                            continue;
 
-    // Edge cases
-    if (node->next->next == NULL)
-        return;
-    else if (node->next->next->next == NULL) {
-        // One vertex
-        node = node->next;
+                        ff = (int) remaining_face[v][f];
 
-        for (i = 0; i < 4; i++)
-            if (i != pathStartPoint->region->tetVertex && i != pathStartPoint->vertex && i != pathEndPoint->vertex)
-                break;
-
-        index = 3 * pathStartPoint->region->tetIndex + edge3_between_faces[pathStartPoint->vertex][pathEndPoint->vertex];
-        row[index] = row[index] + orientate_vertex(g->pRegion[node->y]->tri, i, pathStartPoint->vertex);
-        return;
-    }
-
-    while((node = node->next)->next != NULL) {
-        // Path end points
-        if (node->prev->prev == NULL || node->next->next == NULL) {
-            // End point index
-            if (node->prev->prev == NULL) {
-                face = node->nextFace;
-                dirFace = 1;
-            } else {
-                face = node->prevFace;
-                dirFace = -1;
+                        symp_eqns[curve][3 * tet->index + edge3_between_faces[f][ff]]
+                                    += FLOW(tet->extra[curve].curve[curveNum][v][f], tet->extra[curve].curve[curveNum][v][ff]);
+                    }
+                }
             }
-
-            if (node->y == pathStartPoint->regionIndex)
-                endPoint = pathStartPoint;
-            else
-                endPoint = pathEndPoint;
-
-            if (endPoint->vertex == face) {
-                /*
-                 * Curve passes through the face opposite the vertex it
-                 * dives through. Picks up holonomy for the vertex between
-                 * the face that carries the curve and the face the curve
-                 * crosses
-                 */
-
-                index = 3 * pathStartPoint->region->tetIndex + edge3_between_faces
-                [remaining_face[endPoint->region->tetVertex][node->insideVertex]]
-                [remaining_face[node->insideVertex][endPoint->region->tetVertex]];
-
-            } else if (endPoint->face == face){
-                /*
-                 * Curve passes through the face that carries it and
-                 * thus picks up no holonomy.
-                 */
-                continue;
-            } else {
-                /*
-                 * Curve picks up the holonomy for the vertex it dives through
-                 */
-                index = 3 * endPoint->region->tetIndex + edge3_between_faces[endPoint->face][face];
-            }
-
-            row[index] = row[index] + dirFace * orientate_vertex(g->pRegion[node->y]->tri, node->insideVertex, face);
-
-            continue;
         }
-
-        index = 3 * g->pRegion[node->y]->tetIndex + edge3_between_faces[remaining_face[g->pRegion[node->y]->tetVertex][node->insideVertex]]
-                [remaining_face[node->insideVertex][g->pRegion[node->y]->tetVertex]];
-        row[index] = row[index] + orientate_vertex(g->pRegion[node->y]->tri, node->insideVertex, node->nextFace);
     }
 }
 
