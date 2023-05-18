@@ -1,6 +1,0 @@
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/symplectic_basis.dir
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/symplectic_basis_test.dir
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/clean-all.dir
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/test.dir
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/joshu/Documents/1. School Stuff/Monash 2023/Honours - Research Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug/CMakeFiles/rebuild_cache.dir
