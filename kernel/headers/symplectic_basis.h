@@ -23,6 +23,74 @@ struct Queue {
     int     *array;
 };
 
+/**
+ * Graph
+ */
+
+struct EdgeNode {
+    int                     y;                      /** cusp region index */
+    int                     edgeClass;              /** edgeClass of the edge for edges in the end multi graph */
+    int                     cuspPrev;               /** cusp the edge lies in */
+    int                     cuspNext;
+    int                     nextFace;               /** face the path crosses to the next node */
+    int                     prevFace;               /** face the path crosses to the prev node */
+    int                     insideVertex;           /** inside vertex of the path */
+    int                     intermediate;           /** (end multi graph) which vertex lies between two vertices */
+    struct EdgeNode         *next;                  /** next node in doubly linked list */
+    struct EdgeNode         *prev;                  /** prev node in doubly linked list */
+};
+
+struct Graph {
+    struct EdgeNode         **edge_list_begin;      /** header node of doubly linked list */
+    struct EdgeNode         **edge_list_end;        /** tail node of doubly linked list */
+    struct CuspRegion       **pRegion;              /** list of regions in the graph */
+    int                     *degree;                /** degree of each vertex */
+    int                     *color;                 /** color a tree bipartite */
+    int                     nVertices;              /** number of vertices in the graph */
+    int                     directed;               /** is the graph directed */
+};
+
+struct EndMultiGraph {
+    int                     e0;                     /** edge connecting vertices of the same color */
+    struct Graph            *multi_graph;           /** tree with extra edge of cusps */
+};
+
+/**
+ * Dual Curves
+ *
+ * Each oscillating curve is made up of two components, accessed using macros
+ * FIRST and SECOND. For each component we have the starting endpoint,
+ * *endpoints[curveNum][START] and finish endpoint *endpoint[curveNum][FINISH].
+ * The path of the curve is stored as a double linked list with header and tail nodes,
+ * the header is curves[curveNum][START] and the tail is curve[curveNum][FINISH].
+ */
+
+struct extra {
+    int                     curve[2][4][4];        /** oscillating curve holonomy for a cusp triangle */
+};
+
+struct PathEndPoint {
+    int                     face;                   /** face containg the short rectangle carrying the curve */
+    int                     vertex;                 /** vertex we dive through the manifold along */
+    int                     regionIndex;            /** index of the region the endpoint lies in */
+    struct CuspRegion       *region;                /** pointer to the region the endpoint lies in */
+};
+
+struct DualCurves {
+    int                     edgeClass[2];
+    struct EdgeNode         curves_begin;           /** header node of doubbly linked list */
+    struct EdgeNode         curves_end;             /** tailer node of doubbly linked list */
+    struct PathEndPoint     endpoints[2];           /** path end points */
+    struct DualCurves       *next;                  /** next dual curve in doubly linked list */
+    struct DualCurves       *prev;                  /** prev dual curve in doubly linked list */
+};
+
+struct OscillatingCurves {
+    int                     numCurves;
+    int                     *edgeClass;
+    struct DualCurves       *dual_curve_begin;      /** array of doubly linked lists of dual curves */
+    struct DualCurves       *dual_curve_end;        /** array of doubly linkek lists of dual curves */
+};
 
 /**
  * Cusp Triangulation
@@ -75,74 +143,11 @@ struct ManifoldBoundary {
     int                     numDualCurves;          /** number of dual curves in the boundary */
     Cusp                    *cusp;                  /** which cusp is the boundary in */
     struct Graph            *dual_graph;            /** dual graph of the cusp region */
-    struct CuspTriangle     *cusp_triangle_begin;   /** header node of doubly linked list of cusp triangles */
-    struct CuspTriangle     *cusp_triangle_end;     /** tail node of doubly linked list of cusp triangles */
-    struct CuspRegion       *cusp_region_begin;     /** header node of doubly linked list of cusp regions */
-    struct CuspRegion       *cusp_region_end;       /** tail node of doubly linked list of cusp regions */
-    struct DualCurves       *dual_curve_begin;      /** header node of doubly linked list of dual curves */
-    struct DualCurves       *dual_curve_end;        /** tail node of doubly linked list of dual curves */
+    struct CuspTriangle     cusp_triangle_begin;    /** header node of doubly linked list of cusp triangles */
+    struct CuspTriangle     cusp_triangle_end;      /** tail node of doubly linked list of cusp triangles */
+    struct CuspRegion       cusp_region_begin;      /** header node of doubly linked list of cusp regions */
+    struct CuspRegion       cusp_region_end;        /** tail node of doubly linked list of cusp regions */
 };
-
-/**
- * Dual Curves
- *
- * Each oscillating curve is made up of two components, accessed using macros
- * FIRST and SECOND. For each component we have the starting endpoint,
- * *endpoints[curveNum][START] and finish endpoint *endpoint[curveNum][FINISH].
- * The path of the curve is stored as a double linked list with header and tail nodes,
- * the header is curves[curveNum][START] and the tail is curve[curveNum][FINISH].
- */
-
-struct extra {
-    int                     curve[2][4][4];        /** oscillating curve holonomy for a cusp triangle */
-};
-
-struct PathEndPoint {
-    int                     face;                   /** face containg the short rectangle carrying the curve */
-    int                     vertex;                 /** vertex we dive through the manifold along */
-    int                     regionIndex;            /** index of the region the endpoint lies in */
-    struct CuspRegion       *region;                /** pointer to the region the endpoint lies in */
-};
-
-struct DualCurves {
-    int                     edgeClass;              /** which edge class does the curve dive through */
-    struct EdgeNode         *curves[2][2];          /** matrix of curves */
-    struct PathEndPoint     *endpoints[2][2];       /** matrix of endpoints */
-    struct DualCurves       *next;                  /** next dual curve in doubly linked list */
-    struct DualCurves       *prev;                  /** prev dual curve in doubly linked list */
-};
-
-/**
- * Graph
- */
-
-struct EdgeNode {
-    int                     y;                      /** cusp region index */
-    int                     nextFace;               /** face the path crosses to the next node */
-    int                     prevFace;               /** face the path crosses to the prev node */
-    int                     insideVertex;           /** inside vertex of the path */
-    int                     intermediate;           /** (end multi graph) which vertex lies between two vertices */
-    struct EdgeNode         *next;                  /** next node in doubly linked list */
-    struct EdgeNode         *prev;                  /** prev node in doubly linked list */
-};
-
-struct Graph {
-    struct EdgeNode         **edge_list_begin;      /** header node of doubly linked list */
-    struct EdgeNode         **edge_list_end;        /** tail node of doubly linked list */
-    struct CuspRegion       **pRegion;              /** list of regions in the graph */
-    int                     *degree;                /** degree of each vertex */
-    int                     nVertices;              /** number of vertices in the graph */
-    int                     directed;               /** is the graph directed */
-};
-
-struct EndMultiGraph {
-    int                     e0;                     /** base edge class */
-    int                     *parents;               /** parents array for even path len */
-    int                     *inter;                 /** inter array for even path len */
-    struct Graph            *multi_graph;           /** tree with extra edge of cusps */
-    struct Graph            *double_graph;          /** double of the multi graph for finding paths of even length */
-};
-
 
 // Graph
 struct Graph            *init_graph(int, bool);
@@ -168,17 +173,18 @@ int                     init_normal_cusp_region(struct ManifoldBoundary *, struc
 void                    set_cusp_region_data(struct CuspRegion *, struct CuspTriangle *, int [4], int [4], int);
 void                    update_adj_region_data(struct CuspRegion *, struct CuspRegion *);
 struct CuspRegion       *find_adj_region(struct CuspRegion *, struct CuspRegion *, struct CuspRegion *, int);
-void                    init_oscillating_curves(struct ManifoldBoundary *);
-void                    free_oscillating_curves(struct DualCurves *);
+struct OscillatingCurves*init_oscillating_curves(int);
+void                    free_oscillating_curves(struct OscillatingCurves *);
 void                    find_intersection_triangle(Triangulation *, struct ManifoldBoundary *);
 
 /**
  * Construct Oscillating Curves and calculate holonomy
  */
 
-void                    construct_oscillating_curves(Triangulation *, struct ManifoldBoundary **, int);
+void                    do_one_dual_curve(struct ManifoldBoundary **, struct DualCurves *, struct DualCurves *, struct EndMultiGraph *, int);
+void                    do_one_cusp(struct ManifoldBoundary *, struct DualCurves *);
 struct Graph *          construct_cusp_region_dual_graph(struct ManifoldBoundary *);
-void                    print_debug_info(struct ManifoldBoundary **, int, int);
+void                    print_debug_info(struct ManifoldBoundary **, struct OscillatingCurves *, int, int);
 void                    find_path_endpoints(struct Graph *, struct PathEndPoint *, struct PathEndPoint *, int, int, bool);
 void                    update_path_info(struct Graph *g, struct DualCurves *, int);
 void                    update_path_endpoint_info(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int, int, int);
@@ -218,8 +224,8 @@ struct EndMultiGraph    *init_end_multi_graph(Triangulation *);
 void                    free_end_multi_graph(struct EndMultiGraph *);
 void                    spanning_tree(struct Graph *, struct Graph *, int, int *);
 void                    cusp_graph(Triangulation *, struct Graph *);
-void                    add_odd_cycle_edge(struct Graph *, int *);
+void                    color_graph(struct Graph *);
+int                     find_same_color_edges(struct Graph *, struct Graph *);
 int                     find_path_len(int, int, int *, int);
-void                    construct_double_graph(struct Graph *, struct Graph *);
-void                    find_even_len_path(struct EndMultiGraph *, int, int, struct EdgeNode *);
+void                    find_multi_graph_path(struct Graph *, int, struct EdgeNode *);
 void                    print_graph(struct Graph *, int);
