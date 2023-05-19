@@ -1013,6 +1013,15 @@ struct CuspTriangle *find_cusp_triangle(struct CuspTriangle *cusp_triangle_begin
     return NULL;
 }
 
+void do_oscillating_curves(struct ManifoldBoundary **cusps, struct OscillatingCurves *oscCurv) {
+  int i;
+
+  for (i = 0; i < oscCurv->numCurves; i++) {
+    
+  }
+
+}
+
 void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_curve_begin,
         struct DualCurves *dual_curve_end, struct EndMultiGraph *multiGraph, int edgeClass) {
     struct EdgeNode *node = NEW_STRUCT( struct EdgeNode );
@@ -1021,15 +1030,17 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
     // find paths through cusps
     find_multi_graph_path(multiGraph->multi_graph, edgeClass, node);
 
-
     // find paths inside each cusp
+    dual_curve_begin.edgeClass[FINISH] = edgeClass;
+    dual_curve_end.edgeClass[START]    = edgeClass;
+
     for (; node->next != NULL; node = node->next) {
         newPath = NEW_STRUCT( struct DualCurves );
         newPath->edgeClass[START] = node->y;
         newPath->edgeClass[FINISH] = node->next->y;
 
         INSERT_BEFORE(newPath, dual_curve_end);
-        do_one_cusp(cusps[node->cuspNext], newPath);
+        do_one_cusp(cusps[node->cuspNext], newPath, edgeClass);
     }
 
     my_free(node);
@@ -1039,15 +1050,24 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
  * Construct oscillating curves on the boundary components
  */
 
-void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path) {
+void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, struct DualCurves *pathStart, int edgeClass) {
     int i, j, *parent;
     bool *processed, *discovered;
 
     // Find current endpoints
-    find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[START],
-                        &path->endpoints[START], path->prev->edgeClass[FINISH], SECOND, TRUE);
-    find_path_endpoints(boundary->dual_graph, &path->endpoints[FINISH],
-                        &path->endpoints[FINISH], path->edgeClass[START], FIRST, FALSE);
+    if (path->prev->edgeClass[FINISH] == edgeClass)
+        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH], 
+            &path->endpoints[START], path->prev->edgeClass[FINISH], SECOND, FALSE);
+    else 
+        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH],
+            &path->endpoints[START], path->prev->edgeClass[FINISH], SECOND, TRUE);
+
+    if (path->next->edgeClass[START] == edgeClass)
+        find_path_endpoints(boundary->dual_graph, &pathStart->next->endpoints[START],
+            &path->endpoints[FINISH], path->next->edgeClass[FINISH], FIRST, TRUE);
+    else 
+        find_path_endpoints(boundary->dual_graph, &path->next->endpoints[START],
+            &path->endpoints[FINISH], path->edgeClass[START], FIRST, FALSE);
 
     processed = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
     discovered = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
