@@ -31,7 +31,7 @@ int edgesThreeToFour[4][3] = {{1, 2, 3},
 
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
     int i, j, k, l;
-
+    int *edgeClasses = NEW_ARRAY(manifold->num_tetrahedra, int);
     peripheral_curves(manifold);
 
     // Edge Curves C_i -> gluing equations
@@ -42,46 +42,27 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 
     // Get Gluing Equations
     edge_eqns = get_gluing_equations(manifold, &edge_num_rows, num_cols);
-    symp_num_rows = edge_num_rows;
 
     // Get Symplectic Equations
-    Tetrahedron *tet;
-    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
-        if (tet->extra != NULL)
-            uFatalError("get_symplectic_basis", "symplectic_basis");
-
-        tet->extra = NEW_ARRAY(manifold->num_tetrahedra, Extra);
-
-        for (i = 0; i < manifold->num_tetrahedra; i++)
-            for (j = 0; j < 4; j++)
-                for (k = 0; k < 4; k++)
-                    tet->extra[i].curve[j][k] = 0;
-    }
-
-    symp_eqns = get_symplectic_equations(manifold, symp_num_rows, *num_cols);
+    symp_eqns = get_symplectic_equations(manifold, edgeClasses, &symp_num_rows, *num_cols);
 
     // Construct return array
-    *num_rows = edge_num_rows + symp_num_rows - 2;
+    *num_rows = 2 * symp_num_rows;
     int **eqns = NEW_ARRAY(*num_rows, int *);
 
     j = 0;
     for (i = 0; i < edge_num_rows; i++) {
-        if (i == 0) {
+        if (!edgeClasses[i])
             continue;
-        }
 
         eqns[2 * j] = edge_eqns[i];
         eqns[2 * j + 1] = symp_eqns[i];
         j++;
     }
 
+    my_free(edgeClasses);
     my_free(symp_eqns);
     my_free(edge_eqns);
-
-    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
-        my_free(tet->extra);
-        tet->extra = NULL;
-    }
 
     return eqns;
 }
@@ -91,11 +72,10 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  */
 static int debug = FALSE;
 
-int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCols) {
-    int i, j;
+int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *num_rows, int numCols) {
+    int i, j, k;
     label_triangulation_edges(manifold);
 
-    int *edgeClasses                    = NEW_ARRAY(manifold->num_tetrahedra, int);
     struct ManifoldBoundary **cusps     = NEW_ARRAY(manifold->num_cusps, struct ManifoldBoundary *);
     struct Cusp *cusp                   = manifold->cusp_list_begin.next;
     struct EndMultiGraph *multiGraph    = init_end_multi_graph(manifold, edgeClasses);
@@ -106,6 +86,19 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
         cusp = cusp->next;
     }
 
+    Tetrahedron *tet;
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        if (tet->extra != NULL)
+            uFatalError("get_symplectic_equations", "symplectic_basis");
+
+        tet->extra = NEW_ARRAY(manifold->num_tetrahedra, Extra);
+
+        for (i = 0; i < manifold->num_tetrahedra; i++)
+            for (j = 0; j < 4; j++)
+                for (k = 0; k < 4; k++)
+                    tet->extra[i].curve[j][k] = 0;
+    }
+
     print_debug_info(cusps, oscCurv, 0);       // Gluing
     print_debug_info(cusps, oscCurv, 3);       // Homology
     print_debug_info(cusps, oscCurv, 4);       // Edge classes
@@ -113,9 +106,10 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     print_debug_info(cusps, oscCurv, 2);       // Regions
 
     // Allocate Symplectic Equations Array
-    int **symp_eqns = NEW_ARRAY(num_rows, int *);
+    *num_rows = oscCurv->numCurves;
+    int **symp_eqns = NEW_ARRAY(manifold->num_tetrahedra, int *);
 
-    for (i = 0; i < num_rows; i ++) {
+    for (i = 0; i < manifold->num_tetrahedra; i ++) {
         symp_eqns[i] = NEW_ARRAY(3 * manifold->num_tetrahedra, int);
 
         for (j = 0; j < 3 * manifold->num_tetrahedra; j++)
@@ -123,7 +117,7 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     }
 
     do_oscillating_curves(cusps, oscCurv, multiGraph);
-    calculate_holonomy(manifold, symp_eqns, oscCurv->numCurves);
+    calculate_holonomy(manifold, symp_eqns, manifold->num_tetrahedra);
 
     print_debug_info(cusps, oscCurv, 8);
     print_debug_info(cusps, oscCurv, 5);
@@ -131,6 +125,12 @@ int **get_symplectic_equations(Triangulation *manifold, int num_rows, int numCol
     free_end_multi_graph(multiGraph);
     free_oscillating_curves(oscCurv);
     free_boundary(cusps, manifold->num_cusps);
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        my_free(tet->extra);
+        tet->extra = NULL;
+    }
+
     return symp_eqns;
 }
 
@@ -164,6 +164,8 @@ struct ManifoldBoundary *init_boundary(Triangulation *manifold, Cusp *cusp) {
     find_intersection_triangle(manifold, boundary);
     init_cusp_triangulation(manifold, boundary);
     init_cusp_region(boundary);
+
+    boundary->dual_graph = construct_cusp_region_dual_graph(boundary);
 
     return boundary;
 }
@@ -730,13 +732,10 @@ struct OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *
 
     // which curve
     for (i = 0; i < oscCurv->numCurves; i++) {
-        pathStart = oscCurv->dual_curve_begin[i];
-        pathEnd   = oscCurv->dual_curve_end[i];
-
-        pathStart.next    = &pathEnd;
-        pathStart.prev    = NULL;
-        pathEnd.next      = NULL;
-        pathEnd.prev      = &pathStart;
+        oscCurv->dual_curve_begin[i].next    = &oscCurv->dual_curve_end[i];
+        oscCurv->dual_curve_begin[i].prev    = NULL;
+        oscCurv->dual_curve_end[i].next      = NULL;
+        oscCurv->dual_curve_end[i].prev      = &oscCurv->dual_curve_begin[i];
     }
 
     return oscCurv;
@@ -747,7 +746,7 @@ void free_oscillating_curves(struct OscillatingCurves *oscCurv) {
     struct DualCurves *path;
 
     for (i = 0; i < oscCurv->numCurves; i++) {
-        while (oscCurv->dual_curve_begin[i].next != oscCurv->dual_curve_end) {
+        while (oscCurv->dual_curve_begin[i].next != &oscCurv->dual_curve_end[i]) {
             path = oscCurv->dual_curve_begin[i].next;
             REMOVE_NODE(path);
             my_free(path);
@@ -1913,6 +1912,7 @@ struct EndMultiGraph *init_end_multi_graph(Triangulation *manifold, int *edgeCla
     for (i = 0; i < manifold->num_tetrahedra; i++) {
         edgeClasses[i] = !edges[i];
     }
+    edgeClasses[multiGraph->e0] = 0;
 
     free_graph(g);
 
@@ -2053,7 +2053,10 @@ int find_path_len(int start, int end, int *parents, int pathLen) {
 }
 
 void find_multi_graph_path(struct Graph *g, int edgeClass, struct EdgeNode *node) {
-
+    node->y = 0;
+    node->next = NEW_STRUCT( struct EdgeNode );
+    node->next->y = 1;
+    node->next->next = NULL;
 }
 
 void print_graph(struct Graph *g, int flag) {
