@@ -155,7 +155,7 @@ void                    delete_edge(struct Graph *, int, int, bool);
 int                     edge_exists(struct Graph *, int, int);
 
 // Symplectic Basis
-int                     **get_symplectic_equations(Triangulation *, int, int);
+int                     **get_symplectic_equations(Triangulation *, int *, int *, int);
 
 struct ManifoldBoundary *init_boundary(Triangulation *, Cusp *);
 void                    free_boundary(struct ManifoldBoundary **, int);
