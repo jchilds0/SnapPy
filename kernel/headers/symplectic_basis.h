@@ -182,7 +182,7 @@ void                    find_intersection_triangle(Triangulation *, struct Manif
  */
 
 void                    do_one_dual_curve(struct ManifoldBoundary **, struct DualCurves *, struct DualCurves *, struct EndMultiGraph *, int);
-void                    do_one_cusp(struct ManifoldBoundary *, struct DualCurves *);
+void                    do_one_cusp(struct ManifoldBoundary *, struct DualCurves *, struct DualCurves *, int);
 struct Graph *          construct_cusp_region_dual_graph(struct ManifoldBoundary *);
 void                    print_debug_info(struct ManifoldBoundary **, struct OscillatingCurves *, int, int);
 void                    find_path_endpoints(struct Graph *, struct PathEndPoint *, struct PathEndPoint *, int, int, bool);
