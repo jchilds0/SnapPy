@@ -14,8 +14,8 @@ int main(void) {
     Triangulation *theTriangulation;
 
     int count = 1;
-    int numTet[] = {5};
-    int index[][2] = {{4, 5}};
+    int numTet[] = {5, 7};
+    int index[][2] = {{4, 5}, {1060, 1061}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
@@ -24,13 +24,14 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            if (get_num_cusps(theTriangulation) != 1)
-                continue;
+//            if (get_num_cusps(theTriangulation) == 1)
+//                continue;
 
             printf("Num Tet: %d Index: %d\n", numTet[i], j);
             if (theTriangulation != NULL) {
                 eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
                 printMatrix(eqns, num_cols, num_rows);
+                printf("---------------------------\n");
                 free_symplectic_basis(eqns, num_rows);
             } else
                 printf("Couldn't read census manifold.\n");

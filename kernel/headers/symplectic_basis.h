@@ -139,6 +139,7 @@ struct ManifoldBoundary {
     int                     numCuspTriangles;       /** number of cusp triangle in the boundary */
     int                     numCuspRegions;         /** number of cusp regions in the boundary */
     int                     numDualCurves;          /** number of dual curves in the boundary */
+    Triangulation           *manifold;              /** manifold */
     Cusp                    *cusp;                  /** which cusp is the boundary in */
     struct Graph            *dual_graph;            /** dual graph of the cusp region */
     struct CuspTriangle     cusp_triangle_begin;    /** header node of doubly linked list of cusp triangles */
@@ -183,7 +184,7 @@ void                    do_oscillating_curves(struct ManifoldBoundary **, struct
 void                    do_one_dual_curve(struct ManifoldBoundary **, struct DualCurves *, struct DualCurves *, struct EndMultiGraph *, int);
 void                    do_one_cusp(struct ManifoldBoundary *, struct DualCurves *, struct DualCurves *, int);
 struct Graph *          construct_cusp_region_dual_graph(struct ManifoldBoundary *);
-void                    print_debug_info(struct ManifoldBoundary **, struct OscillatingCurves *, int);
+void                    print_debug_info(Triangulation *, struct ManifoldBoundary **, struct OscillatingCurves *, int);
 void                    find_path_endpoints(struct Graph *, struct PathEndPoint *, struct PathEndPoint *, int, int, bool);
 void                    update_path_info(struct Graph *g, struct DualCurves *);
 void                    update_path_endpoint_info(struct CuspRegion *, struct EdgeNode *, struct PathEndPoint *, int, int);
@@ -221,6 +222,7 @@ void                    find_path(int, int, int *, struct EdgeNode *);
 
 struct EndMultiGraph    *init_end_multi_graph(Triangulation *, int *);
 void                    free_end_multi_graph(struct EndMultiGraph *);
+int                     insert_edge_end_multi_graph(struct Graph *, int, int, int, bool);
 void                    spanning_tree(struct Graph *, struct Graph *, int, int *);
 void                    cusp_graph(Triangulation *, struct Graph *);
 void                    color_graph(struct Graph *);

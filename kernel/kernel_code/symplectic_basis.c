@@ -70,7 +70,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 /*
  * Setup graph and cusp triangulation, and run construct dual curves.
  */
-static int debug = FALSE;
+static int debug = TRUE;
 
 int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *num_rows, int numCols) {
     int i, j, k;
@@ -99,11 +99,11 @@ int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *n
                     tet->extra[i].curve[j][k] = 0;
     }
 
-    print_debug_info(cusps, oscCurv, 0);       // Gluing
-    print_debug_info(cusps, oscCurv, 3);       // Homology
-    print_debug_info(cusps, oscCurv, 4);       // Edge classes
-    print_debug_info(cusps, oscCurv, 6);       // Inside Edge
-    print_debug_info(cusps, oscCurv, 2);       // Regions
+    print_debug_info(manifold, cusps, oscCurv, 0);       // Gluing
+    print_debug_info(manifold, cusps, oscCurv, 3);       // Homology
+    print_debug_info(manifold, cusps, oscCurv, 4);       // Edge classes
+    print_debug_info(manifold, cusps, oscCurv, 6);       // Inside Edge
+    print_debug_info(manifold, cusps, oscCurv, 2);       // Regions
 
     // Allocate Symplectic Equations Array
     *num_rows = oscCurv->numCurves;
@@ -118,9 +118,6 @@ int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *n
 
     do_oscillating_curves(cusps, oscCurv, multiGraph);
     calculate_holonomy(manifold, symp_eqns, manifold->num_tetrahedra);
-
-    print_debug_info(cusps, oscCurv, 8);
-    print_debug_info(cusps, oscCurv, 5);
 
     free_end_multi_graph(multiGraph);
     free_oscillating_curves(oscCurv);
@@ -155,6 +152,7 @@ struct ManifoldBoundary *init_boundary(Triangulation *manifold, Cusp *cusp) {
     if (cusp->topology == Klein_cusp)
         uFatalError("init_boundary", "symplectic_basis");
 
+    boundary->manifold = manifold;
     boundary->cusp = cusp;
     boundary->numEdgeClasses = manifold->num_tetrahedra;
     boundary->numCuspTriangles = 0;
@@ -744,11 +742,19 @@ struct OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *
 void free_oscillating_curves(struct OscillatingCurves *oscCurv) {
     int i, j;
     struct DualCurves *path;
+    struct EdgeNode *node;
 
     for (i = 0; i < oscCurv->numCurves; i++) {
         while (oscCurv->dual_curve_begin[i].next != &oscCurv->dual_curve_end[i]) {
             path = oscCurv->dual_curve_begin[i].next;
             REMOVE_NODE(path);
+
+            while (path->curves_begin.next != &path->curves_end) {
+                node = path->curves_begin.next;
+                REMOVE_NODE(node);
+                my_free(node);
+            }
+
             my_free(path);
         }
     }
@@ -797,7 +803,20 @@ struct Graph *construct_cusp_region_dual_graph(struct ManifoldBoundary *boundary
     return graph1;
 }
 
-void print_debug_info(struct ManifoldBoundary **cusps, struct OscillatingCurves *oscCurv, int flag) {
+/*
+ * flag
+ *  - 0: Gluing info
+ *  - 1: Dual Curves
+ *  - 2: Cusp Regions
+ *  - 3: Homology
+ *  - 4: Edge Indices
+ *  - 5: Dual Curve Paths
+ *  - 6: Inside Edge
+ *  - 7: Graph
+ *  - 8: End points
+ */
+
+void print_debug_info(Triangulation *manifold, struct ManifoldBoundary **cusps, struct OscillatingCurves *oscCurv, int flag) {
     int i, j, k, x_vertex1, x_vertex2, y_vertex1, y_vertex2, v1, v2, v3;
 
     struct CuspTriangle *tri;
@@ -805,7 +824,7 @@ void print_debug_info(struct ManifoldBoundary **cusps, struct OscillatingCurves 
     struct CuspRegion *region;
     struct DualCurves *path;
     struct Graph *g;
-    struct ManifoldBoundary *boundary = cusps[0];
+    struct ManifoldBoundary *boundary;
 
     if (!debug)
         return;
@@ -813,27 +832,32 @@ void print_debug_info(struct ManifoldBoundary **cusps, struct OscillatingCurves 
     if (!flag) {
         // Gluing Info
         printf("Triangle gluing info\n");
-        for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
-            for (j = 0; j < 4; j++) {
-                if (j == tri->tetVertex)
-                    continue;
+        for (i = 0; i < manifold->num_cusps; i++) {
+            printf("Boundary %d\n", i);
+            boundary = cusps[i];
 
-                x_vertex1 = (int) remaining_face[tri->tetVertex][j];
-                x_vertex2 = (int) remaining_face[j][tri->tetVertex];
-                y_vertex1 = EVALUATE(tri->tet->gluing[j], x_vertex1);
-                y_vertex2 = EVALUATE(tri->tet->gluing[j], x_vertex2);
+            for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
+                for (j = 0; j < 4; j++) {
+                    if (j == tri->tetVertex)
+                        continue;
 
-                printf("(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d glues to "
-                       "(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d. (%d -> %d, %d -> %d)\n",
-                       tri->tetIndex,               // Tet Index
-                       tri->tetVertex,                // Tet Vertex
-                       j,      // Cusp Edge
-                       tri->tet->neighbor[j]->index,                              // Tet Index
-                       EVALUATE(tri->tet->gluing[j], tri->tetVertex),             // Tet Vertex
-                       EVALUATE(tri->tet->gluing[j], j),   // Cusp Edge
-                       x_vertex1, y_vertex1,
-                       x_vertex2, y_vertex2
-                       );
+                    x_vertex1 = (int) remaining_face[tri->tetVertex][j];
+                    x_vertex2 = (int) remaining_face[j][tri->tetVertex];
+                    y_vertex1 = EVALUATE(tri->tet->gluing[j], x_vertex1);
+                    y_vertex2 = EVALUATE(tri->tet->gluing[j], x_vertex2);
+
+                    printf("    (Tet Index: %d, Tet Vertex: %d) Cusp Edge %d glues to "
+                           "(Tet Index: %d, Tet Vertex: %d) Cusp Edge %d. (%d -> %d, %d -> %d)\n",
+                           tri->tetIndex,               // Tet Index
+                           tri->tetVertex,                // Tet Vertex
+                           j,      // Cusp Edge
+                           tri->tet->neighbor[j]->index,                              // Tet Index
+                           EVALUATE(tri->tet->gluing[j], tri->tetVertex),             // Tet Vertex
+                           EVALUATE(tri->tet->gluing[j], j),   // Cusp Edge
+                           x_vertex1, y_vertex1,
+                           x_vertex2, y_vertex2
+                    );
+                }
             }
         }
     } else if (flag == 1) {
@@ -859,96 +883,129 @@ void print_debug_info(struct ManifoldBoundary **cusps, struct OscillatingCurves 
     } else if (flag == 2) {
         // Region Info
         printf("Cusp Region info\n");
-        for (region = boundary->cusp_region_begin.next; region != &boundary->cusp_region_end; region = region->next) {
-            v1 = edgesThreeToFour[region->tetVertex][0];
-            v2 = edgesThreeToFour[region->tetVertex][1];
-            v3 = edgesThreeToFour[region->tetVertex][2];
 
-            printf("Region %d (Tet Index: %d, Tet Vertex: %d) (Adj Tri: %d, %d, %d) (Adj Regions: %d, %d, %d) "
-                   "(Curves: [[%d %d] [%d %d] [%d %d]]) (Dive: [[%d %d] [%d %d] [%d %d]])\n",
-                   region->index, region->tetIndex, region->tetVertex,
-                   region->adjTri[v1], region->adjTri[v2], region->adjTri[v3],
-                   region->adjRegions[v1] == NULL ? -1 : region->adjRegions[v1]->index,
-                   region->adjRegions[v2] == NULL ? -1 : region->adjRegions[v2]->index,
-                   region->adjRegions[v3] == NULL ? -1 : region->adjRegions[v3]->index,
-                   region->curve[v2][v1], region->curve[v3][v1],
-                   region->curve[v1][v2], region->curve[v3][v2],
-                   region->curve[v1][v3], region->curve[v2][v3],
-                   region->dive[v2][v1], region->dive[v3][v1],
-                   region->dive[v1][v2], region->dive[v3][v2],
-                   region->dive[v1][v3], region->dive[v2][v3]
-            );
+        for (i = 0; i < manifold->num_cusps; i++) {
+            printf("Boundary %d\n", i);
+
+            boundary = cusps[i];
+            for (region = boundary->cusp_region_begin.next; region != &boundary->cusp_region_end; region = region->next) {
+                v1 = edgesThreeToFour[region->tetVertex][0];
+                v2 = edgesThreeToFour[region->tetVertex][1];
+                v3 = edgesThreeToFour[region->tetVertex][2];
+
+                printf("    Region %d (Tet Index: %d, Tet Vertex: %d) (Adj Tri: %d, %d, %d) (Adj Regions: %d, %d, %d) "
+                       "(Curves: [[%d %d] [%d %d] [%d %d]]) (Dive: [[%d %d] [%d %d] [%d %d]])\n",
+                       region->index, region->tetIndex, region->tetVertex,
+                       region->adjTri[v1], region->adjTri[v2], region->adjTri[v3],
+                       region->adjRegions[v1] == NULL ? -1 : region->adjRegions[v1]->index,
+                       region->adjRegions[v2] == NULL ? -1 : region->adjRegions[v2]->index,
+                       region->adjRegions[v3] == NULL ? -1 : region->adjRegions[v3]->index,
+                       region->curve[v2][v1], region->curve[v3][v1],
+                       region->curve[v1][v2], region->curve[v3][v2],
+                       region->curve[v1][v3], region->curve[v2][v3],
+                       region->dive[v2][v1], region->dive[v3][v1],
+                       region->dive[v1][v2], region->dive[v3][v2],
+                       region->dive[v1][v3], region->dive[v2][v3]
+                );
+            }
         }
+
     } else if (flag == 3) {
         // Homology Info
         printf("Homology info\n");
-        printf("Meridian\n");
+        for (i = 0; i < manifold->num_cusps; i++) {
+            boundary = cusps[i];
 
-        for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
-            printf("(Tet Index: %d, Tet Vertex: %d) %d %d %d %d\n",
-                   tri->tetIndex,
-                   tri->tetVertex,
-                   tri->tet->curve[M][right_handed][tri->tetVertex][0],
-                   tri->tet->curve[M][right_handed][tri->tetVertex][1],
-                   tri->tet->curve[M][right_handed][tri->tetVertex][2],
-                   tri->tet->curve[M][right_handed][tri->tetVertex][3]
+            printf("Boundary %d\n", i);
+            printf("Intersect Tet Index %d, Intersect Tet Vertex %d\n", boundary->intersectTetIndex, boundary->intersectTetVertex);
+            printf("    Meridian\n");
+
+            for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
+                printf("        (Tet Index: %d, Tet Vertex: %d) %d %d %d %d\n",
+                       tri->tetIndex,
+                       tri->tetVertex,
+                       tri->tet->curve[M][right_handed][tri->tetVertex][0],
+                       tri->tet->curve[M][right_handed][tri->tetVertex][1],
+                       tri->tet->curve[M][right_handed][tri->tetVertex][2],
+                       tri->tet->curve[M][right_handed][tri->tetVertex][3]
                 );
-        }
-        printf("Longitude\n");
-        for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
-            printf("(Tet Index: %d, Tet Vertex: %d) %d %d %d %d\n",
-                   tri->tetIndex,
-                   tri->tetVertex,
-                   tri->tet->curve[L][right_handed][tri->tetVertex][0],
-                   tri->tet->curve[L][right_handed][tri->tetVertex][1],
-                   tri->tet->curve[L][right_handed][tri->tetVertex][2],
-                   tri->tet->curve[L][right_handed][tri->tetVertex][3]
+            }
+            printf("    Longitude\n");
+            for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
+                printf("        (Tet Index: %d, Tet Vertex: %d) %d %d %d %d\n",
+                       tri->tetIndex,
+                       tri->tetVertex,
+                       tri->tet->curve[L][right_handed][tri->tetVertex][0],
+                       tri->tet->curve[L][right_handed][tri->tetVertex][1],
+                       tri->tet->curve[L][right_handed][tri->tetVertex][2],
+                       tri->tet->curve[L][right_handed][tri->tetVertex][3]
                 );
+            }
         }
+
     } else if (flag == 4) {
         // Edge indices
         printf("Edge classes\n");
-        for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
-            v1 = edgesThreeToFour[tri->tetVertex][0];
-            v2 = edgesThreeToFour[tri->tetVertex][1];
-            v3 = edgesThreeToFour[tri->tetVertex][2];
 
-            printf("(Tet Index: %d, Tet Vertex: %d) Vertex %d: (%d %d), "
-                   "Vertex %d: (%d %d), Vertex %d: (%d %d)\n",
-                   tri->tetIndex, tri->tetVertex,
-                   v1, tri->vertices[v1].edgeClass, tri->vertices[v1].edgeIndex,
-                   v2, tri->vertices[v2].edgeClass, tri->vertices[v2].edgeIndex,
-                   v3, tri->vertices[v3].edgeClass, tri->vertices[v3].edgeIndex
-            );
+        for (i = 0; i < manifold->num_cusps; i++) {
+            printf("Boundary %d\n", i);
+
+            boundary = cusps[i];
+            for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
+                v1 = edgesThreeToFour[tri->tetVertex][0];
+                v2 = edgesThreeToFour[tri->tetVertex][1];
+                v3 = edgesThreeToFour[tri->tetVertex][2];
+
+                printf("    (Tet Index: %d, Tet Vertex: %d) Vertex %d: (%d %d), "
+                       "Vertex %d: (%d %d), Vertex %d: (%d %d)\n",
+                       tri->tetIndex, tri->tetVertex,
+                       v1, tri->vertices[v1].edgeClass, tri->vertices[v1].edgeIndex,
+                       v2, tri->vertices[v2].edgeClass, tri->vertices[v2].edgeIndex,
+                       v3, tri->vertices[v3].edgeClass, tri->vertices[v3].edgeIndex
+                );
+            }
         }
+
     } else if (flag == 5) {
         // Dual Curve Paths
         printf("Oscillating curve paths\n");
-//        for (path = boundary->dual_curve_begin->next; path != boundary->dual_curve_end; path = path->next) {
-//            if (path->edgeClass == e0)
-//                continue;
-//
-//            for (j = 0; j < 2; j++) {
-//                edge = path->curves[j][START];
-//
-//                while ((edge = edge->next)->next != NULL) {
-//                    printf("%d ", edge->y);
-//                }
-//
-//                printf("\n");
-//            }
-//        }
+
+        // which dual curve
+        for (i = 0; i < oscCurv->numCurves; i++) {
+            j = 0;
+
+            printf("Dual Curve %d\n", i);
+            // which curve component
+            for (path = oscCurv->dual_curve_begin[i].next; path != &oscCurv->dual_curve_end[i]; path = path->next) {
+                printf("    Part %d: ", j);
+
+                edge = &path->curves_begin;
+
+                while ((edge = edge->next)->next != NULL) {
+                    printf("%d ", edge->y);
+                }
+
+                printf("\n");
+                j++;
+            }
+        }
     } else if (flag == 6) {
         // Inside Edge Info
         printf("Inside edge info\n");
-        for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
-            printf("(Tet Index: %d, Tet Vertex: %d) Edge label (%d, %d, %d)\n",
-                   tri->tetIndex,               // Tet Index
-                   tri->tetVertex,                // Tet Vertex
-                   edge3_between_faces[edgesThreeToFour[tri->tetVertex][1]][edgesThreeToFour[tri->tetVertex][2]],
-                   edge3_between_faces[edgesThreeToFour[tri->tetVertex][0]][edgesThreeToFour[tri->tetVertex][2]],
-                   edge3_between_faces[edgesThreeToFour[tri->tetVertex][0]][edgesThreeToFour[tri->tetVertex][1]]
-            );
+
+        for (i = 0; i < manifold->num_cusps; i++) {
+            printf("Boundary %d\n", i);
+
+            boundary = cusps[i];
+            for (tri = boundary->cusp_triangle_begin.next; tri != &boundary->cusp_triangle_end; tri = tri->next) {
+                printf("    (Tet Index: %d, Tet Vertex: %d) Edge label (%d, %d, %d)\n",
+                       tri->tetIndex,               // Tet Index
+                       tri->tetVertex,                // Tet Vertex
+                       edge3_between_faces[edgesThreeToFour[tri->tetVertex][1]][edgesThreeToFour[tri->tetVertex][2]],
+                       edge3_between_faces[edgesThreeToFour[tri->tetVertex][0]][edgesThreeToFour[tri->tetVertex][2]],
+                       edge3_between_faces[edgesThreeToFour[tri->tetVertex][0]][edgesThreeToFour[tri->tetVertex][1]]
+                );
+            }
         }
     } else if (flag == 7) {
         printf("Graph info\n");
@@ -972,19 +1029,29 @@ void print_debug_info(struct ManifoldBoundary **cusps, struct OscillatingCurves 
     } else if (flag == 8) {
         // end point info
         printf("EndPoint Info\n");
-//        for (path = boundary->dual_curve_begin->next; path != boundary->dual_curve_end; path = path->next) {
-//            for (j = 0; j < 2; j++) {
-//                for (k = 0; k < 2; k++) {
-//                    if (path->endpoints[j][k]->region == NULL)
-//                        continue;
-//
-//                    printf("Region: %d (Tet Index: %d, Tet Vertex: %d) Curve num: %d Pos: %d Face: %d Vertex: %d\n",
-//                    path->endpoints[j][k]->regionIndex, path->endpoints[j][k]->region->tetIndex,
-//                    path->endpoints[j][k]->region->tetVertex, j, k,
-//                    path->endpoints[j][k]->face, path->endpoints[j][k]->vertex);
-//                }
-//            }
-//        }
+
+        // which curve
+        for (i = 0; i < oscCurv->numCurves; i++) {
+            printf("Dual Curve %d\n", i);
+
+            j = 0;
+            // which component
+            for (path = oscCurv->dual_curve_begin[i].next; path != &oscCurv->dual_curve_end[i]; path = path->next) {
+                printf("    Part %d\n", j);
+                for (k = 0; k < 2; k++) {
+                    if (k == 0)
+                        printf("        Start: ");
+                    else
+                        printf("        End:   ");
+
+                    printf("Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d\n",
+                           path->endpoints[k].regionIndex, path->endpoints[k].region->tetIndex,
+                           path->endpoints[k].region->tetVertex, path->endpoints[k].face, path->endpoints[k].vertex);
+                }
+
+                j++;
+            }
+        }
     }
     printf("-------------------------------\n");
 }
@@ -1035,6 +1102,11 @@ void do_oscillating_curves(struct ManifoldBoundary **cusps, struct OscillatingCu
     for (i = 0; i < oscCurv->numCurves; i++) {
         do_one_dual_curve(cusps, &oscCurv->dual_curve_begin[i], &oscCurv->dual_curve_end[i],
                           multiGraph, oscCurv->edgeClass[i]);
+
+        print_debug_info(cusps[i]->manifold, cusps, oscCurv, 2);
+        print_debug_info(cusps[i]->manifold, cusps, oscCurv, 7);
+        print_debug_info(cusps[i]->manifold, cusps, oscCurv, 5);
+        print_debug_info(cusps[i]->manifold, cusps, oscCurv, 8);
     }
 
 }
@@ -1053,11 +1125,17 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
 
     for (; node->next != NULL; node = node->next) {
         newPath = NEW_STRUCT( struct DualCurves );
-        newPath->edgeClass[START] = node->y;
-        newPath->edgeClass[FINISH] = node->next->y;
+
+        newPath->curves_begin.next = &newPath->curves_end;
+        newPath->curves_begin.prev = NULL;
+        newPath->curves_end.next = NULL;
+        newPath->curves_end.prev = &newPath->curves_begin;
+
+        newPath->edgeClass[START] = node->edgeClass;
+        newPath->edgeClass[FINISH] = node->next->edgeClass;
 
         INSERT_BEFORE(newPath, dual_curve_end);
-        do_one_cusp(cusps[node->y], newPath, dual_curve_end, edgeClass);
+        do_one_cusp(cusps[node->y], newPath, dual_curve_begin, edgeClass);
     }
 
     my_free(node);
@@ -1081,8 +1159,8 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
 
     if (path->next->edgeClass[START] == edgeClass)
         find_path_endpoints(boundary->dual_graph, &pathStart->next->endpoints[START],
-            &path->endpoints[FINISH], path->next->edgeClass[FINISH], FIRST, TRUE);
-    else 
+            &path->endpoints[FINISH], path->next->edgeClass[START], FIRST, TRUE);
+    else
         find_path_endpoints(boundary->dual_graph, &path->next->endpoints[START],
             &path->endpoints[FINISH], path->edgeClass[START], FIRST, FALSE);
 
@@ -1097,9 +1175,6 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
               parent, &path->curves_begin);
     update_path_info(boundary->dual_graph, path);
 
-//    print_debug_info(cusps, e0, 8);
-//    print_debug_info(cusps, e0, 5);
-
     // Reallocate memory
     my_free(processed);
     my_free(discovered);
@@ -1107,11 +1182,9 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
 
     // Split the regions along the path
     split_cusp_regions_along_path(boundary, path);
-//    print_debug_info(cusps, e0, 2);
 
     free_graph(boundary->dual_graph);
     boundary->dual_graph = construct_cusp_region_dual_graph(boundary);
-//    print_debug_info(cusps, e0, 7);
 }
 
 /*
@@ -1682,7 +1755,11 @@ void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *par
 void find_path(int start, int end, int *parents, struct EdgeNode *node) {
     struct EdgeNode *new_node = NEW_STRUCT(struct EdgeNode);
 
-    INSERT_AFTER(new_node, node);
+//    INSERT_AFTER(new_node, node);
+    new_node->prev = node;
+    new_node->next = node->next;
+    new_node->prev->next = new_node;
+    new_node->next->prev = new_node;
 
     if ((start == end) || (end == -1)) {
         new_node->y = start;
@@ -1925,6 +2002,25 @@ void free_end_multi_graph(struct EndMultiGraph *multiGraph) {
     my_free(multiGraph);
 }
 
+int insert_edge_end_multi_graph(struct Graph *g, int x, int y, int edgeClass, bool directed) {
+    // Ignore edge if it already exists
+    if (edge_exists(g, x, y))
+        return x;
+
+    struct EdgeNode *p = NEW_STRUCT( struct EdgeNode);
+    INSERT_AFTER(p, g->edge_list_begin[x]);
+    p->y = y;
+    p->edgeClass = edgeClass;
+    g->degree[x]++;
+
+    if (!directed) {
+        insert_edge_end_multi_graph(g, y, x, edgeClass, TRUE);
+    }
+
+    return x;
+}
+
+
 void cusp_graph(Triangulation *manifold, struct Graph *g) {
     int vertex1, vertex2;
     Tetrahedron *tet;
@@ -1940,8 +2036,7 @@ void cusp_graph(Triangulation *manifold, struct Graph *g) {
                     continue;
 
                 edge = tet->edge_class[edge_between_vertices[vertex1][vertex2]];
-                insert_edge(g, tet->cusp[vertex1]->index, tet->cusp[vertex2]->index, g->directed);
-                g->edge_list_begin[tet->cusp[vertex1]->index]->next->edgeClass = edge->index;
+                insert_edge_end_multi_graph(g, tet->cusp[vertex1]->index, tet->cusp[vertex2]->index, edge->index, g->directed);
             }
         }
     }
@@ -1952,7 +2047,9 @@ void cusp_graph(Triangulation *manifold, struct Graph *g) {
  */
 
 void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *parent) {
-    int i;
+    int i, edgeClass;
+    struct EdgeNode *node;
+
     bool *processed = NEW_ARRAY(graph1->nVertices, bool);
     bool *discovered = NEW_ARRAY(graph1->nVertices, bool);
 
@@ -1964,7 +2061,17 @@ void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *p
         if (parent[i] == -1)
             continue;
 
-        insert_edge(graph2, i, parent[i], graph2->directed);
+        edgeClass = -1;
+        for (node = graph1->edge_list_begin[i]->next; node != graph1->edge_list_end[i]; node = node->next)
+            if (node->y == parent[i]) {
+                edgeClass = node->edgeClass;
+                break;
+            }
+
+        if (edgeClass == -1)
+            continue;
+
+        insert_edge_end_multi_graph(graph2, i, parent[i], edgeClass, graph2->directed);
     }
 }
 
@@ -2054,9 +2161,17 @@ int find_path_len(int start, int end, int *parents, int pathLen) {
 
 void find_multi_graph_path(struct Graph *g, int edgeClass, struct EdgeNode *node) {
     node->y = 0;
+    node->edgeClass = 0;
+
     node->next = NEW_STRUCT( struct EdgeNode );
-    node->next->y = 1;
-    node->next->next = NULL;
+    node->next->y = 0;
+    node->next->edgeClass = edgeClass;
+
+    node->next->next = NEW_STRUCT( struct EdgeNode );
+    node->next->next->y = 0;
+    node->next->next->edgeClass = 0;
+
+    node->next->next->next = NULL;
 }
 
 void print_graph(struct Graph *g, int flag) {
