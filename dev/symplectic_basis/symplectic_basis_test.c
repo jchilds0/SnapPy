@@ -21,13 +21,13 @@ int main() {
 }
 
 void testMultiGraph(void) {
-    int i, j, numCusps = 0, index;
+    int i, j, numCusps = 0, index, e0;
     Triangulation *theTriangulation;
     struct EndMultiGraph *multiGraph;
 
     theTriangulation = GetCuspedCensusManifold("", 7, oriented_manifold, 3227);
 
-    multiGraph = init_end_multi_graph(theTriangulation);
+    multiGraph = init_end_multi_graph(theTriangulation, &e0);
 }
 
 void testDual(void) {
