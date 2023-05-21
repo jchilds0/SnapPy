@@ -229,5 +229,5 @@ void                    color_graph(struct Graph *);
 int                     *find_tree_edges(struct Graph *, int);
 int                     find_same_color_edge(struct Graph *, struct Graph *, int *);
 int                     find_path_len(int, int, int *, int);
-void                    find_multi_graph_path(struct Graph *, int, struct EdgeNode *);
+void                    find_multi_graph_path(struct Graph *, int, int, struct EdgeNode *);
 void                    print_graph(struct Graph *, int);
