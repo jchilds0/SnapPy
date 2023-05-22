@@ -3037,6 +3037,13 @@ cdef class Triangulation():
         Returns a symplectic basis for the symplectic vector space associated with the ideal triangulation of a
         cusped 3-manifold
 
+        >>> M = Manifold("4_1")
+        >>> M.symplectic_basis()
+        [[0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]]
+
         <https://arxiv.org/abs/2208.06969>
         """
         cdef int **c_eqns;
