@@ -14,7 +14,8 @@
 #define atleast_two(a, b, c)                    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 
 #define FIRST                   0
-#define SECOND                  1
+#define MIDDLE                  1
+#define LAST                    2
 #define START                   0
 #define FINISH                  1
 
@@ -71,7 +72,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  * Setup graph and cusp triangulation, and run construct dual curves.
  */
 
-static int debug = TRUE;
+static int debug = FALSE;
 
 int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *num_rows, int numCols) {
     int i, j, k;
@@ -1124,8 +1125,22 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
     dual_curve_begin->edgeClass[FINISH] = edgeClass;
     dual_curve_end->edgeClass[START]    = edgeClass;
 
-    for (; node->next != NULL; node = node->next) {
+    newPath = NEW_STRUCT( struct DualCurves );
+
+    newPath->curves_begin.next = &newPath->curves_end;
+    newPath->curves_begin.prev = NULL;
+    newPath->curves_end.next = NULL;
+    newPath->curves_end.prev = &newPath->curves_begin;
+
+    newPath->edgeClass[START] = node->edgeClass;
+    newPath->edgeClass[FINISH] = node->next->edgeClass;
+
+    INSERT_BEFORE(newPath, dual_curve_end);
+    do_one_cusp(cusps[node->y], newPath, dual_curve_begin, FIRST);
+
+    while ((node = node->next)->next != NULL) {
         newPath = NEW_STRUCT( struct DualCurves );
+        INSERT_BEFORE(newPath, dual_curve_end);
 
         newPath->curves_begin.next = &newPath->curves_end;
         newPath->curves_begin.prev = NULL;
@@ -1135,9 +1150,21 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
         newPath->edgeClass[START] = node->edgeClass;
         newPath->edgeClass[FINISH] = node->next->edgeClass;
 
-        INSERT_BEFORE(newPath, dual_curve_end);
-        do_one_cusp(cusps[node->y], newPath, dual_curve_begin, edgeClass);
+        do_one_cusp(cusps[node->y], newPath, dual_curve_begin, MIDDLE);
     }
+
+    newPath = NEW_STRUCT( struct DualCurves );
+    INSERT_BEFORE(newPath, dual_curve_end);
+
+    newPath->curves_begin.next = &newPath->curves_end;
+    newPath->curves_begin.prev = NULL;
+    newPath->curves_end.next = NULL;
+    newPath->curves_end.prev = &newPath->curves_begin;
+
+    newPath->edgeClass[START] = node->edgeClass;
+    newPath->edgeClass[FINISH] = dual_curve_begin->next->edgeClass[START];
+
+    do_one_cusp(cusps[node->y], newPath, dual_curve_begin, LAST);
 
     my_free(node);
 }
@@ -1146,20 +1173,26 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
  * Construct oscillating curves on the boundary components
  */
 
-void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, struct DualCurves *pathStart, int edgeClass) {
+void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, struct DualCurves *pathStart, int pos) {
     int *parent;
+    bool copy;
     bool *processed, *discovered;
 
     // Find current endpoints
-    if (path->prev->edgeClass[FINISH] == edgeClass)
-        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH], 
-            &path->endpoints[START], path->prev->edgeClass[FINISH], SECOND, FALSE);
+    if (pos == FIRST)
+        find_path_endpoints(boundary->dual_graph, NULL,
+            &path->endpoints[START], path->edgeClass[START], START, FALSE);
     else 
-        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH],
-            &path->endpoints[START], path->edgeClass[START], SECOND, TRUE);
+        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[START],
+                            &path->endpoints[START],path->prev->edgeClass[START], FINISH, TRUE);
 
-    find_path_endpoints(boundary->dual_graph, &path->next->endpoints[START],
-                        &path->endpoints[FINISH], path->edgeClass[FINISH], FIRST, FALSE);
+    if (pos == LAST)
+        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH],
+                        &path->endpoints[FINISH], path->prev->edgeClass[FINISH],FINISH, TRUE);
+    else
+        find_path_endpoints(boundary->dual_graph, NULL,
+                            &path->endpoints[FINISH],path->edgeClass[FINISH], START, FALSE);
+
 
     processed = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
     discovered = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
@@ -1170,7 +1203,7 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
     bfs(boundary->dual_graph, path->endpoints[START].regionIndex, processed, discovered, parent, NULL);
     find_path(path->endpoints[START].regionIndex,path->endpoints[FINISH].regionIndex,
               parent, &path->curves_begin);
-    update_path_info(boundary->dual_graph, path);
+    update_path_info(boundary->dual_graph, path, pathStart->edgeClass[FINISH]);
 
     // Reallocate memory
     my_free(processed);
@@ -1252,7 +1285,7 @@ void find_path_endpoints(struct Graph *g, struct PathEndPoint *path1, struct Pat
  * it cuts off to simplify combinatorial holonomy calculation.
  */
 
-void update_path_info(struct Graph *g, struct DualCurves *path) {
+void update_path_info(struct Graph *g, struct DualCurves *path, int edgeClass) {
     int face;
     struct EdgeNode *node = &path->curves_begin;
 
@@ -1269,10 +1302,10 @@ void update_path_info(struct Graph *g, struct DualCurves *path) {
                 path->endpoints[FINISH].vertex != face)
                 break;
 
-        g->pRegion[node->y]->tri->tet->extra[path->edgeClass[FINISH]].curve[g->pRegion[node->y]->tetVertex]
+        g->pRegion[node->y]->tri->tet->extra[edgeClass].curve[g->pRegion[node->y]->tetVertex]
         [path->endpoints[FINISH].face]++;
 
-        g->pRegion[node->y]->tri->tet->extra[path->edgeClass[START]].curve[g->pRegion[node->y]->tetVertex]
+        g->pRegion[node->y]->tri->tet->extra[edgeClass].curve[g->pRegion[node->y]->tetVertex]
         [path->endpoints[START].face]--;
 
         node->insideVertex = face;
@@ -1281,17 +1314,17 @@ void update_path_info(struct Graph *g, struct DualCurves *path) {
 
 
     // Set Header node
-    update_path_endpoint_info(g->pRegion[node->y], node, &path->endpoints[START], path->edgeClass[START], START);
+    update_path_endpoint_info(g->pRegion[node->y], node, &path->endpoints[START], edgeClass, START);
 
     for (node = node->next; node->next->next != NULL; node = node->next) {
         inside_vertex(g->pRegion[node->y], node);
 
-        g->pRegion[node->y]->tri->tet->extra[path->edgeClass[FINISH]].curve[g->pRegion[node->y]->tetVertex][node->nextFace]++;
-        g->pRegion[node->y]->tri->tet->extra[path->edgeClass[START]].curve[g->pRegion[node->y]->tetVertex][node->prevFace]--;
+        g->pRegion[node->y]->tri->tet->extra[edgeClass].curve[g->pRegion[node->y]->tetVertex][node->nextFace]++;
+        g->pRegion[node->y]->tri->tet->extra[edgeClass].curve[g->pRegion[node->y]->tetVertex][node->prevFace]--;
     }
 
     // Set Tail node
-    update_path_endpoint_info(g->pRegion[node->y], node, &path->endpoints[FINISH], path->edgeClass[FINISH], FINISH);
+    update_path_endpoint_info(g->pRegion[node->y], node, &path->endpoints[FINISH], edgeClass, FINISH);
 }
 
 void update_path_endpoint_info(struct CuspRegion *pRegion, struct EdgeNode *node, struct PathEndPoint *endPoint,
@@ -2167,11 +2200,7 @@ void find_multi_graph_path(struct Graph *g, int edgeClass, int e0, struct EdgeNo
     node->next->y = 0;
     node->next->edgeClass = e0;
 
-    node->next->next = NEW_STRUCT( struct EdgeNode );
-    node->next->next->y = 0;
-    node->next->next->edgeClass = edgeClass;
-
-    node->next->next->next = NULL;
+    node->next->next = NULL;
 }
 
 void print_graph(struct Graph *g, int flag) {
