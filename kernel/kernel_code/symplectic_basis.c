@@ -1117,6 +1117,7 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
         struct DualCurves *dual_curve_end, struct EndMultiGraph *multiGraph, int edgeClass) {
     struct EdgeNode *node = NEW_STRUCT( struct EdgeNode );
     struct DualCurves *newPath;
+    int orientation = START;
 
     // find paths through cusps
     find_multi_graph_path(multiGraph->multi_graph, edgeClass, multiGraph->e0, node);
@@ -1125,46 +1126,22 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
     dual_curve_begin->edgeClass[FINISH] = edgeClass;
     dual_curve_end->edgeClass[START]    = edgeClass;
 
-    newPath = NEW_STRUCT( struct DualCurves );
-
-    newPath->curves_begin.next = &newPath->curves_end;
-    newPath->curves_begin.prev = NULL;
-    newPath->curves_end.next = NULL;
-    newPath->curves_end.prev = &newPath->curves_begin;
-
-    newPath->edgeClass[START] = node->edgeClass;
-    newPath->edgeClass[FINISH] = node->next->edgeClass;
-
-    INSERT_BEFORE(newPath, dual_curve_end);
-    do_one_cusp(cusps[node->y], newPath, dual_curve_begin, FIRST);
+    newPath = init_dual_curve(dual_curve_end, node->edgeClass, node->next->edgeClass);
+    find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, FIRST, orientation);
+    do_one_cusp(cusps[node->y], newPath, edgeClass);
+    orientation = (orientation == START ? FINISH : START);
 
     while ((node = node->next)->next != NULL) {
-        newPath = NEW_STRUCT( struct DualCurves );
-        INSERT_BEFORE(newPath, dual_curve_end);
-
-        newPath->curves_begin.next = &newPath->curves_end;
-        newPath->curves_begin.prev = NULL;
-        newPath->curves_end.next = NULL;
-        newPath->curves_end.prev = &newPath->curves_begin;
-
-        newPath->edgeClass[START] = node->edgeClass;
-        newPath->edgeClass[FINISH] = node->next->edgeClass;
-
-        do_one_cusp(cusps[node->y], newPath, dual_curve_begin, MIDDLE);
+        newPath = init_dual_curve(dual_curve_end, node->edgeClass, node->next->edgeClass);
+        find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, MIDDLE, orientation);
+        do_one_cusp(cusps[node->y], newPath, edgeClass);
+        orientation = (orientation == START ? FINISH : START);
     }
 
-    newPath = NEW_STRUCT( struct DualCurves );
-    INSERT_BEFORE(newPath, dual_curve_end);
-
-    newPath->curves_begin.next = &newPath->curves_end;
-    newPath->curves_begin.prev = NULL;
-    newPath->curves_end.next = NULL;
-    newPath->curves_end.prev = &newPath->curves_begin;
-
-    newPath->edgeClass[START] = node->edgeClass;
-    newPath->edgeClass[FINISH] = dual_curve_begin->next->edgeClass[START];
-
-    do_one_cusp(cusps[node->y], newPath, dual_curve_begin, LAST);
+    orientation = (orientation == START ? FINISH : START);
+    newPath = init_dual_curve(dual_curve_end, node->edgeClass, edgeClass);
+    find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, LAST, orientation);
+    do_one_cusp(cusps[node->y], newPath, edgeClass);
 
     my_free(node);
 }
@@ -1173,26 +1150,10 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
  * Construct oscillating curves on the boundary components
  */
 
-void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, struct DualCurves *pathStart, int pos) {
+void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, int edgeClass) {
     int *parent;
     bool copy;
     bool *processed, *discovered;
-
-    // Find current endpoints
-    if (pos == FIRST)
-        find_path_endpoints(boundary->dual_graph, NULL,
-            &path->endpoints[START], path->edgeClass[START], START, FALSE);
-    else 
-        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[START],
-                            &path->endpoints[START],path->prev->edgeClass[START], FINISH, TRUE);
-
-    if (pos == LAST)
-        find_path_endpoints(boundary->dual_graph, &path->prev->endpoints[FINISH],
-                        &path->endpoints[FINISH], path->prev->edgeClass[FINISH],FINISH, TRUE);
-    else
-        find_path_endpoints(boundary->dual_graph, NULL,
-                            &path->endpoints[FINISH],path->edgeClass[FINISH], START, FALSE);
-
 
     processed = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
     discovered = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
@@ -1203,7 +1164,7 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
     bfs(boundary->dual_graph, path->endpoints[START].regionIndex, processed, discovered, parent, NULL);
     find_path(path->endpoints[START].regionIndex,path->endpoints[FINISH].regionIndex,
               parent, &path->curves_begin);
-    update_path_info(boundary->dual_graph, path, pathStart->edgeClass[FINISH]);
+    update_path_info(boundary->dual_graph, path, edgeClass);
 
     // Reallocate memory
     my_free(processed);
@@ -1217,6 +1178,21 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
     boundary->dual_graph = construct_cusp_region_dual_graph(boundary);
 }
 
+struct DualCurves *init_dual_curve(struct DualCurves *curve_end, int edgeClassStart, int edgeClassFinish) {
+    struct DualCurves *newPath = NEW_STRUCT( struct DualCurves );
+    INSERT_BEFORE(newPath, curve_end);
+
+    newPath->curves_begin.next = &newPath->curves_end;
+    newPath->curves_begin.prev = NULL;
+    newPath->curves_end.next = NULL;
+    newPath->curves_end.prev = &newPath->curves_begin;
+
+    newPath->edgeClass[START] = edgeClassStart;
+    newPath->edgeClass[FINISH] = edgeClassFinish;
+
+    return newPath;
+}
+
 /*
  * Find the indicies of the cusp triangles which dive through the manifold
  * along the given edgeclass. If copy is true, find the path end point
@@ -1224,7 +1200,58 @@ void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, str
  * point and store in path2
  */
 
-void find_path_endpoints(struct Graph *g, struct PathEndPoint *path1, struct PathEndPoint *path2,
+void find_path_endpoints(struct Graph *g, struct DualCurves *pathStart, struct DualCurves *path, int pos, int orientation) {
+    if (pos == FIRST) {
+        find_single_endpoints(g,
+                            NULL,
+                            &path->endpoints[START],
+                            path->edgeClass[START],
+                            START,
+                            FALSE);
+
+        find_single_endpoints(g,
+                            NULL,
+                            &path->endpoints[FINISH],
+                            path->edgeClass[FINISH],
+                            START,
+                            FALSE);
+
+    } else if (pos == MIDDLE) {
+        find_single_endpoints(g,
+                            &path->prev->endpoints[!orientation],
+                            &path->endpoints[!orientation],
+                            path->prev->edgeClass[!orientation],
+                            orientation,
+                            !orientation);
+
+        find_single_endpoints(g,
+                            &path->prev->endpoints[orientation],
+                            &path->endpoints[orientation],
+                            path->edgeClass[orientation],
+                            !orientation,
+                            orientation);
+
+    } else if (pos == LAST) {
+        find_single_endpoints(g,
+                            &pathStart->next->endpoints[START],
+                            &path->endpoints[START],
+                            pathStart->next->edgeClass[START],
+                            FINISH,
+                            TRUE);
+
+        find_single_endpoints(g,
+                            &path->prev->endpoints[FINISH],
+                            &path->endpoints[FINISH],
+                            path->prev->edgeClass[FINISH],
+                            FINISH,
+                            TRUE);
+
+    } else {
+        uFatalError("do_one_cusp", "symplectic_basis");
+    }
+}
+
+void find_single_endpoints(struct Graph *g, struct PathEndPoint *path1, struct PathEndPoint *path2,
         int edgeClass, int edgeIndex, bool copy) {
     int i, vertex, face1, face2, face;
     struct CuspRegion *pRegion;
