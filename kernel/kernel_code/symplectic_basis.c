@@ -31,7 +31,7 @@ int edgesThreeToFour[4][3] = {{1, 2, 3},
  */
 
 int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols) {
-    int i, j, k, l;
+    int i, j;
     int *edgeClasses = NEW_ARRAY(manifold->num_tetrahedra, int);
     peripheral_curves(manifold);
 
@@ -53,8 +53,11 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 
     j = 0;
     for (i = 0; i < edge_num_rows; i++) {
-        if (!edgeClasses[i])
+        if (!edgeClasses[i]) {
+            my_free(edge_eqns[i]);
+            my_free(symp_eqns[i]);
             continue;
+        }
 
         eqns[2 * j] = edge_eqns[i];
         eqns[2 * j + 1] = symp_eqns[i];
@@ -174,7 +177,6 @@ void free_boundary(struct ManifoldBoundary **cusps, int numCusps) {
     int i;
     struct CuspTriangle *tri;
     struct CuspRegion *region;
-    struct DualCurves *path;
     struct ManifoldBoundary *boundary;
 
     for (i = 0; i < numCusps; i++) {
@@ -710,7 +712,6 @@ struct CuspRegion *find_adj_region(struct CuspRegion *cusp_region_begin, struct 
 struct OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *edgeClasses) {
     int i, j;
     struct OscillatingCurves *oscCurv = NEW_STRUCT( struct OscillatingCurves );
-    struct DualCurves pathStart, pathEnd;
 
     oscCurv->numCurves = 0;
     for (i = 0; i < manifold->num_tetrahedra; i++)
@@ -742,7 +743,7 @@ struct OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *
 }
 
 void free_oscillating_curves(struct OscillatingCurves *oscCurv) {
-    int i, j;
+    int i;
     struct DualCurves *path;
     struct EdgeNode *node;
 
@@ -761,6 +762,9 @@ void free_oscillating_curves(struct OscillatingCurves *oscCurv) {
         }
     }
 
+    my_free(oscCurv->dual_curve_begin);
+    my_free(oscCurv->dual_curve_end);
+    my_free(oscCurv->edgeClass);
     my_free(oscCurv);
 }
 
@@ -1011,22 +1015,27 @@ void print_debug_info(Triangulation *manifold, struct ManifoldBoundary **cusps, 
         }
     } else if (flag == 7) {
         printf("Graph info\n");
-        g = boundary->dual_graph;
 
-        for (i = 0; i < g->nVertices; i++) {\
-            if (g->pRegion[i] == NULL)
-                continue;
+        for (i = 0; i < manifold->num_cusps; i++) {
+            boundary = cusps[i];
 
-            printf("Vertex %d (Tet Index: %d, Tet Vertex: %d): ",
-                   i,
-                   g->pRegion[i]->tetIndex,
-                   g->pRegion[i]->tetVertex
-            );
-            edge = g->edge_list_begin[i];
-            while ((edge = edge->next)->next != NULL) {
-                printf("%d ", edge->y);
+            printf("Boundary %d\n", i);
+            g = boundary->dual_graph;
+            for (j = 0; j < g->nVertices; j++) {
+                if (g->pRegion[j] == NULL)
+                        continue;
+
+                printf("    Vertex %d (Tet Index: %d, Tet Vertex: %d): ",
+                       j,
+                       g->pRegion[j]->tetIndex,
+                       g->pRegion[j]->tetVertex
+                );
+                edge = &g->edge_list_begin[j];
+                while ((edge = edge->next)->next != NULL) {
+                    printf("%d ", edge->y);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     } else if (flag == 8) {
         // end point info
@@ -1115,12 +1124,13 @@ void do_oscillating_curves(struct ManifoldBoundary **cusps, struct OscillatingCu
 
 void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_curve_begin,
         struct DualCurves *dual_curve_end, struct EndMultiGraph *multiGraph, int edgeClass) {
-    struct EdgeNode *node = NEW_STRUCT( struct EdgeNode );
+    struct EdgeNode *nodeStart, *node = NEW_STRUCT( struct EdgeNode );
     struct DualCurves *newPath;
     int orientation = START;
 
     // find paths through cusps
     find_multi_graph_path(multiGraph->multi_graph, edgeClass, multiGraph->e0, node);
+    nodeStart = node;
 
     // find paths inside each cusp
     dual_curve_begin->edgeClass[FINISH] = edgeClass;
@@ -1143,7 +1153,13 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
     find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, LAST, orientation);
     do_one_cusp(cusps[node->y], newPath, edgeClass);
 
-    my_free(node);
+    while (nodeStart->next->next != NULL) {
+        node = nodeStart;
+        REMOVE_NODE(node);
+        my_free(node);
+    }
+    my_free(nodeStart->next);
+    my_free(nodeStart);
 }
 
 /*
@@ -1152,7 +1168,6 @@ void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_
 
 void do_one_cusp(struct ManifoldBoundary *boundary, struct DualCurves *path, int edgeClass) {
     int *parent;
-    bool copy;
     bool *processed, *discovered;
 
     processed = NEW_ARRAY(boundary->dual_graph->nVertices, bool);
@@ -1778,18 +1793,17 @@ void init_search(struct Graph *g, bool *processed, bool *discovered, int *parent
  */
 
 void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *parent, int *inter) {
-    struct Queue *q = NEW_STRUCT( struct Queue );
+    struct Queue *q = init_queue(10);
     int v, y;
     struct EdgeNode *p;
 
-    initialise_queue(q, 10);
     enqueue(q, start);
     discovered[start] = true;
 
     while (!empty_queue(q)) {
         v = dequeue(q);
         processed[v] = true;
-        p = g->edge_list_begin[v];
+        p = &g->edge_list_begin[v];
 
         while ((p = p->next)->next != NULL) {
             y = p->y;
@@ -1835,21 +1849,25 @@ void find_path(int start, int end, int *parents, struct EdgeNode *node) {
 
 // Queue Data Structure
 
-void initialise_queue(struct Queue *q, int size) {
+struct Queue *init_queue(int size) {
+    struct Queue *q = NEW_STRUCT( struct Queue );
+
     q->front = 0;
     q->rear = -1;
     q->len = 0;
-    q->size = size;
-    q->array = NEW_ARRAY(size, int);
+    q->size = MIN(size, 256);
+    q->array = NEW_ARRAY(q->size, int);
+
+    return q;
 }
 
 struct Queue *enqueue(struct Queue *q, int i) {
     // Queue is full
-    if ( q->size - 1 == q->len ) {
-        resize_queue(q);
+    if ( q->size == q->len ) {
+        q = resize_queue(q);
         q = enqueue(q, i);
     } else {
-        q->rear = (q->rear + 1) % (q->size - 1);
+        q->rear = (q->rear + 1) % q->size;
         q->array[q->rear] = i;
         q->len++;
     }
@@ -1861,7 +1879,7 @@ int dequeue(struct Queue *q) {
     // User to verify queue is not empty
     int i = q->array[q->front];
 
-    q->front = (q->front + 1) % (q->size - 1);
+    q->front = (q->front + 1) % q->size;
     q->len--;
 
     return i;
@@ -1871,30 +1889,23 @@ int empty_queue(struct Queue *q) {
     return (!q->len);
 }
 
-void resize_queue(struct Queue *q) {
+struct Queue *resize_queue(struct Queue *q) {
     int i;
-    struct Queue p;
-
-    initialise_queue(&p, 2 * q->size);
+    struct Queue *p = init_queue(2 * q->size);
 
     // Copy elements to new array
     while (!empty_queue(q)) {
         i = dequeue(q);
-        enqueue(&p, i);
+        enqueue(p, i);
     }
 
     free_queue(q);
-
-    // Move p queue to q
-    q->front = p.front;
-    q->rear = p.rear;
-    q->len = p.len;
-    q->size = p.size;
-    q->array = p.array;
+    return p;
 }
 
 void free_queue(struct Queue *q) {
     my_free(q->array);
+    my_free(q);
 }
 
 // Graph Data Structure
@@ -1912,8 +1923,8 @@ struct Graph *init_graph(int maxVertices, bool directed) {
     g->nVertices = maxVertices;
     g->directed = directed;
 
-    g->edge_list_begin      = NEW_ARRAY(maxVertices, struct EdgeNode *);
-    g->edge_list_end        = NEW_ARRAY(maxVertices, struct EdgeNode *);
+    g->edge_list_begin      = NEW_ARRAY(maxVertices, struct EdgeNode);
+    g->edge_list_end        = NEW_ARRAY(maxVertices, struct EdgeNode);
     g->degree               = NEW_ARRAY(maxVertices, int);
     g->color                = NEW_ARRAY(maxVertices, int);
     g->pRegion              = NEW_ARRAY(maxVertices, struct CuspRegion *);
@@ -1922,13 +1933,11 @@ struct Graph *init_graph(int maxVertices, bool directed) {
         g->degree[i] = 0;
         g->color[i] = -1;
 
-        g->edge_list_begin[i]           = NEW_STRUCT(struct EdgeNode);
-        g->edge_list_end[i]             = NEW_STRUCT(struct EdgeNode);
-        g->edge_list_begin[i]->next     = g->edge_list_end[i];
-        g->edge_list_begin[i]->prev     = NULL;
-        g->edge_list_end[i]->next       = NULL;
-        g->edge_list_end[i]->prev       = g->edge_list_begin[i];
-        g->pRegion[i]                   = NULL;
+        g->edge_list_begin[i].next     = &g->edge_list_end[i];
+        g->edge_list_begin[i].prev     = NULL;
+        g->edge_list_end[i].next       = NULL;
+        g->edge_list_end[i].prev       = &g->edge_list_begin[i];
+        g->pRegion[i]                  = NULL;
     }
 
     return g;
@@ -1945,8 +1954,8 @@ void free_graph(struct Graph *g) {
     struct EdgeNode *edge;
 
     for (i = 0; i < g->nVertices; i++) {
-        while (g->edge_list_begin[i]->next != g->edge_list_end[i]) {
-            edge = g->edge_list_begin[i]->next;
+        while (g->edge_list_begin[i].next != &g->edge_list_end[i]) {
+            edge = g->edge_list_begin[i].next;
             REMOVE_NODE(edge);
             my_free(edge);
         }
@@ -1972,7 +1981,7 @@ int insert_edge(struct Graph *g, int x, int y, bool directed) {
         return x;
 
     struct EdgeNode *p = NEW_STRUCT( struct EdgeNode);
-    INSERT_AFTER(p, g->edge_list_begin[x]);
+    INSERT_AFTER(p, &g->edge_list_begin[x]);
     p->y = y;
     g->degree[x]++;
 
@@ -1992,7 +2001,7 @@ int insert_edge(struct Graph *g, int x, int y, bool directed) {
 void delete_edge(struct Graph *g, int vertex_x, int vertex_y, bool directed) {
     struct EdgeNode *node, *deleted_node;
 
-    node = g->edge_list_begin[vertex_x];
+    node = &g->edge_list_begin[vertex_x];
 
     while (node->next->y != vertex_y  && (node = node->next) != NULL);
 
@@ -2016,7 +2025,7 @@ void delete_edge(struct Graph *g, int vertex_x, int vertex_y, bool directed) {
  */
 
 int edge_exists(struct Graph *g, int v1, int v2) {
-    struct EdgeNode *node = g->edge_list_begin[v1];
+    struct EdgeNode *node = &g->edge_list_begin[v1];
 
     while ((node = node->next)->next != NULL) {
         if (node->y == v2) {
@@ -2051,8 +2060,9 @@ struct EndMultiGraph *init_end_multi_graph(Triangulation *manifold, int *edgeCla
     }
     edgeClasses[multiGraph->e0] = 0;
 
+    my_free(edges);
     free_graph(g);
-
+    my_free(parent);
     return multiGraph;
 }
 
@@ -2068,7 +2078,7 @@ int insert_edge_end_multi_graph(struct Graph *g, int x, int y, int edgeClass, bo
         return x;
 
     struct EdgeNode *p = NEW_STRUCT( struct EdgeNode);
-    INSERT_AFTER(p, g->edge_list_begin[x]);
+    INSERT_AFTER(p, &g->edge_list_begin[x]);
     p->y = y;
     p->edgeClass = edgeClass;
     g->degree[x]++;
@@ -2122,7 +2132,7 @@ void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *p
             continue;
 
         edgeClass = -1;
-        for (node = graph1->edge_list_begin[i]->next; node != graph1->edge_list_end[i]; node = node->next)
+        for (node = graph1->edge_list_begin[i].next; node != &graph1->edge_list_end[i]; node = node->next)
             if (node->y == parent[i]) {
                 edgeClass = node->edgeClass;
                 break;
@@ -2133,12 +2143,14 @@ void spanning_tree(struct Graph *graph1, struct Graph *graph2, int start, int *p
 
         insert_edge_end_multi_graph(graph2, i, parent[i], edgeClass, graph2->directed);
     }
+
+    my_free(processed);
+    my_free(discovered);
 }
 
 void color_graph(struct Graph *g) {
     int currentColor = 0, v;
-    struct Queue *q = NEW_STRUCT(struct Queue);
-    initialise_queue(q, g->nVertices);
+    struct Queue *q = init_queue(g->nVertices);
     struct EdgeNode *node;
 
     g->color[0] = currentColor;
@@ -2148,7 +2160,7 @@ void color_graph(struct Graph *g) {
         v = dequeue(q);
         currentColor = g->color[v];
 
-        for (node = g->edge_list_begin[v]->next; node != g->edge_list_end[v]; node = node->next) {
+        for (node = g->edge_list_begin[v].next; node != &g->edge_list_end[v]; node = node->next) {
             // graph is not bipartite
             if (g->color[node->y] == currentColor)
                 uFatalError("color_graph", "symplectic_basis");
@@ -2176,7 +2188,7 @@ int *find_tree_edges(struct Graph *g, int numEdges) {
     // which vertex
     for (vertex = 0; vertex < g->nVertices; vertex++) {
         // which edge
-        for (node = g->edge_list_begin[vertex]->next; node != g->edge_list_end[vertex]; node = node->next) {
+        for (node = g->edge_list_begin[vertex].next; node != &g->edge_list_end[vertex]; node = node->next) {
             edges[node->edgeClass] = 1;
         }
     }
@@ -2195,7 +2207,7 @@ int find_same_color_edge(struct Graph *g1, struct Graph *g2, int *edgeClasses) {
     struct EdgeNode *node;
 
     for (v = 0; v < g1->nVertices; v++) {
-        for (node = g2->edge_list_begin[v]->next; node != g2->edge_list_end[v]; node = node->next) {
+        for (node = g2->edge_list_begin[v].next; node != &g2->edge_list_end[v]; node = node->next) {
             if (g1->color[v] == g1->color[node->y] && !edgeClasses[node->edgeClass])
                 // we found an edge
                 return node->edgeClass;
@@ -2247,7 +2259,7 @@ void print_graph(struct Graph *g, int flag) {
 
     for (i = 0; i < g->nVertices; i++) {
         printf("(Cusp Index: %d) ", i);
-        edge = g->edge_list_begin[i];
+        edge = &g->edge_list_begin[i];
         while ((edge = edge->next)->next != NULL) {
             printf("%d ", edge->y);
         }

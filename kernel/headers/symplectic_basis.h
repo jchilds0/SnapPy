@@ -39,8 +39,8 @@ struct EdgeNode {
 };
 
 struct Graph {
-    struct EdgeNode         **edge_list_begin;      /** header node of doubly linked list */
-    struct EdgeNode         **edge_list_end;        /** tail node of doubly linked list */
+    struct EdgeNode         *edge_list_begin;      /** header node of doubly linked list */
+    struct EdgeNode         *edge_list_end;        /** tail node of doubly linked list */
     struct CuspRegion       **pRegion;              /** list of regions in the graph */
     int                     *degree;                /** degree of each vertex */
     int                     *color;                 /** color a tree bipartite */
@@ -202,10 +202,10 @@ void                    inside_vertex(struct CuspRegion *, struct EdgeNode *);
  * Queue Data Structure
  */
 
-void                    initialise_queue(struct Queue *, int);
+struct Queue            *init_queue(int);
 struct Queue            *enqueue(struct Queue *, int);
 int                     dequeue(struct Queue *);
-void                    resize_queue(struct Queue *);
+struct Queue            *resize_queue(struct Queue *);
 int                     empty_queue(struct Queue *);
 void                    free_queue(struct Queue *);
 
