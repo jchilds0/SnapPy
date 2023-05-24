@@ -13,9 +13,9 @@ int main(void) {
     int i, j, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int count = 1;
-    int numTet[] = {5, 7};
-    int index[][2] = {{4, 5}, {1060, 1061}};
+    int count = 3;
+    int numTet[] = {5, 6, 7};
+    int index[][2] = {{4, 5}, {443, 444}, {1060, 1061}};
 
     for (i = 0; i < count; i++) {
         for (j = index[i][0]; j < index[i][1]; j++) {
