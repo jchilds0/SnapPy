@@ -33,7 +33,6 @@ struct EdgeNode {
     int                     nextFace;               /** face the path crosses to the next node */
     int                     prevFace;               /** face the path crosses to the prev node */
     int                     insideVertex;           /** inside vertex of the path */
-    int                     intermediate;           /** (end multi graph) which vertex lies between two vertices */
     struct EdgeNode         *next;                  /** next node in doubly linked list */
     struct EdgeNode         *prev;                  /** prev node in doubly linked list */
 };
@@ -213,8 +212,8 @@ void                    free_queue(struct Queue *);
  * Graph for Breadth First Search
  */
 
-void                    init_search(struct Graph *, bool *, bool *, int *, int *);
-void                    bfs(struct Graph *, int, bool *, bool *, int *, int *);
+void                    init_search(struct Graph *, bool *, bool *, int *);
+void                    bfs(struct Graph *, int, bool *, bool *, int *);
 void                    find_path(int, int, int *, struct EdgeNode *);
 
 
@@ -231,5 +230,7 @@ void                    color_graph(struct Graph *);
 int                     *find_tree_edges(struct Graph *, int);
 int                     find_same_color_edge(struct Graph *, struct Graph *, int *);
 int                     find_path_len(int, int, int *, int);
-void                    find_multi_graph_path(struct Graph *, int, int, struct EdgeNode *);
+struct EdgeNode         *find_multi_graph_path(struct Graph *, Triangulation *, int, int);
+void                    update_edge_classes(struct Graph *, struct EdgeNode *, struct EdgeNode *, int);
+void                    find_edge_ends(struct Graph *, Triangulation *, int, int *, int *);
 void                    print_graph(struct Graph *, int);
