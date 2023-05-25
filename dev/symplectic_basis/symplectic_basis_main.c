@@ -13,29 +13,28 @@ int main(void) {
     int i, j, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int count = 3;
-    int numTet[] = {5, 6, 7};
-    int index[][2] = {{4, 5}, {443, 444}, {1060, 1061}};
+    int count = 5;
+    int numTet[] = {7, 7, 7, 7, 7};
+    int index[] = {2208, 2652, 2942, 3140, 3507};
 
-    for (i = 0; i < count; i++) {
-        for (j = index[i][0]; j < index[i][1]; j++) {
-            theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, j);
+    for (i = 1; i < count; i++) {
+        theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
 
-            if (get_orientability(theTriangulation) == nonorientable_manifold)
-                continue;
+        if (get_orientability(theTriangulation) == nonorientable_manifold)
+            continue;
 
 //            if (get_num_cusps(theTriangulation) == 1)
 //                continue;
 
-            printf("Num Tet: %d Index: %d\n", numTet[i], j);
-            if (theTriangulation != NULL) {
-                eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
-                printMatrix(eqns, num_cols, num_rows);
-                printf("---------------------------\n");
-                free_symplectic_basis(eqns, num_rows);
-            } else
-                printf("Couldn't read census manifold.\n");
-        }
+        printf("Num Tet: %d Index: %d\n", numTet[i], index[i]);
+        if (theTriangulation != NULL) {
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
+            printMatrix(eqns, num_cols, num_rows);
+            printf("---------------------------\n");
+            free_symplectic_basis(eqns, num_rows);
+            free_triangulation(theTriangulation);
+        } else
+            printf("Couldn't read census manifold.\n");
     }
 
     return 0;

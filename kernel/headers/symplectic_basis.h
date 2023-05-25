@@ -47,6 +47,13 @@ struct Graph {
     int                     directed;               /** is the graph directed */
 };
 
+struct CuspEndPoint {
+    int                     cuspIndex;
+    int                     edgeClass1;
+    int                     edgeClass2;
+    int                     pos;
+};
+
 struct EndMultiGraph {
     int                     e0;                     /** edge connecting vertices of the same color */
     struct Graph            *multi_graph;           /** tree with extra edge of cusps */
@@ -155,6 +162,7 @@ void                    delete_edge(struct Graph *, int, int, bool);
 int                     edge_exists(struct Graph *, int, int);
 
 // Symplectic Basis
+int                     *gluing_equations_for_edge_class(Triangulation *, int);
 int                     **get_symplectic_equations(Triangulation *, int *, int *, int);
 
 struct ManifoldBoundary *init_boundary(Triangulation *, Cusp *);
@@ -230,7 +238,7 @@ void                    color_graph(struct Graph *);
 int                     *find_tree_edges(struct Graph *, int);
 int                     find_same_color_edge(struct Graph *, struct Graph *, int *);
 int                     find_path_len(int, int, int *, int);
-struct EdgeNode         *find_multi_graph_path(struct Graph *, Triangulation *, int, int);
-void                    update_edge_classes(struct Graph *, struct EdgeNode *, struct EdgeNode *, int);
+struct CuspEndPoint     *find_multi_graph_path(struct Graph *, Triangulation *, int, int, int *);
+struct CuspEndPoint     *find_cusp_endpoint_edge_classes(struct Graph *, struct EdgeNode *, struct EdgeNode *, int, int *);
 void                    find_edge_ends(struct Graph *, Triangulation *, int, int *, int *);
 void                    print_graph(struct Graph *, int);

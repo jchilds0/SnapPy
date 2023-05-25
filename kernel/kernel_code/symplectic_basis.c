@@ -35,41 +35,65 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     int *edgeClasses = NEW_ARRAY(manifold->num_tetrahedra, int);
     peripheral_curves(manifold);
 
-    // Edge Curves C_i -> gluing equations
-    int **edge_eqns, edge_num_rows;
-
     // Dual Edge Curves Gamma_i -> symplectic equations
     int **symp_eqns, symp_num_rows;
-
-    // Get Gluing Equations
-    edge_eqns = get_gluing_equations(manifold, &edge_num_rows, num_cols);
 
     // Get Symplectic Equations
     symp_eqns = get_symplectic_equations(manifold, edgeClasses, &symp_num_rows, *num_cols);
 
     // Construct return array
-    *num_rows = 2 * symp_num_rows;
+    *num_rows = 2 * (manifold->num_tetrahedra - manifold->num_cusps);
     int **eqns = NEW_ARRAY(*num_rows, int *);
 
     j = 0;
-    for (i = 0; i < edge_num_rows; i++) {
+    for (i = 0; i < manifold->num_tetrahedra; i++) {
         if (!edgeClasses[i]) {
-            my_free(edge_eqns[i]);
             my_free(symp_eqns[i]);
             continue;
         }
 
-        eqns[2 * j] = edge_eqns[i];
+        eqns[2 * j] = gluing_equations_for_edge_class(manifold, i);
         eqns[2 * j + 1] = symp_eqns[i];
         j++;
     }
 
     my_free(edgeClasses);
     my_free(symp_eqns);
-    my_free(edge_eqns);
+
+    *num_cols = 3 * manifold->num_tetrahedra;
+    return eqns;
+}
+
+int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
+    int *eqns, i, T;
+    EdgeClass *edge;
+    PositionedTet ptet0, ptet;
+
+    T = manifold->num_tetrahedra;
+    eqns = NEW_ARRAY(3 * T, int);
+
+    for (i = 0; i < 3 * T; i++)
+        eqns[i] = 0;
+
+    /*
+     *  Build edge equations.
+     */
+
+    for (edge = manifold->edge_list_begin.next; edge != &manifold->edge_list_end; edge = edge->next) {
+        if (edge->index == edgeClass)
+            break;
+    }
+
+    set_left_edge(edge, &ptet0);
+    ptet = ptet0;
+    do {
+        eqns[3 * ptet.tet->index + edge3_between_faces[ptet.near_face][ptet.left_face]]++;
+        veer_left(&ptet);
+    } while (same_positioned_tet(&ptet, &ptet0) == FALSE);
 
     return eqns;
 }
+
 
 /*
  * Setup graph and cusp triangulation, and run construct dual curves.
@@ -1114,8 +1138,8 @@ void do_oscillating_curves(struct ManifoldBoundary **cusps, struct OscillatingCu
         do_one_dual_curve(cusps, &oscCurv->dual_curve_begin[i], &oscCurv->dual_curve_end[i],
                           multiGraph, oscCurv->edgeClass[i]);
 
-        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 2);
-        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 7);
+//        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 2);
+//        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 7);
         print_debug_info(cusps[0]->manifold, cusps, oscCurv, 5);
         print_debug_info(cusps[0]->manifold, cusps, oscCurv, 8);
     }
@@ -1124,42 +1148,29 @@ void do_oscillating_curves(struct ManifoldBoundary **cusps, struct OscillatingCu
 
 void do_one_dual_curve(struct ManifoldBoundary **cusps, struct DualCurves *dual_curve_begin,
         struct DualCurves *dual_curve_end, struct EndMultiGraph *multiGraph, int edgeClass) {
-    struct EdgeNode *nodeStart, *node;
+    int i, pathLen;
+    struct CuspEndPoint *pCuspEndPoint;
     struct DualCurves *newPath;
     int orientation = START;
 
     // find paths through cusps
-    node = find_multi_graph_path(multiGraph->multi_graph, cusps[0]->manifold, edgeClass, multiGraph->e0);
-    nodeStart = node;
+    pCuspEndPoint = find_multi_graph_path(multiGraph->multi_graph, cusps[0]->manifold, edgeClass, multiGraph->e0, &pathLen);
 
     // find paths inside each cusp
     dual_curve_begin->edgeClass[FINISH] = edgeClass;
     dual_curve_end->edgeClass[START]    = edgeClass;
 
-    newPath = init_dual_curve(dual_curve_end, node->edgeClass, node->next->edgeClass);
-    find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, FIRST, orientation);
-    do_one_cusp(cusps[node->y], newPath, edgeClass);
-    orientation = (orientation == START ? FINISH : START);
+    for (i = 0; i < pathLen; i++) {
+        print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
+        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
 
-    while ((node = node->next)->next->next != NULL) {
-        newPath = init_dual_curve(dual_curve_end, node->edgeClass, node->next->edgeClass);
-        find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, MIDDLE, orientation);
-        do_one_cusp(cusps[node->y], newPath, edgeClass);
+        newPath = init_dual_curve(dual_curve_end, pCuspEndPoint[i].edgeClass1, pCuspEndPoint[i].edgeClass2);
+        find_path_endpoints(cusps[pCuspEndPoint[i].cuspIndex]->dual_graph, dual_curve_begin, newPath, pCuspEndPoint[i].pos, orientation);
+        do_one_cusp(cusps[pCuspEndPoint[i].cuspIndex], newPath, edgeClass);
         orientation = (orientation == START ? FINISH : START);
     }
 
-    orientation = (orientation == START ? FINISH : START);
-    newPath = init_dual_curve(dual_curve_end, node->edgeClass, node->next->edgeClass);
-    find_path_endpoints(cusps[node->y]->dual_graph, dual_curve_begin, newPath, LAST, orientation);
-    do_one_cusp(cusps[node->y], newPath, edgeClass);
-
-    while (nodeStart->next->next != NULL) {
-        node = nodeStart->next;
-        REMOVE_NODE(node);
-        my_free(node);
-    }
-    my_free(nodeStart->next);
-    my_free(nodeStart);
+    my_free(pCuspEndPoint);
 }
 
 /*
@@ -1216,59 +1227,57 @@ struct DualCurves *init_dual_curve(struct DualCurves *curve_end, int edgeClassSt
  */
 
 void find_path_endpoints(struct Graph *g, struct DualCurves *pathStart, struct DualCurves *path, int pos, int orientation) {
+    int endpoint1_edge_class, endpoint1_edge_index, endpoint1_copy, endpoint2_edge_class, endpoint2_edge_index, endpoint2_copy;
+    struct PathEndPoint *endpoint1_path1, *endpoint1_path2, *endpoint2_path1, *endpoint2_path2;
     if (pos == FIRST) {
-        find_single_endpoints(g,
-                            NULL,
-                            &path->endpoints[START],
-                            path->edgeClass[START],
-                            START,
-                            FALSE);
+        endpoint1_path1 = NULL;
+        endpoint1_path2 = &path->endpoints[START];
+        endpoint1_edge_class = path->edgeClass[START];
+        endpoint1_edge_index = START;
+        endpoint1_copy = FALSE;
 
-        find_single_endpoints(g,
-                            NULL,
-                            &path->endpoints[FINISH],
-                            path->edgeClass[FINISH],
-                            START,
-                            FALSE);
-
+        endpoint2_path1 = NULL;
+        endpoint2_path2 = &path->endpoints[FINISH];
+        endpoint2_edge_class = path->edgeClass[FINISH];
+        endpoint2_edge_index = START;
+        endpoint2_copy = FALSE;
     } else if (pos == MIDDLE) {
-        find_single_endpoints(g,
-                            &path->prev->endpoints[!orientation],
-                            &path->endpoints[!orientation],
-                            path->prev->edgeClass[!orientation],
-                            orientation,
-                            !orientation);
+        endpoint1_path1 = &path->prev->endpoints[!orientation];
+        endpoint1_path2 = &path->endpoints[orientation];
+        endpoint1_edge_class = path->edgeClass[orientation];
+        endpoint1_edge_index = !orientation;
+        endpoint1_copy = !orientation;
 
-        find_single_endpoints(g,
-                            &path->prev->endpoints[orientation],
-                            &path->endpoints[orientation],
-                            path->edgeClass[orientation],
-                            !orientation,
-                            orientation);
-
+        endpoint2_path1 = &path->prev->endpoints[orientation];
+        endpoint2_path2 = &path->endpoints[!orientation];
+        endpoint2_edge_class = path->edgeClass[!orientation];
+        endpoint2_edge_index = orientation;
+        endpoint2_copy = orientation;
     } else if (pos == LAST) {
-        find_single_endpoints(g,
-                            &pathStart->next->endpoints[START],
-                            &path->endpoints[START],
-                            pathStart->next->edgeClass[START],
-                            FINISH,
-                            TRUE);
+        endpoint1_path1 = &pathStart->next->endpoints[START];
+        endpoint1_path2 = &path->endpoints[START];
+        endpoint1_edge_class = pathStart->next->edgeClass[START];
+        endpoint1_edge_index = FINISH;
+        endpoint1_copy = TRUE;
 
-        find_single_endpoints(g,
-                            &path->prev->endpoints[FINISH],
-                            &path->endpoints[FINISH],
-                            path->prev->edgeClass[FINISH],
-                            FINISH,
-                            TRUE);
-
+        endpoint2_path1 = &path->prev->endpoints[FINISH];
+        endpoint2_path2 = &path->endpoints[FINISH];
+        endpoint2_edge_class = path->prev->edgeClass[FINISH];
+        endpoint2_edge_index = FINISH;
+        endpoint2_copy = TRUE;
     } else {
         uFatalError("do_one_cusp", "symplectic_basis");
+        return;
     }
+
+    find_single_endpoints(g, endpoint1_path1, endpoint1_path2, endpoint1_edge_class, endpoint1_edge_index, endpoint1_copy);
+    find_single_endpoints(g, endpoint2_path1, endpoint2_path2, endpoint2_edge_class, endpoint2_edge_index, endpoint2_copy);
 }
 
 void find_single_endpoints(struct Graph *g, struct PathEndPoint *path1, struct PathEndPoint *path2,
         int edgeClass, int edgeIndex, bool copy) {
     int i, vertex, face1, face2, face;
+    bool edge_lies_in_one_cusp;
     struct CuspRegion *pRegion;
 
     // which cusp region
@@ -1282,9 +1291,12 @@ void find_single_endpoints(struct Graph *g, struct PathEndPoint *path1, struct P
             if (vertex == pRegion->tetVertex)
                 continue;
 
-            // does the vertex belong to the correct class
-            if (pRegion->tri->vertices[vertex].edgeClass != edgeClass ||
-            pRegion->tri->vertices[vertex].edgeIndex != edgeIndex) {
+            if (pRegion->tri->vertices[vertex].edgeClass != edgeClass)
+                continue;
+
+            edge_lies_in_one_cusp = (pRegion->tri->tet->cusp[pRegion->tetVertex]->index == pRegion->tri->tet->cusp[vertex]->index);
+
+            if (edge_lies_in_one_cusp && pRegion->tri->vertices[vertex].edgeIndex != edgeIndex) {
                 continue;
             }
 
@@ -1822,6 +1834,7 @@ void bfs(struct Graph *g, int start, bool *processed, bool *discovered, int *par
 
 void find_path(int start, int end, int *parents, struct EdgeNode *node) {
     struct EdgeNode *new_node = NEW_STRUCT(struct EdgeNode);
+    new_node->edgeClass = -1;
 
     INSERT_AFTER(new_node, node);
 
@@ -2221,11 +2234,11 @@ int find_path_len(int start, int end, int *parents, int pathLen) {
     }
 }
 
-struct EdgeNode *find_multi_graph_path(struct Graph *g, Triangulation *manifold, int edgeClass, int e0) {
+struct CuspEndPoint *find_multi_graph_path(struct Graph *g, Triangulation *manifold, int edgeClass, int e0, int *pathLen) {
     bool *processed     = NEW_ARRAY(g->nVertices, bool);
     bool *discovered    = NEW_ARRAY(g->nVertices, bool);
     int *parent         = NEW_ARRAY(g->nVertices, int);
-    int start, end, startE0, endE0, pathLen = 0;
+    int start, end, startE0, endE0;
     struct EdgeNode *node_begin = NEW_STRUCT( struct EdgeNode ), *node_end = NEW_STRUCT( struct EdgeNode), *tempNode;
 
     node_begin->next = node_end;
@@ -2239,36 +2252,39 @@ struct EdgeNode *find_multi_graph_path(struct Graph *g, Triangulation *manifold,
     init_search(g, processed, discovered, parent);
     bfs(g, start, processed, discovered, parent);
 
-    pathLen = find_path_len(start, end, parent, pathLen);
+    *pathLen = 0;
+    *pathLen = find_path_len(start, end, parent, *pathLen);
     tempNode = NEW_STRUCT( struct EdgeNode );
 
-    if (pathLen % 2 == 1) {
+    if (*pathLen % 2 == 1) {
         find_path(start, end, parent, node_begin);
-
-        INSERT_BEFORE(tempNode, node_end);
-        tempNode->y = start;
     } else {
         init_search(g, processed, discovered, parent);
         bfs(g, start, processed, discovered, parent);
 
         find_path(start, startE0, parent, node_begin);
 
-        tempNode->y = startE0;
-        tempNode->edgeClass = e0;
-        INSERT_BEFORE(tempNode, node_end);
+        my_free(tempNode);
+        tempNode = node_end->prev;
+//        tempNode->y = startE0;
+//        tempNode->edgeClass = e0;
+//        INSERT_BEFORE(tempNode, node_end);
 
         init_search(g, processed, discovered, parent);
         bfs(g, endE0, processed, discovered, parent);
 
         find_path(endE0, end, parent, node_end->prev);
+        tempNode->next->edgeClass = e0;
     }
 
-    update_edge_classes(g, node_begin, node_end, edgeClass);
+    struct CuspEndPoint *pCuspEndPoint = find_cusp_endpoint_edge_classes(g, node_begin, node_end, edgeClass, pathLen);
 
     // remove header and tailer nodes
-    tempNode = node_begin->next;
-    tempNode->prev = NULL;
-    node_end->prev->next = NULL;
+    while (node_begin->next != node_end) {
+        tempNode = node_begin->next;
+        REMOVE_NODE(tempNode);
+        my_free(tempNode);
+    }
 
     my_free(node_begin);
     my_free(node_end);
@@ -2277,26 +2293,55 @@ struct EdgeNode *find_multi_graph_path(struct Graph *g, Triangulation *manifold,
     my_free(discovered);
     my_free(processed);
 
-    return tempNode;
+    return pCuspEndPoint;
 }
 
-void update_edge_classes(struct Graph *g, struct EdgeNode *node_begin, struct EdgeNode *node_end, int edgeClass) {
-    int cusp;
+struct CuspEndPoint *find_cusp_endpoint_edge_classes(struct Graph *g, struct EdgeNode *node_begin,
+        struct EdgeNode *node_end, int edgeClass, int *pathLen) {
+    int i, cusp;
     struct EdgeNode *edge, *node;
 
-    node_begin->next->edgeClass = edgeClass;
-    node_end->prev->edgeClass = edgeClass;
+    *pathLen = 0;
+    for (node = node_begin->next; node != node_end; node = node->next)
+        (*pathLen)++;
 
-    for (node = node_begin->next->next; node->next != node_end; node = node->next) {
+    struct CuspEndPoint *pCuspEndPoint = NEW_ARRAY(*pathLen, struct CuspEndPoint);
+
+    pCuspEndPoint[0].edgeClass1 = edgeClass;
+
+    i = 0;
+    for (node = node_begin->next; node->next != node_end; node = node->next) {
         cusp = node->y;
+
+        pCuspEndPoint[i].cuspIndex = node->y;
+        pCuspEndPoint[i].pos = MIDDLE;
+
+        if (i != 0)
+            pCuspEndPoint[i].edgeClass1 = pCuspEndPoint[i - 1].edgeClass2;
+
+        if (node->next->edgeClass != -1) {
+            pCuspEndPoint[i].edgeClass2 = node->next->edgeClass;
+            i++;
+            continue;
+        }
 
         for (edge = g->edge_list_begin[cusp].next; edge != &g->edge_list_end[cusp]; edge = edge->next) {
             if (node->next->y == edge->y) {
-                node->edgeClass = edge->edgeClass;
+                pCuspEndPoint[i].edgeClass2 = edge->edgeClass;
                 break;
             }
         }
+
+        i++;
     }
+
+    pCuspEndPoint[0].pos = FIRST;
+    pCuspEndPoint[*pathLen - 1].cuspIndex = node->y;
+    pCuspEndPoint[*pathLen - 1].edgeClass1 = pCuspEndPoint[*pathLen - 2].edgeClass2;
+    pCuspEndPoint[*pathLen - 1].edgeClass2 = edgeClass;
+    pCuspEndPoint[*pathLen - 1].pos = LAST;
+
+    return pCuspEndPoint;
 }
 
 void find_edge_ends(struct Graph *g, Triangulation *manifold, int edgeClass, int *start, int *end) {
