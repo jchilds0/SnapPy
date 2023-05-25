@@ -7,7 +7,7 @@
 #include "kernel_namespace.h"
 #include "unix_cusped_census.h"
 #include "addl_code.h"
-#include "symplectic_basis.h"
+#include "symplectic_basis_old.h"
 
 void testDual(void);
 int omega(int *, int *, int);
