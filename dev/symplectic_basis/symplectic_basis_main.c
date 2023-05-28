@@ -10,14 +10,14 @@
 void printMatrix(int**, int, int);
 
 int main(void) {
-    int i, j, **eqns, num_rows, num_cols;
+    int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int count = 5;
+    int count = 1;
     int numTet[] = {7, 7, 7, 7, 7};
     int index[] = {2208, 2652, 2942, 3140, 3507};
 
-    for (i = 1; i < count; i++) {
+    for (i = 0; i < count; i++) {
         theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
 
         if (get_orientability(theTriangulation) == nonorientable_manifold)
