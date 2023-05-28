@@ -295,6 +295,14 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     return eqns;
 }
 
+/*
+ * Copy of get_gluings_equations.c get_gluing_equations which finds 
+ * the edge gluings equations for a given edge index. Used instead 
+ * of get_gluing_equations to ensure we have the correct edge index 
+ * and reduce the chance of memory leak since we dont need all of 
+ * rows from gluing equations 
+ */
+
 int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
     int *eqns, i, T;
     EdgeClass *edge;
@@ -1302,16 +1310,18 @@ void print_debug_info(Triangulation *manifold, ManifoldBoundary **cusps, Oscilla
             j = 0;
             // which component
             for (path = oscCurv->dual_curve_begin[i].next; path != &oscCurv->dual_curve_end[i]; path = path->next) {
-                printf("    Part %d\n", j);
+                printf("    Part %d Cusp %d\n", j, path->endpoints[0].region->tri->tet->cusp[path->endpoints[0].region->tetVertex]->index);
                 for (k = 0; k < 2; k++) {
                     if (k == 0)
                         printf("        Start: ");
                     else
                         printf("        End:   ");
 
-                    printf("Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d\n",
+                    printf("Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d (%d, %d)\n",
                            path->endpoints[k].regionIndex, path->endpoints[k].region->tetIndex,
-                           path->endpoints[k].region->tetVertex, path->endpoints[k].face, path->endpoints[k].vertex);
+                           path->endpoints[k].region->tetVertex, path->endpoints[k].face, path->endpoints[k].vertex,
+                           path->endpoints[k].region->tri->vertices[path->endpoints[k].vertex].edgeClass,
+                           path->endpoints[k].region->tri->vertices[path->endpoints[k].vertex].edgeIndex);
                 }
 
                 j++;
@@ -1368,8 +1378,8 @@ void do_oscillating_curves(ManifoldBoundary **cusps, OscillatingCurves *oscCurv,
         do_one_dual_curve(cusps, &oscCurv->dual_curve_begin[i], &oscCurv->dual_curve_end[i],
                           multiGraph, oscCurv->edgeClass[i]);
 
-//        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 2);
-//        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 7);
+        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 2);
+        print_debug_info(cusps[0]->manifold, cusps, oscCurv, 7);
         print_debug_info(cusps[0]->manifold, cusps, oscCurv, 5);
         print_debug_info(cusps[0]->manifold, cusps, oscCurv, 8);
     }
@@ -1391,8 +1401,8 @@ void do_one_dual_curve(ManifoldBoundary **cusps, DualCurves *dual_curve_begin,
     dual_curve_end->edgeClass[START]    = edgeClass;
 
     for (i = 0; i < pathLen; i++) {
-        print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
-        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
+//        print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
+//        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
 
         newPath = init_dual_curve(dual_curve_end, pCuspEndPoint[i].edgeClass1, pCuspEndPoint[i].edgeClass2);
         find_path_endpoints(cusps[pCuspEndPoint[i].cuspIndex]->dual_graph, dual_curve_begin, newPath, pCuspEndPoint[i].pos, orientation);
@@ -1471,18 +1481,30 @@ void find_path_endpoints(Graph *g, DualCurves *pathStart, DualCurves *path, int 
         endpoint2_edge_class = path->edgeClass[FINISH];
         endpoint2_edge_index = START;
         endpoint2_copy = FALSE;
-    } else if (pos == MIDDLE) {
-        endpoint1_path1 = &path->prev->endpoints[!orientation];
-        endpoint1_path2 = &path->endpoints[orientation];
-        endpoint1_edge_class = path->edgeClass[orientation];
-        endpoint1_edge_index = !orientation;
-        endpoint1_copy = !orientation;
+    } else if (pos == MIDDLE && orientation == START) {
+        endpoint1_path1 = &path->prev->endpoints[START];
+        endpoint1_path2 = &path->endpoints[START];
+        endpoint1_edge_class = path->edgeClass[START];
+        endpoint1_edge_index = FINISH;
+        endpoint1_copy = TRUE;
 
-        endpoint2_path1 = &path->prev->endpoints[orientation];
-        endpoint2_path2 = &path->endpoints[!orientation];
-        endpoint2_edge_class = path->edgeClass[!orientation];
-        endpoint2_edge_index = orientation;
-        endpoint2_copy = orientation;
+        endpoint2_path1 = &path->prev->endpoints[FINISH];
+        endpoint2_path2 = &path->endpoints[FINISH];
+        endpoint2_edge_class = path->edgeClass[FINISH];
+        endpoint2_edge_index = START;
+        endpoint2_copy = FALSE;
+    } else if (pos == MIDDLE && orientation == FINISH) {
+        endpoint1_path1 = &path->prev->endpoints[FINISH];
+        endpoint1_path2 = &path->endpoints[FINISH];
+        endpoint1_edge_class = path->edgeClass[START];
+        endpoint1_edge_index = FINISH;
+        endpoint1_copy = TRUE;
+
+        endpoint2_path1 = &path->prev->endpoints[START];
+        endpoint2_path2 = &path->endpoints[START];
+        endpoint2_edge_class = path->edgeClass[FINISH];
+        endpoint2_edge_index = START;
+        endpoint2_copy = FALSE;
     } else if (pos == LAST) {
         endpoint1_path1 = &pathStart->next->endpoints[START];
         endpoint1_path2 = &path->endpoints[START];
@@ -1622,6 +1644,9 @@ void update_path_endpoint_info(CuspRegion *pRegion, EdgeNode *node, PathEndPoint
     else
         nextNode = node->prev;
 
+    node->nextFace = -1;
+    node->prevFace = -1;
+
     for (i = 0; i < 4; i++) {
         if (i == pRegion->tetVertex || !pRegion->adjTri[i])
             continue;
@@ -1631,6 +1656,10 @@ void update_path_endpoint_info(CuspRegion *pRegion, EdgeNode *node, PathEndPoint
             node->nextFace = i;
         }
     }
+
+    // next node isn't in an adjacent region
+    if (node->nextFace == -1 || node->prevFace == -1)
+        uFatalError("update_path_endpoint_info", "symplectic_basis");
 
     if (pos == START)
         node->prevFace = endPoint->face;
