@@ -3047,29 +3047,6 @@ cdef class Triangulation():
         <https://arxiv.org/abs/2208.06969>
         """
 
-        def is_symplectic(M):
-            """
-            Test if the matrix M is symplectic
-            :param M: square matrix
-            :return: true or false
-            """
-            n = len(M)
-
-            for i in range(n):
-                for j in range(i, n):
-                    omega = abs(symplectic_form(M[i], M[j]))
-
-                    if i % 2 == 0 and j % 2 == 1 and j == i + 1:
-                        if omega != 2:
-                            return False
-                    elif omega:
-                        return False
-
-            return True
-
-        def symplectic_form(u, v):
-            return sum([u[2 * i] * v[2 * i + 1] - u[2 * i + 1] * v[2 * i] for i in range(len(u) // 2)])
-
         cdef int **c_eqns;
         cdef int **g_eqns;
         cdef int num_rows, num_cols, dual_rows;
@@ -3104,8 +3081,5 @@ cdef class Triangulation():
         # Convert to Neumann Zagier Matrix
         rows = len(eqns)
         retval = [[eqns[i][3 * (j // 2) + j % 2] - eqns[i][3 * (j // 2) + 2] for j in range(rows)] for i in range(rows)]
-
-        if not is_symplectic(retval):
-            raise Exception
 
         return matrix(retval)
