@@ -1,6 +1,7 @@
 import snappy
 import unittest
 from tqdm import tqdm
+import sys
 
 
 def is_symplectic(M):
@@ -40,18 +41,21 @@ class TestSymplecticBasis(unittest.TestCase):
                 i += 1
 
     def test_link_complements(self):
-        i = 0
-        for M in tqdm(snappy.HTLinkExteriors[:1000], desc="Knots...", ncols=120):
-            with self.subTest(i=i):
-                # M = snappy.HTLinkExteriors[i]
-                if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
-                    continue
-                else:
-                    # print(M.identify()[0])
-                    basis = M.symplectic_basis()
-                    self.assertTrue(is_symplectic(basis.data))
+        with open('dev/symplectic_basis/test.log', 'w') as file:
+            i = 0
+            initial_pos = file.tell()
+            for M in tqdm(snappy.HTLinkExteriors[:1000], desc="Knots...", ncols=120, file=file):
+                with self.subTest(i=i):
+                    # M = snappy.HTLinkExteriors[i]
+                    if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
+                        continue
+                    else:
+                        # print(M.identify()[0])
+                        basis = M.symplectic_basis()
+                        self.assertTrue(is_symplectic(basis.data))
 
-                i += 1
+                    file.seek(initial_pos)
+                    i += 1
 
 
 if __name__ == "__main__":
