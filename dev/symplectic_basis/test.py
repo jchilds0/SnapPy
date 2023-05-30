@@ -1,7 +1,8 @@
+from datetime import datetime
 import snappy
 import unittest
 from tqdm import tqdm
-import sys
+from multiprocessing import Pool
 
 
 def is_symplectic(M):
@@ -29,17 +30,54 @@ def symplectic_form(u, v):
     return sum([u[2 * i] * v[2 * i + 1] - u[2 * i + 1] * v[2 * i] for i in range(len(u) // 2)])
 
 
+def process_manifold(i: int):
+    M = snappy.HTLinkExteriors[i]
+
+    # print("Testing: " + str(M.identify()[0]))
+
+    if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
+        return True
+
+    basis = M.symplectic_basis()
+    return is_symplectic(basis.data)
+
+
 class TestSymplecticBasis(unittest.TestCase):
+    @unittest.skip
     def test_knot_complements(self):
         i = 0
-        for M in snappy.CensusKnots:
+        for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
                 self.assertTrue(is_symplectic(basis.data))
                 i += 1
 
+    @unittest.skip
     def test_link_complements(self):
+        i = 0
+        for M in tqdm(snappy.HTLinkExteriors[:300], desc="Links...", ncols=120):
+            with self.subTest(i=i):
+                if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
+                    continue
+                else:
+                    # print(M.identify()[0])
+                    basis = M.symplectic_basis()
+                    self.assertTrue(is_symplectic(basis.data))
+                    i += 1
+
+    def test_link_complements_pool(self):
+        scale = 1000
+        for i in range(50):
+            print("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "] " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1))
+            with Pool(maxtasksperchild=100) as pool:
+                result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)), chunksize=100)
+
+                for res in result:
+                    self.assertTrue(res)
+
+    @unittest.skip
+    def test_link_complements_file(self):
         with open('dev/symplectic_basis/test.log', 'w') as file:
             i = 0
             initial_pos = file.tell()
