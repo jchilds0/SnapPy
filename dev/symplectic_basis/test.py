@@ -32,10 +32,9 @@ def symplectic_form(u, v):
 class TestSymplecticBasis(unittest.TestCase):
     def test_knot_complements(self):
         i = 0
-        for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
+        for M in snappy.CensusKnots:
             with self.subTest(i=i):
                 # print(M.identify()[0])
-                M = snappy.CensusKnots[i]
                 basis = M.symplectic_basis()
                 self.assertTrue(is_symplectic(basis.data))
                 i += 1
@@ -44,7 +43,7 @@ class TestSymplecticBasis(unittest.TestCase):
         with open('dev/symplectic_basis/test.log', 'w') as file:
             i = 0
             initial_pos = file.tell()
-            for M in tqdm(snappy.HTLinkExteriors[:1000], desc="Knots...", ncols=120, file=file):
+            for M in tqdm(snappy.HTLinkExteriors, desc="Knots...", ncols=120, file=file):
                 with self.subTest(i=i):
                     # M = snappy.HTLinkExteriors[i]
                     if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
