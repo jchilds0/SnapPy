@@ -42,8 +42,28 @@ def process_manifold(i: int):
     return is_symplectic(basis.data)
 
 
+def test_link_complements_pool(start: int, end: int):
+    scale = 1000
+    for i in range(start, end):
+        passed = True
+        print("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1))
+        with Pool() as pool:
+            result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
+
+            j = 0
+            for j, res in enumerate(result):
+                if not res:
+                    passed = False
+                    break
+
+            time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
+            if passed:
+                print(time + "Passed")
+            else:
+                print(time + "Failed " + str(j))
+
+
 class TestSymplecticBasis(unittest.TestCase):
-    @unittest.skip
     def test_knot_complements(self):
         i = 0
         for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
@@ -53,7 +73,6 @@ class TestSymplecticBasis(unittest.TestCase):
                 self.assertTrue(is_symplectic(basis.data))
                 i += 1
 
-    @unittest.skip
     def test_link_complements(self):
         i = 0
         for M in tqdm(snappy.HTLinkExteriors[:300], desc="Links...", ncols=120):
@@ -66,34 +85,7 @@ class TestSymplecticBasis(unittest.TestCase):
                     self.assertTrue(is_symplectic(basis.data))
                     i += 1
 
-    def test_link_complements_pool(self):
-        scale = 1000
-        for i in range(50):
-            print("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "] " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1))
-            with Pool(maxtasksperchild=100) as pool:
-                result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)), chunksize=100)
-
-                for res in result:
-                    self.assertTrue(res)
-
-    @unittest.skip
-    def test_link_complements_file(self):
-        with open('dev/symplectic_basis/test.log', 'w') as file:
-            i = 0
-            initial_pos = file.tell()
-            for M in tqdm(snappy.HTLinkExteriors, desc="Knots...", ncols=120, file=file):
-                with self.subTest(i=i):
-                    # M = snappy.HTLinkExteriors[i]
-                    if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
-                        continue
-                    else:
-                        # print(M.identify()[0])
-                        basis = M.symplectic_basis()
-                        self.assertTrue(is_symplectic(basis.data))
-
-                    file.seek(initial_pos)
-                    i += 1
-
 
 if __name__ == "__main__":
-    unittest.main()
+    test_link_complements_pool(0, 1)
+    # unittest.main()
