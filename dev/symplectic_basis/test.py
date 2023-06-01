@@ -65,7 +65,7 @@ def test_link_complements_pool(start: int, end: int):
             passed = True
             file.write("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1) + "\n")
             with Pool() as pool:
-                result = pool.imap(process_manifold, range(scale * i, 100))
+                result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
                 j = 0
                 for j, res in enumerate(result):
