@@ -5,7 +5,9 @@ from tqdm import tqdm
 from multiprocessing import Pool
 
 
-ERROR_MANIFOLDS = ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)", "K13a4726(0,0)", "K13a4878(0,0)"]
+# Names "3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)", "K13a4726(0,0)", "K13a4878(0,0)"
+ERROR_MANIFOLDS = [1, 4, 35, 76, 7703, 7855, 12442]
+
 
 def is_symplectic(M):
     """
@@ -34,17 +36,23 @@ def symplectic_form(u, v):
 
 def process_manifold(i: int):
     M = snappy.HTLinkExteriors[i]
-    label = M.identify()[0]
+    label = M.identify()
 
-    if str(label) in ERROR_MANIFOLDS:
+    if i in ERROR_MANIFOLDS:
         return True
 
-    basis = M.symplectic_basis()
-    result = is_symplectic(basis.data)
-
     with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-        string = "Testing: " + str(M.identify()[0])
-        file.write(string + (60 - len(string)) * " " + str(result) + '\n')
+        test = "Testing: " + str(i) + ' ' + str(label)
+        file.write(test)
+
+        basis = M.symplectic_basis()
+        result = is_symplectic(basis.data)
+
+        if result:
+            string = "Passed\n"
+        else:
+            string = "Failed\n"
+        file.write((60 - len(test)) * " " + str(string))
 
     return result
 
@@ -67,7 +75,6 @@ def test_link_complements_pool(start: int, end: int):
             with Pool() as pool:
                 result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
-                j = 0
                 for j, res in enumerate(result):
                     if not res:
                         passed = False
@@ -104,5 +111,5 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements_pool(0, 1)
+    test_link_complements_pool(12, 50)
     # unittest.main()
