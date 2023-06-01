@@ -68,23 +68,26 @@ def find_manifold(start: int):
 
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
-    with open("logs/total.log", "a") as file:
-        for i in range(start, end):
-            passed = True
+    for i in range(start, end):
+        passed = True
+
+        with open("logs/total.log", "a") as file:
             file.write("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1) + "\n")
-            with Pool() as pool:
-                result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
-                for j, res in enumerate(result):
-                    if not res:
-                        passed = False
-                        break
+        with Pool() as pool:
+            result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
-                time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
-                if passed:
-                    file.write(time + "Passed\n")
-                else:
-                    file.write(time + "Failed\n")
+            for j, res in enumerate(result):
+                if not res:
+                    passed = False
+                    break
+
+        with open("logs/total.log", "a") as file:
+            time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
+            if passed:
+                file.write(time + "Passed\n")
+            else:
+                file.write(time + "Failed\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
