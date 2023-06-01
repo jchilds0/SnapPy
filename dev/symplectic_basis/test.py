@@ -5,6 +5,8 @@ from tqdm import tqdm
 from multiprocessing import Pool
 
 
+ERROR_MANIFOLDS = ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)", "K13a4726(0,0)", "K13a4878(0,0)"]
+
 def is_symplectic(M):
     """
     Test if the matrix M is symplectic
@@ -32,35 +34,50 @@ def symplectic_form(u, v):
 
 def process_manifold(i: int):
     M = snappy.HTLinkExteriors[i]
+    label = M.identify()[0]
 
-    # print("Testing: " + str(M.identify()[0]))
-
-    if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
+    if str(label) in ERROR_MANIFOLDS:
         return True
 
     basis = M.symplectic_basis()
-    return is_symplectic(basis.data)
+    result = is_symplectic(basis.data)
+
+    with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
+        string = "Testing: " + str(M.identify()[0])
+        file.write(string + (60 - len(string)) * " " + str(result) + '\n')
+
+    return result
+
+
+def find_manifold(start: int):
+    scale = 1000
+    for i in range(scale * start, scale * (start + 1)):
+        M = snappy.HTLinkExteriors[i]
+
+        if len(M.identify()) == 0:
+            return True
 
 
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
-    for i in range(start, end):
-        passed = True
-        print("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1))
-        with Pool() as pool:
-            result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
+    with open("logs/total.log", "a") as file:
+        for i in range(start, end):
+            passed = True
+            file.write("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1) + "\n")
+            with Pool() as pool:
+                result = pool.imap(process_manifold, range(scale * i, 100))
 
-            j = 0
-            for j, res in enumerate(result):
-                if not res:
-                    passed = False
-                    break
+                j = 0
+                for j, res in enumerate(result):
+                    if not res:
+                        passed = False
+                        break
 
-            time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
-            if passed:
-                print(time + "Passed")
-            else:
-                print(time + "Failed " + str(j))
+                time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
+                if passed:
+                    file.write(time + "Passed\n")
+                else:
+                    file.write(time + "Failed\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -77,7 +94,7 @@ class TestSymplecticBasis(unittest.TestCase):
         i = 0
         for M in tqdm(snappy.HTLinkExteriors[:300], desc="Links...", ncols=120):
             with self.subTest(i=i):
-                if str(M.identify()[0]) in ["3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)"]:
+                if str(M.identify()[0]) in ERROR_MANIFOLDS:
                     continue
                 else:
                     # print(M.identify()[0])
