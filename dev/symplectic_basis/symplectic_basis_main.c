@@ -4,6 +4,7 @@
 
 #include "SnapPea.h"
 #include "unix_cusped_census.h"
+#include "unix_file_io.h"
 #include "addl_code.h"
 #include <stdio.h>
 
@@ -13,21 +14,34 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int count = 1;
+    int fromFile = 1;
+
+    int count = 7;
     int numTet[] = {7, 7, 7, 7, 7};
     int index[] = {2208, 2652, 2942, 3140, 3507};
 
+    char *error[] = {"CuspedCensusData/1.tri",
+                     "CuspedCensusData/4.tri",
+                     "CuspedCensusData/35.tri",
+                     "CuspedCensusData/76.tri",
+                     "CuspedCensusData/7703.tri",
+                     "CuspedCensusData/7855.tri",
+                     "CuspedCensusData/12442.tri"};
+
     for (i = 0; i < count; i++) {
-        theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
+        if (fromFile) {
+            printf("Triangulation: %s\n", error[i]);
+            theTriangulation = read_triangulation(error[i]);
+        }
+        else {
+            theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
+            printf("Num Tet: %d Index: %d\n", numTet[i], index[i]);
+        }
 
-        if (get_orientability(theTriangulation) == nonorientable_manifold)
-            continue;
-
-//            if (get_num_cusps(theTriangulation) == 1)
-//                continue;
-
-        printf("Num Tet: %d Index: %d\n", numTet[i], index[i]);
         if (theTriangulation != NULL) {
+            if (get_orientability(theTriangulation) == nonorientable_manifold)
+                continue;
+
             eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
             printMatrix(eqns, num_cols, num_rows);
             printf("---------------------------\n");
