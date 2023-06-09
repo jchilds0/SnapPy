@@ -107,12 +107,17 @@ class TestSymplecticBasis(unittest.TestCase):
                 if str(M.identify()[0]) in ERROR_MANIFOLDS:
                     continue
                 else:
-                    # print(M.identify()[0])
+                    print(M.identify()[0])
                     basis = M.symplectic_basis()
                     self.assertTrue(is_symplectic(basis.data))
                     i += 1
 
 
 if __name__ == "__main__":
-    test_link_complements_pool(12, 50)
+    # test_link_complements_pool(12, 50)
     # unittest.main()
+    for index in ERROR_MANIFOLDS:
+        M = snappy.HTLinkExteriors[index]
+        # print(M.identify()[0])
+        # basis = M.symplectic_basis()
+        M.save("CuspedCensusData/" + str(index) + '.tri')
