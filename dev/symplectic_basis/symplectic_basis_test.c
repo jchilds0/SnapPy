@@ -47,13 +47,13 @@ void testDual(void) {
             if (j == 2208 || j == 2652 || j == 2942 || j == 3140 || j == 3507)
                 continue;
 
-//            printf("Num Tet: %d Index: %d \n", index[i][0], j);
+            printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
 
             for (k = 0; k < dual_rows / 2; k ++) {
                 if (ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols)) == 2) {
-//                    printf("Passed\n");
+                    printf("Passed\n");
                     continue;
                 }
 
