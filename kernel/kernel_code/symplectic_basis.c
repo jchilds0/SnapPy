@@ -12,22 +12,22 @@
 
 #define atleast_two(a, b, c)                    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 
-#define FIRST               0
-#define MIDDLE              1
-#define LAST                2
-#define START               0
-#define FINISH              1
+#define FIRST                   0
+#define MIDDLE                  1
+#define LAST                    2
+#define START                   0
+#define FINISH                  1
 
 /*
  * Queue
  */
 
 typedef struct Queue {
-    int                     front;      // First element of queue
-    int                     rear;       // Last element of queue
-    int                     len;        // num of elements
-    int                     size;       // array size
-    int                     *array;
+    int                         front;      // First element of queue
+    int                         rear;       // Last element of queue
+    int                         len;        // num of elements
+    int                         size;       // array size
+    int                         *array;
 } Queue ;
 
 /**
@@ -35,35 +35,35 @@ typedef struct Queue {
  */
 
 typedef struct EdgeNode {
-    int                     y;                      /** cusp region index */
-    int                     edge_class;              /** edge_class of the edge for edges in the end multi graph */
-    int                     next_face;               /** face the path crosses to the next node */
-    int                     prev_face;               /** face the path crosses to the prev node */
-    int                     inside_vertex;           /** inside vertex of the path */
-    struct EdgeNode         *next;                  /** next node in doubly linked list */
-    struct EdgeNode         *prev;                  /** prev node in doubly linked list */
+    int                         y;                       /** cusp region index */
+    int                         edge_class;              /** edge_class of the edge for edges in the end multi graph */
+    int                         next_face;               /** face the path crosses to the next node */
+    int                         prev_face;               /** face the path crosses to the prev node */
+    int                         inside_vertex;           /** inside vertex of the path */
+    struct EdgeNode             *next;                   /** next node in doubly linked list */
+    struct EdgeNode             *prev;                   /** prev node in doubly linked list */
 } EdgeNode;
 
 typedef struct Graph {
-    EdgeNode                *edge_list_begin;       /** header node of doubly linked list */
-    EdgeNode                *edge_list_end;         /** tail node of doubly linked list */
-    struct CuspRegion       **regions;              /** list of regions in the graph */
-    int                     *degree;                /** degree of each vertex */
-    int                     *color;                 /** color a tree bipartite */
-    int                     num_vertices;              /** number of vertices in the graph */
-    int                     directed;               /** is the graph directed */
+    EdgeNode                    *edge_list_begin;        /** header node of doubly linked list */
+    EdgeNode                    *edge_list_end;          /** tail node of doubly linked list */
+    struct CuspRegion           **regions;               /** list of regions in the graph */
+    int                         *degree;                 /** degree of each vertex */
+    int                         *color;                  /** color a tree bipartite */
+    int                         num_vertices;            /** number of vertices in the graph */
+    int                         directed;                /** is the graph directed */
 } Graph;
 
 typedef struct CuspEndPoint {
-    int                     cusp_index;
-    int                     edge_class1;
-    int                     edge_class2;
-    int                     pos;
+    int                         cusp_index;
+    int                         edge_class1;
+    int                         edge_class2;
+    int                         pos;
 } CuspEndPoint;
 
 typedef struct EndMultiGraph {
-    int                     e0;                     /** edge connecting vertices of the same color */
-    Graph                   *multi_graph;           /** tree with extra edge of cusps */
+    int                         e0;                      /** edge connecting vertices of the same color */
+    Graph                       *multi_graph;            /** tree with extra edge of cusps */
 } EndMultiGraph;
 
 /**
@@ -77,32 +77,32 @@ typedef struct EndMultiGraph {
  */
 
 struct extra {
-    int                     curve[4][4];            /** oscillating curve holonomy for a cusp triangle */
+    int                         curve[4][4];            /** oscillating curve holonomy for a cusp triangle */
 };
 
 typedef struct PathEndPoint {
-    int                     face;                   /** face containg the short rectangle carrying the curve */
-    int                     vertex;                 /** vertex we dive through the manifold along */
-    int                     region_index;            /** index of the region the endpoint lies in */
-    int                     num_adj_curves[4][4];         /** where the curve dives into the manifold */
-    struct CuspRegion       *region;                /** pointer to the region the endpoint lies in */
+    int                         face;                   /** face containg the short rectangle carrying the curve */
+    int                         vertex;                 /** vertex we dive through the manifold along */
+    int                         region_index;           /** index of the region the endpoint lies in */
+    int                         num_adj_curves[4][4];   /** where the curve dives into the manifold */
+    struct CuspRegion           *region;                /** pointer to the region the endpoint lies in */
 } PathEndPoint;
 
 typedef struct DualCurves {
-    int                     edge_class[2];
-    int                     cusp_index;             /** which cusp does the curve lie in */
-    EdgeNode                curves_begin;           /** header node of doubbly linked list */
-    EdgeNode                curves_end;             /** tailer node of doubbly linked list */
-    PathEndPoint            endpoints[2];           /** path end points */
-    struct DualCurves       *next;                  /** next dual curve in doubly linked list */
-    struct DualCurves       *prev;                  /** prev dual curve in doubly linked list */
+    int                         edge_class[2];
+    int                         cusp_index;             /** which cusp does the curve lie in */
+    EdgeNode                    curves_begin;           /** header node of doubbly linked list */
+    EdgeNode                    curves_end;             /** tailer node of doubbly linked list */
+    PathEndPoint                endpoints[2];           /** path end points */
+    struct DualCurves           *next;                  /** next dual curve in doubly linked list */
+    struct DualCurves           *prev;                  /** prev dual curve in doubly linked list */
 } DualCurves;
 
 typedef struct OscillatingCurves {
-    int                     num_curves;
-    int                     *edge_class;
-    DualCurves              *dual_curve_begin;      /** array of doubly linked lists of dual curves */
-    DualCurves              *dual_curve_end;        /** array of doubly linkek lists of dual curves */
+    int                         num_curves;
+    int                         *edge_class;
+    DualCurves                  *dual_curve_begin;      /** array of doubly linked lists of dual curves */
+    DualCurves                  *dual_curve_end;        /** array of doubly linkek lists of dual curves */
 } OscillatingCurves;
 
 /**
@@ -116,53 +116,53 @@ typedef struct OscillatingCurves {
 */
 
 typedef struct CuspVertex {
-    int                     edge_class;
-    int                     edge_index;
-    EdgeClass               *edge;
-    int                     v1;
-    int                     v2;
+    int                         edge_class;
+    int                         edge_index;
+    EdgeClass                   *edge;
+    int                         v1;
+    int                         v2;
 } CuspVertex;
 
 typedef struct CuspTriangle {
-    Tetrahedron             *tet;                   /** tetrahedron the triangle comes from */
-    int                     tet_index;               /** tet->index */
-    int                     tet_vertex;              /** vertex the triangle comes from */
-    int                     num_curves;              /** number of curves on the triangle */
-    CuspVertex              vertices[4];            /** information about each vertex */
-    struct CuspTriangle     *neighbours[4];         /** triangle neighbouring a face */
-    struct CuspTriangle     *next;                  /** next cusp triangle on doubly linked list */
-    struct CuspTriangle     *prev;                  /** prev cusp triangle on doubly linkled list */
+    Tetrahedron                 *tet;                   /** tetrahedron the triangle comes from */
+    int                         tet_index;              /** tet->index */
+    int                         tet_vertex;             /** vertex the triangle comes from */
+    int                         num_curves;             /** number of curves on the triangle */
+    CuspVertex                  vertices[4];            /** information about each vertex */
+    struct CuspTriangle         *neighbours[4];         /** triangle neighbouring a face */
+    struct CuspTriangle         *next;                  /** next cusp triangle on doubly linked list */
+    struct CuspTriangle         *prev;                  /** prev cusp triangle on doubly linkled list */
 } CuspTriangle;
 
 typedef struct CuspRegion {
-    CuspTriangle            *tri;                   /** cusp triangle the region lies on */
-    int                     tet_index;               /** tri->tetIndex */
-    int                     tet_vertex;              /** tri->tet_vertex */
-    int                     index;                  /** index of the cusp region */
-    int                     curve[4][4];            /** looking at face, number of curves between the region and vertex */
-    int                     adj_cusp_triangle[4];              /** does the region meet this edge of the cusp triangle */
-    int                     dive[4][4];             /** can we dive along the face into this vertex */
-    int                     num_adj_curves[4][4];            /** stores the number of curves between a region and a face */
-    int                     temp_adj_curves[4][4];        /** store the adj curve until pathfinding is complete */
-    struct CuspRegion       *adj_cusp_regions[4];         /** index of the adjacent regions */
-    struct CuspRegion       *adj_dive_regions[4];        /** regions which are adjacent by diving through the manifold */
-    struct CuspRegion       *next;                  /** next cusp region in doubly linked list */
-    struct CuspRegion       *prev;                  /** prev cusp region in doubly linked list */
+    CuspTriangle                *tri;                   /** cusp triangle the region lies on */
+    int                         tet_index;              /** tri->tetIndex */
+    int                         tet_vertex;             /** tri->tet_vertex */
+    int                         index;                  /** index of the cusp region */
+    int                         curve[4][4];            /** looking at face, number of curves between the region and vertex */
+    int                         adj_cusp_triangle[4];   /** does the region meet this edge of the cusp triangle */
+    int                         dive[4][4];             /** can we dive along the face into this vertex */
+    int                         num_adj_curves[4][4];   /** stores the number of curves between a region and a face */
+    int                         temp_adj_curves[4][4];  /** store the adj curve until pathfinding is complete */
+    struct CuspRegion           *adj_cusp_regions[4];   /** index of the adjacent regions */
+    struct CuspRegion           *adj_dive_regions[4];   /** regions which are adjacent by diving through the manifold */
+    struct CuspRegion           *next;                  /** next cusp region in doubly linked list */
+    struct CuspRegion           *prev;                  /** prev cusp region in doubly linked list */
 } CuspRegion;
 
 typedef struct ManifoldBoundary {
-    int                     intersect_tet_index;      /** index of the intersection triangle */
-    int                     intersect_tet_vertex;     /** vertex of the intersection triangle */
-    int                     num_edge_classes;         /** number of edge classes in the boundary */
-    int                     num_cusp_triangles;       /** number of cusp triangle in the boundary */
-    int                     num_cusp_regions;         /** number of cusp regions in the boundary */
-    Triangulation           *manifold;              /** manifold */
-    Cusp                    *cusp;                  /** which cusp is the boundary in */
-    Graph                   *dual_graph;            /** dual graph of the cusp region */
-    CuspTriangle            cusp_triangle_begin;    /** header node of doubly linked list of cusp triangles */
-    CuspTriangle            cusp_triangle_end;      /** tail node of doubly linked list of cusp triangles */
-    CuspRegion              cusp_region_begin;      /** header node of doubly linked list of cusp regions */
-    CuspRegion              cusp_region_end;        /** tail node of doubly linked list of cusp regions */
+    int                         intersect_tet_index;    /** index of the intersection triangle */
+    int                         intersect_tet_vertex;   /** vertex of the intersection triangle */
+    int                         num_edge_classes;       /** number of edge classes in the boundary */
+    int                         num_cusp_triangles;     /** number of cusp triangle in the boundary */
+    int                         num_cusp_regions;       /** number of cusp regions in the boundary */
+    Triangulation               *manifold;              /** manifold */
+    Cusp                        *cusp;                  /** which cusp is the boundary in */
+    Graph                       *dual_graph;            /** dual graph of the cusp region */
+    CuspTriangle                cusp_triangle_begin;    /** header node of doubly linked list of cusp triangles */
+    CuspTriangle                cusp_triangle_end;      /** tail node of doubly linked list of cusp triangles */
+    CuspRegion                  cusp_region_begin;      /** header node of doubly linked list of cusp regions */
+    CuspRegion                  cusp_region_end;        /** tail node of doubly linked list of cusp regions */
 } ManifoldBoundary;
 
 /**
@@ -203,13 +203,14 @@ int                     **get_symplectic_equations(Triangulation *, int *, int *
 ManifoldBoundary        *init_boundary(Triangulation *, Cusp *);
 void                    free_boundary(ManifoldBoundary **, int);
 void                    init_cusp_triangulation(Triangulation *, ManifoldBoundary *);
-int                     flow(CuspTriangle *, int);
+int                     net_flow_around_vertex(CuspTriangle *, int);
 void                    label_triangulation_edges(Triangulation *);
 CuspTriangle            *find_cusp_triangle(CuspTriangle *, CuspTriangle *, CuspTriangle *, int);
 void                    label_cusp_vertex_indices(CuspTriangle *, CuspTriangle *, int);
 void                    walk_around_cusp_vertex(CuspTriangle *, int, int);
 void                    init_cusp_region(ManifoldBoundary *);
 int                     init_intersect_cusp_region(ManifoldBoundary *, CuspTriangle *, int);
+int                     init_intersect_vertex_two_zero_flows(ManifoldBoundary *, CuspTriangle *, int);
 int                     init_normal_cusp_region(ManifoldBoundary *, CuspTriangle *, int);
 void                    set_cusp_region_data(CuspRegion *, CuspTriangle *, int [4], int [4], int);
 void                    update_adj_region_data(CuspRegion *, CuspRegion *);
@@ -275,13 +276,13 @@ int edgesThreeToFour[4][3] = {{1, 2, 3},
 // Queue Data Structure
 
 Queue *init_queue(int size) {
-    Queue *q = NEW_STRUCT( Queue );
+    Queue *q    = NEW_STRUCT( Queue );
 
-    q->front = 0;
-    q->rear = -1;
-    q->len = 0;
-    q->size = MIN(size, 256);
-    q->array = NEW_ARRAY(q->size, int);
+    q->front    = 0;
+    q->rear     = -1;
+    q->len      = 0;
+    q->size     = MIN(size, 256);
+    q->array    = NEW_ARRAY(q->size, int);
 
     return q;
 }
@@ -692,11 +693,11 @@ ManifoldBoundary *init_boundary(Triangulation *manifold, Cusp *cusp) {
     if (cusp->topology == Klein_cusp)
         uFatalError("init_boundary", "symplectic_basis");
 
-    boundary->manifold = manifold;
-    boundary->cusp = cusp;
-    boundary->num_edge_classes = manifold->num_tetrahedra;
-    boundary->num_cusp_triangles = 0;
-    boundary->num_cusp_regions = 0;
+    boundary->manifold              = manifold;
+    boundary->cusp                  = cusp;
+    boundary->num_edge_classes      = manifold->num_tetrahedra;
+    boundary->num_cusp_triangles    = 0;
+    boundary->num_cusp_regions      = 0;
 
     find_intersection_triangle(manifold, boundary);
     init_cusp_triangulation(manifold, boundary);
@@ -787,7 +788,7 @@ void find_intersection_triangle(Triangulation *manifold, ManifoldBoundary *bound
                          *  We found the basepoint!
                          */
 
-                        boundary->intersect_tet_index = cusp->basepoint_tet->index;
+                        boundary->intersect_tet_index  = cusp->basepoint_tet->index;
                         boundary->intersect_tet_vertex = (int) cusp->basepoint_vertex;
                         return;
                     }
@@ -810,10 +811,10 @@ void init_cusp_triangulation(Triangulation *manifold, ManifoldBoundary *boundary
     CuspTriangle *tri;
 
     // Allocate Cusp Triangulation Header and Tail Null nodes
-    boundary->cusp_triangle_begin.next = &boundary->cusp_triangle_end;
-    boundary->cusp_triangle_begin.prev = NULL;
-    boundary->cusp_triangle_end.next = NULL;
-    boundary->cusp_triangle_end.prev = &boundary->cusp_triangle_begin;
+    boundary->cusp_triangle_begin.next      = &boundary->cusp_triangle_end;
+    boundary->cusp_triangle_begin.prev      = NULL;
+    boundary->cusp_triangle_end.next        = NULL;
+    boundary->cusp_triangle_end.prev        = &boundary->cusp_triangle_begin;
 
     // which tetrahedron are we on
     for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
@@ -832,19 +833,20 @@ void init_cusp_triangulation(Triangulation *manifold, ManifoldBoundary *boundary
             tri->tet_index = tri->tet->index;
             tri->tet_vertex = vertex;
 
-            tri->num_curves = flow(tri, edgesThreeToFour[tri->tet_vertex][0])
-                              + flow(tri, edgesThreeToFour[tri->tet_vertex][1])
-                              + flow(tri, edgesThreeToFour[tri->tet_vertex][2]);
+            tri->num_curves = net_flow_around_vertex(tri, edgesThreeToFour[tri->tet_vertex][0])
+                              + net_flow_around_vertex(tri, edgesThreeToFour[tri->tet_vertex][1])
+                              + net_flow_around_vertex(tri, edgesThreeToFour[tri->tet_vertex][2]);
 
             for (face = 0; face < 4; face ++) {
                 if (tri->tet_vertex == face)
                     continue;
 
-                tri->vertices[face].v1 = tri->tet_vertex;
-                tri->vertices[face].v2 = face;
-                tri->vertices[face].edge = tri->tet->edge_class[edge_between_vertices[tri->vertices[face].v1][tri->vertices[face].v2]];
-                tri->vertices[face].edge_class = tri->vertices[face].edge->index;
-                tri->vertices[face].edge_index = -1;
+                tri->vertices[face].v1              = tri->tet_vertex;
+                tri->vertices[face].v2              = face;
+                tri->vertices[face].edge            = tri->tet->edge_class[
+                        edge_between_vertices[tri->vertices[face].v1][tri->vertices[face].v2]];
+                tri->vertices[face].edge_class      = tri->vertices[face].edge->index;
+                tri->vertices[face].edge_index      = -1;
             }
         }
     }
@@ -927,10 +929,10 @@ void walk_around_cusp_vertex(CuspTriangle *tri, int cusp_vertex, int index) {
         old_gluing_vertex       = gluing_vertex;
         old_outside_vertex      = outside_vertex;
 
-        cusp_vertex          = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_cusp_vertex);
-        gluing_vertex       = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_outside_vertex);
-        outside_vertex      = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_gluing_vertex);
-        tri                 = tri->neighbours[old_gluing_vertex];
+        cusp_vertex             = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_cusp_vertex);
+        gluing_vertex           = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_outside_vertex);
+        outside_vertex          = EVALUATE(tri->tet->gluing[old_gluing_vertex], old_gluing_vertex);
+        tri                     = tri->neighbours[old_gluing_vertex];
     }
 }
 
@@ -966,7 +968,7 @@ void init_cusp_region(ManifoldBoundary *boundary) {
 
 int init_intersect_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, int index) {
     int i, curve_index, vertex, v1, v2, v3;
-    int adjTri[4], dist[4];
+    int distance[4], adj_triangle[4];
 
     // which vertex are we inside the flow of
     for (vertex = 0; vertex < 4; vertex++) {
@@ -977,20 +979,21 @@ int init_intersect_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, in
         v1 = (int) remaining_face[tri->tet_vertex][vertex];
         v2 = (int) remaining_face[vertex][tri->tet_vertex];
 
-        for (i = 1; i < flow(tri, vertex); i++) {
+        for (i = 1; i < net_flow_around_vertex(tri, vertex); i++) {
             for (curve_index = 0; curve_index < 2; curve_index++) {
-                dist[v1]           = i;
-                dist[v2]           = MIN(dist[v1], 2 * flow(tri, vertex) - dist[v1])
-                                     + flow(tri, v2) + flow(tri, v1);
-                dist[vertex]            = flow(tri, vertex) - dist[v1] + flow(tri, v1);
-                dist[tri->tet_vertex]    = -1;
+                distance[v1]                    = i;
+                distance[v2]                    = MIN(distance[v1], 2 * net_flow_around_vertex(tri, vertex) - distance[v1])
+                                                + net_flow_around_vertex(tri, v2) + net_flow_around_vertex(tri, v1);
+                distance[vertex]                = net_flow_around_vertex(tri, vertex)
+                                                - distance[v1] + net_flow_around_vertex(tri, v1);
+                distance[tri->tet_vertex]       = -1;
 
-                adjTri[v1]         = 1;
-                adjTri[v2]         = 0;
-                adjTri[vertex]          = 0;
-                adjTri[tri->tet_vertex]  = -1;
+                adj_triangle[v1]                = 1;
+                adj_triangle[v2]                = 0;
+                adj_triangle[vertex]            = 0;
+                adj_triangle[tri->tet_vertex]   = -1;
 
-                set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
+                set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
                 index++;
 
                 // Swap vertices
@@ -1000,97 +1003,106 @@ int init_intersect_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, in
         }
 
         // Region in the middle of face vertex
-        if (flow(tri, v1) && flow(tri, v2)) {
-            dist[v1]           = flow(tri, v2);
-            dist[v2]           = flow(tri, v1);
-            dist[vertex]            = MIN(flow(tri, v1) + dist[v1],
-                                          flow(tri, v2) + dist[v2]) + flow(tri, vertex);
-            dist[tri->tet_vertex]    = -1;
+        if (net_flow_around_vertex(tri, v1) && net_flow_around_vertex(tri, v2)) {
+            distance[v1]                    = net_flow_around_vertex(tri, v2);
+            distance[v2]                    = net_flow_around_vertex(tri, v1);
+            distance[vertex]                = MIN(net_flow_around_vertex(tri, v1) + distance[v1],
+                                              net_flow_around_vertex(tri, v2) + distance[v2]) + net_flow_around_vertex(tri, vertex);
+            distance[tri->tet_vertex]       = -1;
 
-            adjTri[v1]         = 0;
-            adjTri[v2]         = 0;
-            adjTri[vertex]          = 1;
-            adjTri[tri->tet_vertex]  = -1;
+            adj_triangle[v1]                = 0;
+            adj_triangle[v2]                = 0;
+            adj_triangle[vertex]            = 1;
+            adj_triangle[tri->tet_vertex]   = -1;
 
-            set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
+            set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
             index++;
         }
     }
 
-    // Region of dist 0 to vertex
+    // Region of distance 0 to vertex
     v1 = edgesThreeToFour[tri->tet_vertex][0];
     v2 = edgesThreeToFour[tri->tet_vertex][1];
     v3 = edgesThreeToFour[tri->tet_vertex][2];
 
-    // Case 1; two regions
-    if (atleast_two(!flow(tri, v1), !flow(tri, v2), !flow(tri, v3))) {
-        dist[v1]           = flow(tri, v1);
-        dist[v2]           = flow(tri, v2);
-        dist[v3]           = flow(tri, v3);
-        dist[tri->tet_vertex]    = -1;
+    // Edge Case: Two vertices with 0 flow
+    if (atleast_two(!net_flow_around_vertex(tri, v1), !net_flow_around_vertex(tri, v2), !net_flow_around_vertex(tri, v3)))
+        return init_intersect_vertex_two_zero_flows(boundary, tri, index);
 
-        adjTri[v1]         = 1;
-        adjTri[v2]         = 1;
-        adjTri[v3]         = 1;
-        adjTri[tri->tet_vertex]  = -1;
+    for (vertex = 0; vertex < 4; vertex++) {
+        if (vertex == tri->tet_vertex)
+            continue;
 
-        set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
+        v1 = (int) remaining_face[tri->tet_vertex][vertex];
+        v2 = (int) remaining_face[vertex][tri->tet_vertex];
+
+        distance[vertex]               = 0;
+        distance[v1]                   = net_flow_around_vertex(tri, vertex) + net_flow_around_vertex(tri, v1);
+        distance[v2]                   = net_flow_around_vertex(tri, vertex) + net_flow_around_vertex(tri, v2);
+        distance[tri->tet_vertex]      = -1;
+
+        adj_triangle[vertex]           = 0;
+        adj_triangle[v1]               = 1;
+        adj_triangle[v2]               = 1;
+        adj_triangle[tri->tet_vertex]  = 0;
+
+        set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
         index++;
-
-        // Find vertex with non-zero flow
-        for (vertex = 0; vertex < 4; vertex++) {
-            if (vertex == tri->tet_vertex)
-                continue;
-
-            if (flow(tri, vertex)) {
-                v1 = vertex;
-                v2 = (int) remaining_face[tri->tet_vertex][v1];
-                v3 = (int) remaining_face[v1][tri->tet_vertex];
-                break;
-            }
-        }
-        dist[v1]           = 0;
-        dist[v2]           = flow(tri, v1);
-        dist[v3]           = flow(tri, v1);
-        dist[tri->tet_vertex]    = -1;
-
-        adjTri[v1]         = 0;
-        adjTri[v2]         = 1;
-        adjTri[v3]         = 1;
-        adjTri[tri->tet_vertex]  = 0;
-
-        set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
-        index++;
-    } else {
-        // Case 2: three regions
-        for (vertex = 0; vertex < 4; vertex++) {
-            if (vertex == tri->tet_vertex)
-                continue;
-
-            v1 = (int) remaining_face[tri->tet_vertex][vertex];
-            v2 = (int) remaining_face[vertex][tri->tet_vertex];
-
-            dist[vertex]            = 0;
-            dist[v1]           = flow(tri, vertex) + flow(tri, v1);
-            dist[v2]           = flow(tri, vertex) + flow(tri, v2);
-            dist[tri->tet_vertex]    = -1;
-
-            adjTri[vertex]          = 0;
-            adjTri[v1]         = 1;
-            adjTri[v2]         = 1;
-            adjTri[tri->tet_vertex]  = 0;
-
-            set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
-            index++;
-        }
     }
 
     return index;
 }
 
+int init_intersect_vertex_two_zero_flows(ManifoldBoundary *boundary, CuspTriangle *tri, int index) {
+    int vertex, v1, v2, v3, distance[4], adj_triangle[4];
+
+    v1 = (int) edgesThreeToFour[tri->tet_vertex][0];
+    v2 = (int) edgesThreeToFour[tri->tet_vertex][1];
+    v3 = (int) edgesThreeToFour[tri->tet_vertex][2];
+
+    distance[v1]                   = net_flow_around_vertex(tri, v1);
+    distance[v2]                   = net_flow_around_vertex(tri, v2);
+    distance[v3]                   = net_flow_around_vertex(tri, v3);
+    distance[tri->tet_vertex]      = -1;
+
+    adj_triangle[v1]               = 1;
+    adj_triangle[v2]               = 1;
+    adj_triangle[v3]               = 1;
+    adj_triangle[tri->tet_vertex]  = -1;
+
+    set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
+    index++;
+
+    // Find vertex with non-zero flow
+    for (vertex = 0; vertex < 4; vertex++) {
+        if (vertex == tri->tet_vertex)
+            continue;
+
+        if (net_flow_around_vertex(tri, vertex)) {
+            v1 = vertex;
+            v2 = (int) remaining_face[tri->tet_vertex][v1];
+            v3 = (int) remaining_face[v1][tri->tet_vertex];
+            break;
+        }
+    }
+    distance[v1]                    = 0;
+    distance[v2]                    = net_flow_around_vertex(tri, v1);
+    distance[v3]                    = net_flow_around_vertex(tri, v1);
+    distance[tri->tet_vertex]       = -1;
+
+    adj_triangle[v1]                = 0;
+    adj_triangle[v2]                = 1;
+    adj_triangle[v3]                = 1;
+    adj_triangle[tri->tet_vertex]   = 0;
+
+    set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
+
+    return index + 1;
+}
+
 int init_normal_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, int index) {
     int i, vertex, v1, v2;
-    int dist[4], adjTri[4];
+    int distance[4], adj_triangle[4];
 
     // which vertex are we inside the flow of
     for (vertex = 0; vertex < 4; vertex++) {
@@ -1101,36 +1113,38 @@ int init_normal_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, int i
         v1 = (int) remaining_face[tri->tet_vertex][vertex];
         v2 = (int) remaining_face[vertex][tri->tet_vertex];
 
-        for (i = 0; i < flow(tri, vertex); i++) {
-            dist[vertex] = i;
-            dist[v1] = flow(tri, v1) + (flow(tri, vertex) - dist[vertex]);
-            dist[v2] = flow(tri, v2) + (flow(tri, vertex) - dist[vertex]);
-            dist[tri->tet_vertex] = -1;
+        for (i = 0; i < net_flow_around_vertex(tri, vertex); i++) {
+            distance[vertex]                = i;
+            distance[v1]                    = net_flow_around_vertex(tri, v1)
+                                            + (net_flow_around_vertex(tri, vertex) - distance[vertex]);
+            distance[v2]                    = net_flow_around_vertex(tri, v2)
+                                            + (net_flow_around_vertex(tri, vertex) - distance[vertex]);
+            distance[tri->tet_vertex]       = -1;
 
-            adjTri[vertex] = 0;
-            adjTri[v1] = 1;
-            adjTri[v2] = 1;
-            adjTri[tri->tet_vertex] = 0;
+            adj_triangle[vertex]            = 0;
+            adj_triangle[v1]                = 1;
+            adj_triangle[v2]                = 1;
+            adj_triangle[tri->tet_vertex]   = 0;
 
-            set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
+            set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
             index++;
         }
 
     }
 
-    // Center vertex
+    // center region
     for (vertex = 0; vertex < 4; vertex++) {
         if (vertex == tri->tet_vertex)
             continue;
 
-        dist[vertex] = flow(tri, vertex);
-        adjTri[vertex] = 1;
+        distance[vertex]        = net_flow_around_vertex(tri, vertex);
+        adj_triangle[vertex]    = 1;
     }
 
-    dist[tri->tet_vertex] = -1;
-    adjTri[tri->tet_vertex] = 0;
+    distance[tri->tet_vertex]       = -1;
+    adj_triangle[tri->tet_vertex]   = 0;
 
-    set_cusp_region_data(&boundary->cusp_region_end, tri, dist, adjTri, index);
+    set_cusp_region_data(&boundary->cusp_region_end, tri, distance, adj_triangle, index);
     index++;
     return index;
 }
@@ -1145,20 +1159,20 @@ void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, int di
     CuspRegion *region = NEW_STRUCT( CuspRegion );
     INSERT_BEFORE(region, cusp_region_end);
 
-    region->tri                 = tri;
-    region->tet_index            = region->tri->tet_index;
-    region->tet_vertex           = region->tri->tet_vertex;
-    region->index               = index;
+    region->tri             = tri;
+    region->tet_index       = region->tri->tet_index;
+    region->tet_vertex      = region->tri->tet_vertex;
+    region->index           = index;
 
     // default values
     for (i = 0; i < 4; i++) {
         region->adj_cusp_triangle[i] = 0;
 
         for (j = 0; j < 4; j++) {
-            region->curve[i][j] = -1;
-            region->dive[i][j] = 0;
-            region->num_adj_curves[i][j] = 0;
-            region->temp_adj_curves[i][j] = 0;
+            region->curve[i][j]             = -1;
+            region->dive[i][j]              = 0;
+            region->num_adj_curves[i][j]    = 0;
+            region->temp_adj_curves[i][j]   = 0;
         }
     }
 
@@ -1167,10 +1181,10 @@ void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, int di
         v2 = edgesThreeToFour[tri->tet_vertex][(i + 1) % 3];
         v3 = edgesThreeToFour[tri->tet_vertex][(i + 2) % 3];
 
-        region->curve[v2][v1] = distance[v1];
-        region->curve[v3][v1] = distance[v1];
-        region->dive[v2][v1] = (distance[v1] ? 0 : 1);
-        region->dive[v3][v1] = (distance[v1] ? 0 : 1);
+        region->curve[v2][v1]   = distance[v1];
+        region->curve[v3][v1]   = distance[v1];
+        region->dive[v2][v1]    = (distance[v1] ? 0 : 1);
+        region->dive[v3][v1]    = (distance[v1] ? 0 : 1);
 
         region->adj_cusp_triangle[v1] = adj_cusp_triangle[v1];
     }
@@ -1256,7 +1270,7 @@ OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *edge_cl
 
     curves->dual_curve_begin          = NEW_ARRAY(curves->num_curves, DualCurves );
     curves->dual_curve_end            = NEW_ARRAY(curves->num_curves, DualCurves );
-    curves->edge_class                 = NEW_ARRAY(curves->num_curves, int);
+    curves->edge_class                = NEW_ARRAY(curves->num_curves, int);
 
     j = 0;
     for (i = 0; i < manifold->num_tetrahedra; i++) {
@@ -1617,7 +1631,7 @@ void print_debug_info(Triangulation *manifold, ManifoldBoundary **cusps, Oscilla
  * Calculate the number of curves passing around a vertex in the cusp triangulation.
  */
 
-int flow(CuspTriangle *tri, int vertex) {
+int net_flow_around_vertex(CuspTriangle *tri, int vertex) {
     int mflow, lflow, retval;
 
     // Contribution from meridian curves
@@ -1704,9 +1718,9 @@ void do_one_cusp(ManifoldBoundary *boundary, DualCurves *path, int edge_class) {
     int *parent;
     bool *processed, *discovered;
 
-    processed = NEW_ARRAY(boundary->dual_graph->num_vertices, bool);
-    discovered = NEW_ARRAY(boundary->dual_graph->num_vertices, bool);
-    parent = NEW_ARRAY(boundary->dual_graph->num_vertices, int);
+    processed   = NEW_ARRAY(boundary->dual_graph->num_vertices, bool);
+    discovered  = NEW_ARRAY(boundary->dual_graph->num_vertices, bool);
+    parent      = NEW_ARRAY(boundary->dual_graph->num_vertices, int);
 
     // Find path using bfs
     init_search(boundary->dual_graph, processed, discovered, parent);
@@ -1731,13 +1745,13 @@ DualCurves *init_dual_curve(DualCurves *curve_end, int edge_class_start, int edg
     DualCurves *path = NEW_STRUCT(DualCurves );
     INSERT_BEFORE(path, curve_end);
 
-    path->curves_begin.next = &path->curves_end;
-    path->curves_begin.prev = NULL;
-    path->curves_end.next = NULL;
-    path->curves_end.prev = &path->curves_begin;
+    path->curves_begin.next     = &path->curves_end;
+    path->curves_begin.prev     = NULL;
+    path->curves_end.next       = NULL;
+    path->curves_end.prev       = &path->curves_begin;
 
-    path->edge_class[START] = edge_class_start;
-    path->edge_class[FINISH] = edge_class_finish;
+    path->edge_class[START]     = edge_class_start;
+    path->edge_class[FINISH]    = edge_class_finish;
 
     return path;
 }
@@ -1753,48 +1767,48 @@ void find_path_endpoints(Graph *g, DualCurves *path_start, DualCurves *path, int
     int endpoint1_edge_class, endpoint1_edge_index, endpoint2_edge_class, endpoint2_edge_index;
     PathEndPoint *endpoint1_path1, *endpoint1_path2, *endpoint2_path1, *endpoint2_path2;
     if (pos == FIRST) {
-        endpoint1_path2 = &path->endpoints[START];
-        endpoint1_edge_class = path->edge_class[START];
-        endpoint1_edge_index = START;
+        endpoint1_path2         = &path->endpoints[START];
+        endpoint1_edge_class    = path->edge_class[START];
+        endpoint1_edge_index    = START;
         find_single_endpoint(g, endpoint1_path2, endpoint1_edge_class, endpoint1_edge_index);
 
-        endpoint2_path2 = &path->endpoints[FINISH];
-        endpoint2_edge_class = path->edge_class[FINISH];
-        endpoint2_edge_index = START;
+        endpoint2_path2         = &path->endpoints[FINISH];
+        endpoint2_edge_class    = path->edge_class[FINISH];
+        endpoint2_edge_index    = START;
         find_single_endpoint(g, endpoint2_path2, endpoint2_edge_class, endpoint2_edge_index);
     } else if (pos == MIDDLE && orientation == START) {
-        endpoint1_path1 = &path->prev->endpoints[START];
-        endpoint1_path2 = &path->endpoints[START];
-        endpoint1_edge_class = path->edge_class[START];
-        endpoint1_edge_index = FINISH;
+        endpoint1_path1         = &path->prev->endpoints[START];
+        endpoint1_path2         = &path->endpoints[START];
+        endpoint1_edge_class    = path->edge_class[START];
+        endpoint1_edge_index    = FINISH;
         find_single_matching_endpoint(g, endpoint1_path1, endpoint1_path2, endpoint1_edge_class, endpoint1_edge_index);
 
-        endpoint2_path2 = &path->endpoints[FINISH];
-        endpoint2_edge_class = path->edge_class[FINISH];
-        endpoint2_edge_index = START;
+        endpoint2_path2         = &path->endpoints[FINISH];
+        endpoint2_edge_class    = path->edge_class[FINISH];
+        endpoint2_edge_index    = START;
         find_single_endpoint(g, endpoint2_path2, endpoint2_edge_class, endpoint2_edge_index);
     } else if (pos == MIDDLE && orientation == FINISH) {
-        endpoint1_path1 = &path->prev->endpoints[FINISH];
-        endpoint1_path2 = &path->endpoints[FINISH];
-        endpoint1_edge_class = path->edge_class[START];
-        endpoint1_edge_index = FINISH;
+        endpoint1_path1         = &path->prev->endpoints[FINISH];
+        endpoint1_path2         = &path->endpoints[FINISH];
+        endpoint1_edge_class    = path->edge_class[START];
+        endpoint1_edge_index    = FINISH;
         find_single_matching_endpoint(g, endpoint1_path1, endpoint1_path2, endpoint1_edge_class, endpoint1_edge_index);
 
-        endpoint2_path2 = &path->endpoints[START];
-        endpoint2_edge_class = path->edge_class[FINISH];
-        endpoint2_edge_index = START;
+        endpoint2_path2         = &path->endpoints[START];
+        endpoint2_edge_class    = path->edge_class[FINISH];
+        endpoint2_edge_index    = START;
         find_single_endpoint(g, endpoint2_path2, endpoint2_edge_class, endpoint2_edge_index);
     } else if (pos == LAST) {
-        endpoint1_path1 = &path_start->next->endpoints[START];
-        endpoint1_path2 = &path->endpoints[START];
-        endpoint1_edge_class = path_start->next->edge_class[START];
-        endpoint1_edge_index = FINISH;
+        endpoint1_path1         = &path_start->next->endpoints[START];
+        endpoint1_path2         = &path->endpoints[START];
+        endpoint1_edge_class    = path_start->next->edge_class[START];
+        endpoint1_edge_index    = FINISH;
         find_single_matching_endpoint(g, endpoint1_path1, endpoint1_path2, endpoint1_edge_class, endpoint1_edge_index);
 
-        endpoint2_path1 = &path->prev->endpoints[FINISH];
-        endpoint2_path2 = &path->endpoints[FINISH];
-        endpoint2_edge_class = path->prev->edge_class[FINISH];
-        endpoint2_edge_index = FINISH;
+        endpoint2_path1         = &path->prev->endpoints[FINISH];
+        endpoint2_path2         = &path->endpoints[FINISH];
+        endpoint2_edge_class    = path->prev->edge_class[FINISH];
+        endpoint2_edge_index    = FINISH;
         find_single_matching_endpoint(g, endpoint2_path1, endpoint2_path2, endpoint2_edge_class, endpoint2_edge_index);
     } else {
         uFatalError("do_one_cusp", "symplectic_basis");
@@ -1837,10 +1851,10 @@ PathEndPoint *find_single_endpoint(Graph *g, PathEndPoint *path_endpoint, int ed
             } else
                 continue;
 
-            path_endpoint->region = region;
-            path_endpoint->vertex = vertex;
-            path_endpoint->face = face;
-            path_endpoint->region_index = i;
+            path_endpoint->region           = region;
+            path_endpoint->vertex           = vertex;
+            path_endpoint->face             = face;
+            path_endpoint->region_index     = i;
 
             for (j = 0; j < 4; j++)
                 for (k = 0; k < 4; k++)
@@ -1880,19 +1894,19 @@ PathEndPoint *find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoin
             }
 
             // are we in the correct region for copy
-            region_index = (region->tet_index != path_endpoint1->region->tet_index);
-            region_vertex = (region->tet_vertex != path_endpoint1->vertex);
-            dive_vertex = (vertex != path_endpoint1->region->tet_vertex);
-            region_dive = !region->dive[path_endpoint1->face][vertex];
-            region_curve = (region->num_adj_curves[path_endpoint1->face][vertex] != path_endpoint1->num_adj_curves[path_endpoint1->face][path_endpoint1->vertex]);
+            region_index    = (region->tet_index != path_endpoint1->region->tet_index);
+            region_vertex   = (region->tet_vertex != path_endpoint1->vertex);
+            dive_vertex     = (vertex != path_endpoint1->region->tet_vertex);
+            region_dive     = !region->dive[path_endpoint1->face][vertex];
+            region_curve    = (region->num_adj_curves[path_endpoint1->face][vertex] != path_endpoint1->num_adj_curves[path_endpoint1->face][path_endpoint1->vertex]);
 
             if (region_index || region_vertex || dive_vertex || region_dive || region_curve)
                 continue;
 
-            path_endpoint2->region = region;
-            path_endpoint2->vertex = vertex;
-            path_endpoint2->face = path_endpoint1->face;
-            path_endpoint2->region_index = i;
+            path_endpoint2->region          = region;
+            path_endpoint2->vertex          = vertex;
+            path_endpoint2->face            = path_endpoint1->face;
+            path_endpoint2->region_index    = i;
 
             for (j = 0; j < 4; j++)
                 for (k = 0; k < 4; k++)
@@ -2109,19 +2123,19 @@ CuspRegion *split_cusp_region_path_interior(CuspRegion *region, EdgeNode *node, 
     // Update new region
     new_region->curve[v1][node->inside_vertex]++;
     new_region->curve[v2][node->inside_vertex]++;
-    new_region->dive[node->inside_vertex][v1]    = region->dive[node->inside_vertex][v1];
-    new_region->dive[v2][v1]               = region->dive[v2][v1];
-    new_region->dive[node->inside_vertex][v2]    = region->dive[node->inside_vertex][v2];
-    new_region->dive[v1][v2]               = region->dive[v1][v2];
+    new_region->dive[node->inside_vertex][v1]       = region->dive[node->inside_vertex][v1];
+    new_region->dive[v2][v1]                        = region->dive[v2][v1];
+    new_region->dive[node->inside_vertex][v2]       = region->dive[node->inside_vertex][v2];
+    new_region->dive[v1][v2]                        = region->dive[v1][v2];
 
     // Update region
     region->curve[v2][v1]++;
     region->curve[v1][v2]++;
-    region->dive[v2][v1]                  = 0;
-    region->dive[node->inside_vertex][v1]       = 0;
-    region->dive[v1][v2]                  = 0;
-    region->dive[node->inside_vertex][v2]       = 0;
-    region->adj_cusp_triangle[node->inside_vertex]              = 0;
+    region->dive[v2][v1]                            = 0;
+    region->dive[node->inside_vertex][v1]           = 0;
+    region->dive[v1][v2]                            = 0;
+    region->dive[node->inside_vertex][v2]           = 0;
+    region->adj_cusp_triangle[node->inside_vertex]  = 0;
 
     return new_region;
 }
@@ -2152,35 +2166,35 @@ CuspRegion *split_cusp_region_path_endpoint(CuspRegion *region, EdgeNode *node, 
         new_region->temp_adj_curves[vertex1][path_endpoint->vertex]++;
         new_region->dive[vertex1][path_endpoint->vertex]      = (path_endpoint->face == vertex1);
         new_region->dive[vertex2][path_endpoint->vertex]      = region->dive[vertex2][path_endpoint->vertex];
-        new_region->dive[vertex2][vertex1]               = region->dive[vertex2][vertex1];
+        new_region->dive[vertex2][vertex1]                    = region->dive[vertex2][vertex1];
         new_region->dive[path_endpoint->vertex][vertex1]      = region->dive[path_endpoint->vertex][vertex1];
-        new_region->adj_cusp_triangle[vertex1]                      = 0;
+        new_region->adj_cusp_triangle[vertex1]                = 0;
 
         region->curve[path_endpoint->vertex][vertex1]++;
         region->temp_adj_curves[vertex2][path_endpoint->vertex]++;
         region->dive[vertex2][path_endpoint->vertex]         = (path_endpoint->face == vertex2);
-        region->dive[vertex2][vertex1]                  = 0;
+        region->dive[vertex2][vertex1]                       = 0;
         region->dive[path_endpoint->vertex][vertex1]         = 0;
-        region->adj_cusp_triangle[vertex2]                         = 0;
+        region->adj_cusp_triangle[vertex2]                   = 0;
     } else if (face == path_endpoint->face) {
         // curve passes through the face that carries it
         new_region->curve[path_endpoint->face][path_endpoint->face == vertex1 ? vertex2 : vertex1]++;
         new_region->temp_adj_curves[face == vertex1 ? vertex2 : vertex1][path_endpoint->vertex]++;
-        new_region->dive[path_endpoint->face][path_endpoint->vertex]                   = region->dive[path_endpoint->face][path_endpoint->vertex];
+        new_region->dive[path_endpoint->face][path_endpoint->vertex]                         = region->dive[path_endpoint->face][path_endpoint->vertex];
         new_region->adj_cusp_triangle[path_endpoint->vertex]                                 = 0;
         new_region->adj_cusp_triangle[path_endpoint->face == vertex1 ? vertex2 : vertex1]    = 0;
 
         region->curve[path_endpoint->face][path_endpoint->vertex]++;
         region->temp_adj_curves[face][path_endpoint->vertex]++;
-        region->dive[path_endpoint->face][path_endpoint->vertex]                      = 0;
+        region->dive[path_endpoint->face][path_endpoint->vertex] = 0;
     } else {
         // Curve goes around the vertex
         new_region->curve[face][path_endpoint->face]++;
         new_region->temp_adj_curves[path_endpoint->face][path_endpoint->vertex]++;
         new_region->dive[vertex1][path_endpoint->vertex]              = region->dive[vertex1][path_endpoint->vertex];
         new_region->dive[vertex2][path_endpoint->vertex]              = region->dive[vertex2][path_endpoint->vertex];
-        new_region->adj_cusp_triangle[path_endpoint->face]                       = 0;
-        new_region->adj_cusp_triangle[path_endpoint->vertex]                     = 0;
+        new_region->adj_cusp_triangle[path_endpoint->face]            = 0;
+        new_region->adj_cusp_triangle[path_endpoint->vertex]          = 0;
 
         region->curve[face][path_endpoint->vertex]++;
         region->temp_adj_curves[face][path_endpoint->vertex]++;
@@ -2201,19 +2215,19 @@ void copy_region(CuspRegion *region1, CuspRegion *region2) {
     if (region1 == NULL || region2 == NULL || region1->tri == NULL)
         uFatalError("copy_region", "symplectic_basis");
 
-    region2->tri                            = region1->tri;
-    region2->tet_index                       = region1->tet_index;
-    region2->tet_vertex                      = region1->tet_vertex;
+    region2->tri            = region1->tri;
+    region2->tet_index      = region1->tet_index;
+    region2->tet_vertex     = region1->tet_vertex;
 
     for (i = 0; i < 4; i++) {
-        region2->adj_cusp_triangle[i]                  = region1->adj_cusp_triangle[i];
-        region2->adj_cusp_regions[i]              = NULL;
+        region2->adj_cusp_triangle[i]   = region1->adj_cusp_triangle[i];
+        region2->adj_cusp_regions[i]    = NULL;
 
         for (j = 0; j < 4; j++) {
             region2->curve[i][j]            = region1->curve[i][j];
             region2->dive[i][j]             = 0;
-            region2->num_adj_curves[i][j]         = region1->num_adj_curves[i][j];
-            region2->temp_adj_curves[i][j]     = region1->temp_adj_curves[i][j];
+            region2->num_adj_curves[i][j]   = region1->num_adj_curves[i][j];
+            region2->temp_adj_curves[i][j]  = region1->temp_adj_curves[i][j];
         }
     }
 }
@@ -2767,7 +2781,7 @@ CuspEndPoint *find_cusp_endpoint_edge_classes(Graph *g, EdgeNode *node_begin,
     }
 
     pCuspEndPoint[0].pos = FIRST;
-    pCuspEndPoint[*path_length - 1].cusp_index = node->y;
+    pCuspEndPoint[*path_length - 1].cusp_index  = node->y;
     pCuspEndPoint[*path_length - 1].edge_class1 = pCuspEndPoint[*path_length - 2].edge_class2;
     pCuspEndPoint[*path_length - 1].edge_class2 = edge_classes;
     pCuspEndPoint[*path_length - 1].pos = LAST;
