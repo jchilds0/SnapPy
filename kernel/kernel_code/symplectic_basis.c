@@ -125,6 +125,7 @@ typedef struct CuspVertex {
 
 typedef struct CuspTriangle {
     Tetrahedron                 *tet;                   /** tetrahedron the triangle comes from */
+    Cusp                        *cusp;                  /** cusp the triangle lies in */
     int                         tet_index;              /** tet->index */
     int                         tet_vertex;             /** vertex the triangle comes from */
     int                         num_curves;             /** number of curves on the triangle */
@@ -212,10 +213,10 @@ void                    init_cusp_region(ManifoldBoundary *);
 int                     init_intersect_cusp_region(ManifoldBoundary *, CuspTriangle *, int);
 int                     init_intersect_vertex_two_zero_flows(ManifoldBoundary *, CuspTriangle *, int);
 int                     init_normal_cusp_region(ManifoldBoundary *, CuspTriangle *, int);
-void                    set_cusp_region_data(CuspRegion *, CuspTriangle *, int [4], int [4], int);
+void                    set_cusp_region_data(CuspRegion *, CuspTriangle *, const int [4], const int [4], int);
 void                    update_adj_region_data(CuspRegion *, CuspRegion *);
 CuspRegion              *find_adj_region(CuspRegion *, CuspRegion *, CuspRegion *, int);
-OscillatingCurves       *init_oscillating_curves(Triangulation *, int *);
+OscillatingCurves       *init_oscillating_curves(Triangulation *, const int *);
 void                    free_oscillating_curves(OscillatingCurves *);
 void                    find_intersection_triangle(Triangulation *, ManifoldBoundary *);
 
@@ -230,6 +231,7 @@ Graph *                 construct_cusp_region_dual_graph(ManifoldBoundary *);
 void                    print_debug_info(Triangulation *, ManifoldBoundary **, OscillatingCurves *, int);
 DualCurves              *init_dual_curve(DualCurves *, int, int);
 void                    find_path_endpoints(Graph *, DualCurves *, DualCurves *, int, int);
+bool                    is_valid_endpoint(CuspRegion *, int, int, int, int);
 PathEndPoint            *find_single_endpoint(Graph *, PathEndPoint *, int, int);
 PathEndPoint            *find_single_matching_endpoint(Graph *, PathEndPoint *, PathEndPoint *, int, int);
 void                    update_path_info(Graph *g, DualCurves *, int);
@@ -242,6 +244,9 @@ void                    update_cusp_triangle_endpoints(CuspRegion *, CuspRegion 
 void                    copy_region(CuspRegion *, CuspRegion *);
 void                    update_adj_curve_along_path(ManifoldBoundary **, OscillatingCurves *, DualCurves *, DualCurves *, int);
 void                    update_adj_curve_at_endpoint(PathEndPoint *, DualCurves *, DualCurves *);
+CuspRegion              **find_endpoint_region(ManifoldBoundary *, int, int, int *);
+CuspRegion              *find_endpoint_adj_region(ManifoldBoundary *, CuspRegion *, int);
+void                    update_adj_dive(ManifoldBoundary **, int);
 void                    calculate_holonomy(Triangulation *, int **, int);
 void                    find_interior_vertex(CuspRegion *, EdgeNode *);
 
@@ -257,7 +262,7 @@ void                    spanning_tree(Graph *, Graph *, int, int *);
 void                    cusp_graph(Triangulation *, Graph *);
 void                    color_graph(Graph *);
 int                     *find_tree_edges(Graph *, int);
-int                     find_same_color_edge(Graph *, Graph *, int *);
+int                     find_same_color_edge(Graph *, Graph *, const int *);
 int                     find_path_len(int, int, int *, int);
 CuspEndPoint            *find_multi_graph_path(Graph *, Triangulation *, int, int, int *);
 CuspEndPoint            *find_cusp_endpoint_edge_classes(Graph *, EdgeNode *, EdgeNode *, int, int *);
@@ -573,8 +578,8 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
  * Copy of get_gluings_equations.c get_gluing_equations which finds 
  * the edge gluings equations for a given edge index. Used instead 
  * of get_gluing_equations to ensure we have the correct edge index 
- * and reduce the chance of memory leak since we dont need all of 
- * rows from gluing equations 
+ * and reduce the chance of memory leak since we don't need all
+ * rows from gluing equations
  */
 
 int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
@@ -830,6 +835,7 @@ void init_cusp_triangulation(Triangulation *manifold, ManifoldBoundary *boundary
             index++;
 
             tri->tet = tet;
+            tri->cusp = tet->cusp[vertex];
             tri->tet_index = tri->tet->index;
             tri->tet_vertex = vertex;
 
@@ -1154,7 +1160,8 @@ int init_normal_cusp_region(ManifoldBoundary *boundary, CuspTriangle *tri, int i
  * allocates the attributes of the cusp region
  */
 
-void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, int distance[4], int adj_cusp_triangle[4], int index) {
+void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, const int distance[4],
+                          const int adj_cusp_triangle[4], int index) {
     int i, j, v1, v2, v3;
     CuspRegion *region = NEW_STRUCT( CuspRegion );
     INSERT_BEFORE(region, cusp_region_end);
@@ -1167,6 +1174,7 @@ void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, int di
     // default values
     for (i = 0; i < 4; i++) {
         region->adj_cusp_triangle[i] = 0;
+        region->adj_dive_regions[i]  = NULL;
 
         for (j = 0; j < 4; j++) {
             region->curve[i][j]             = -1;
@@ -1259,7 +1267,7 @@ CuspRegion *find_adj_region(CuspRegion *cusp_region_begin, CuspRegion *cusp_regi
  * stores the oscillating curves on the cusp
  */
 
-OscillatingCurves *init_oscillating_curves(Triangulation *manifold, int *edge_classes) {
+OscillatingCurves *init_oscillating_curves(Triangulation *manifold, const int *edge_classes) {
     int i, j;
     OscillatingCurves *curves = NEW_STRUCT(OscillatingCurves );
 
@@ -1816,39 +1824,45 @@ void find_path_endpoints(Graph *g, DualCurves *path_start, DualCurves *path, int
     }
 }
 
+bool is_valid_endpoint(CuspRegion *region, int edge_class, int edge_index, int face, int vertex) {
+    bool edge_lies_in_one_cusp;
+
+    if (vertex == region->tet_vertex)
+        return FALSE;
+
+    if (region->tri->vertices[vertex].edge_class != edge_class)
+        return FALSE;
+
+    edge_lies_in_one_cusp = (region->tri->tet->cusp[region->tet_vertex]->index == region->tri->tet->cusp[vertex]->index);
+
+    if (edge_lies_in_one_cusp && region->tri->vertices[vertex].edge_index != edge_index) {
+        return FALSE;
+    }
+
+    return region->dive[face][vertex];
+}
+
 PathEndPoint *find_single_endpoint(Graph *g, PathEndPoint *path_endpoint, int edge_class, int edge_index) {
     int i, j, k, vertex, face1, face2, face;
-    bool edge_lies_in_one_cusp;
     CuspRegion *region;
 
     // which cusp region
     for (i = 0; i < g->num_vertices; i++) {
-        if (g->regions[i] == NULL)
+        if (g->regions[i] == NULL) {
             continue;
+        }
 
         region = g->regions[i];
         // which vertex to dive through
         for (vertex = 0; vertex < 4; vertex++) {
-            if (vertex == region->tet_vertex)
-                continue;
-
-            if (region->tri->vertices[vertex].edge_class != edge_class)
-                continue;
-
-            edge_lies_in_one_cusp = (region->tri->tet->cusp[region->tet_vertex]->index == region->tri->tet->cusp[vertex]->index);
-
-            if (edge_lies_in_one_cusp && region->tri->vertices[vertex].edge_index != edge_index) {
-                continue;
-            }
-
             face1 = (int) remaining_face[region->tet_vertex][vertex];
             face2 = (int) remaining_face[vertex][region->tet_vertex];
 
-            if (region->dive[face1][vertex]) {
+            if (is_valid_endpoint(region, edge_class, edge_index, face1, vertex))
                 face = face1;
-            } else if (region->dive[face2][vertex]) {
+            else if (is_valid_endpoint(region, edge_class, edge_index, face2, vertex))
                 face = face2;
-            } else
+            else
                 continue;
 
             path_endpoint->region           = region;
@@ -1870,7 +1884,7 @@ PathEndPoint *find_single_endpoint(Graph *g, PathEndPoint *path_endpoint, int ed
 
 PathEndPoint *find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoint1, PathEndPoint *path_endpoint2, int edge_class, int edge_index) {
     int i, j, k, vertex;
-    bool edge_lies_in_one_cusp, region_index, region_vertex, dive_vertex, region_dive, region_curve;
+    bool region_index, region_vertex, dive_vertex, region_dive, region_curve;
     CuspRegion *region;
 
     // which cusp region
@@ -1881,17 +1895,8 @@ PathEndPoint *find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoin
         region = g->regions[i];
         // which vertex to dive through
         for (vertex = 0; vertex < 4; vertex++) {
-            if (vertex == region->tet_vertex)
+            if (!is_valid_endpoint(region, edge_class, edge_index, path_endpoint1->face, vertex))
                 continue;
-
-            if (region->tri->vertices[vertex].edge_class != edge_class)
-                continue;
-
-            edge_lies_in_one_cusp = (region->tri->tet->cusp[region->tet_vertex]->index == region->tri->tet->cusp[vertex]->index);
-
-            if (edge_lies_in_one_cusp && region->tri->vertices[vertex].edge_index != edge_index) {
-                continue;
-            }
 
             // are we in the correct region for copy
             region_index    = (region->tet_index != path_endpoint1->region->tet_index);
@@ -1920,6 +1925,7 @@ PathEndPoint *find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoin
     uFatalError("find_single_endpoints", "symplectic_basis");
     return NULL;
 }
+
 
 /*
  * After finding a path, each node contains the index of the
@@ -2416,6 +2422,112 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, DualCurves *dual_
     }
 }
 
+/*
+ * Find a list of cusp regions which can dive through the manifold along the
+ * edge with edge class 'edge_class'.
+ */
+
+CuspRegion **find_endpoint_regions(ManifoldBoundary *cusp, int edge_class, int *num_regions) {
+    int i, v, face1, face2;
+    CuspVertex *vertex;
+    CuspRegion *region;
+    CuspRegion **retval, **regions = NEW_ARRAY(cusp->num_cusp_regions, CuspRegion *);
+
+    *num_regions = 0;
+
+    for (region = cusp->cusp_region_begin.next; region != &cusp->cusp_region_end; region = region->next) {
+        for (v = 0; v < 4; v++) {
+            vertex = &region->tri->vertices[v];
+
+            if (vertex->edge_class != edge_class)
+                continue;
+
+            face1 = (int) remaining_face[region->tet_vertex][v];
+            face2 = (int) remaining_face[v][region->tet_vertex];
+
+            if (!region->dive[face1][v] && !region->dive[face2][v])
+                continue;
+
+            regions[*num_regions] = region;
+            (*num_regions)++;
+        }
+    }
+
+    // reduce array size
+    retval = NEW_ARRAY(*num_regions, CuspRegion *);
+    for (i = 0; i < *num_regions; i++)
+        retval[i] = regions[i];
+
+    my_free(regions);
+    return retval;
+}
+
+/*
+ * Find the cusp region adjacent to 'region' by diving through the manifold
+ * into vertex 'vertex' of the cusp region.
+ */
+
+CuspRegion *find_endpoint_adj_region(ManifoldBoundary *cusp, CuspRegion *region, int vertex) {
+    int i, j, k, face1, face2, face, edge_class, edge_index;
+    bool dive_along_face1, dive_along_face2, curve_face1, curve_face2, endpoint_face1, endpoint_face2;
+    CuspRegion *current_region;
+
+    face1 = (int) remaining_face[region->tet_vertex][vertex];
+    face2 = (int) remaining_face[vertex][region->tet_vertex];
+
+    edge_class = region->tri->vertices[vertex].edge_class;
+    edge_index = region->tri->vertices[vertex].edge_index;
+
+    dive_along_face1 = region->dive[face1][vertex];
+    dive_along_face2 = region->dive[face2][vertex];
+
+    // which cusp region
+    for (current_region = cusp->cusp_region_begin.next;
+         current_region != &cusp->cusp_region_end;
+         current_region = current_region->next) {
+
+        if (current_region->tet_index != region->tet_index ||
+            current_region->tet_vertex != vertex)
+            continue;
+
+        curve_face1 = (region->curve[face1][vertex] == current_region->curve[face1][region->tet_vertex]);
+        curve_face2 = (region->curve[face2][vertex] == current_region->curve[face2][region->tet_vertex]);
+
+        if (!curve_face1 || !curve_face2)
+            continue;
+
+        endpoint_face1 = is_valid_endpoint(current_region, edge_class, edge_index, face1, region->tet_vertex);
+        endpoint_face2 = is_valid_endpoint(current_region, edge_class, edge_index, face2, region->tet_vertex);
+
+        if ( ( dive_along_face1 && endpoint_face1 ) || ( dive_along_face2 && endpoint_face2 ) )
+            return region;
+    }
+
+    // didn't find valid path endpoints
+    return NULL;
+}
+
+void update_adj_dive(ManifoldBoundary **cusps, int num_cusps) {
+    int i, v;
+    ManifoldBoundary *cusp;
+    CuspRegion *region;
+    CuspVertex *vertex;
+
+    for (i = 0; i < num_cusps; i++) {
+        cusp = cusps[i];
+
+        for (region = cusp->cusp_region_begin.next; region != &cusp->cusp_region_end; region = region->next) {
+            for (v = 0; v < 4; v++) {
+                if (v == region->tet_vertex)
+                    continue;
+
+                vertex = &region->tri->vertices[v];
+                region->adj_dive_regions[v] = find_endpoint_adj_region(cusps[region->tri->tet->cusp[v]->index], region, v);
+            }
+        }
+    }
+}
+
 // ----------------------------------
 
 /*
@@ -2449,7 +2561,7 @@ void calculate_holonomy(Triangulation *manifold, int **symp_eqns, int num_curves
 }
 
 /*
- * node lies in region region, find the vertex which the subpath
+ * node lies in 'region', find the vertex which the subpath
  * node->prev->y --> node->y --> node->next->y cuts off of the
  * cusp triangle region->tri.
  */
@@ -2652,7 +2764,7 @@ int *find_tree_edges(Graph *g, int num_edges) {
  * vertices in g1 of the same color
  */
 
-int find_same_color_edge(Graph *g1, Graph *g2, int *edge_classes) {
+int find_same_color_edge(Graph *g1, Graph *g2, const int *edge_classes) {
     int v;
     EdgeNode *node;
 
