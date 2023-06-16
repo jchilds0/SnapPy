@@ -56,9 +56,8 @@ typedef struct Graph {
 
 typedef struct CuspEndPoint {
     int                         cusp_index;
-    int                         edge_class1;
-    int                         edge_class2;
-    int                         pos;
+    int                         edge_class[2];
+    struct CuspEndPoint         *next;
 } CuspEndPoint;
 
 typedef struct EndMultiGraph {
@@ -265,7 +264,7 @@ int                     *find_tree_edges(Graph *, int);
 int                     find_same_color_edge(Graph *, Graph *, const int *);
 int                     find_path_len(int, int, int *, int);
 CuspEndPoint            *find_multi_graph_path(Graph *, Triangulation *, int, int, int *);
-CuspEndPoint            *find_cusp_endpoint_edge_classes(Graph *, EdgeNode *, EdgeNode *, int, int *);
+CuspEndPoint            *find_cusp_endpoint_edge_classes(Graph *, EdgeNode *, EdgeNode *, int);
 void                    find_edge_ends(Graph *, Triangulation *, int, int *, int *);
 void                    print_graph(Graph *, int);
 
@@ -616,7 +615,7 @@ int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
  * Setup graph and cusp triangulation, and run construct dual curves.
  */
 
-static int debug = FALSE;
+static int debug = TRUE;
 
 int **get_symplectic_equations(Triangulation *manifold, int *edgeClasses, int *num_rows, int numCols) {
     int i, j, k;
@@ -1707,9 +1706,9 @@ void do_one_dual_curve(ManifoldBoundary **cusps, OscillatingCurves *curves, Dual
 //        print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
 //        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
 
-        path = init_dual_curve(dual_curve_end, cusp_end_point[i].edge_class1, cusp_end_point[i].edge_class2);
+        path = init_dual_curve(dual_curve_end, cusp_end_point[i].edge_class[START], cusp_end_point[i].edge_class[FINISH]);
         path->cusp_index = cusp_end_point[i].cusp_index;
-        find_path_endpoints(cusps[path->cusp_index]->dual_graph, dual_curve_begin, path, cusp_end_point[i].pos, orientation);
+        find_path_endpoints(cusps[path->cusp_index]->dual_graph, dual_curve_begin, path, orientation);
         do_one_cusp(cusps[path->cusp_index], path, edge_class);
         orientation = (orientation == START ? FINISH : START);
     }
@@ -2834,9 +2833,9 @@ CuspEndPoint *find_multi_graph_path(Graph *g, Triangulation *manifold, int edge_
         tempNode->next->edge_class = e0;
     }
 
-    cusp_end_point = find_cusp_endpoint_edge_classes(g, node_begin, node_end, edge_class, path_length);
+    cusp_end_point = find_cusp_endpoint_edge_classes(g, node_begin, node_end, edge_class);
 
-    // remove header and tailer nodes
+    //
     while (node_begin->next != node_end) {
         tempNode = node_begin->next;
         REMOVE_NODE(tempNode);
@@ -2853,52 +2852,47 @@ CuspEndPoint *find_multi_graph_path(Graph *g, Triangulation *manifold, int edge_
     return cusp_end_point;
 }
 
-CuspEndPoint *find_cusp_endpoint_edge_classes(Graph *g, EdgeNode *node_begin,
-                                              EdgeNode *node_end, int edge_classes, int *path_length) {
-    int i, cusp;
+CuspEndPoint *find_cusp_endpoint_edge_classes(Graph *g, EdgeNode *node_begin, EdgeNode *node_end, int edge_class) {
+    int cusp, prev_edge_class;
     EdgeNode *edge, *node;
+    CuspEndPoint *endpoint, *cusp_endpoint = NEW_STRUCT( CuspEndPoint );
 
-    *path_length = 0;
-    for (node = node_begin->next; node != node_end; node = node->next)
-        (*path_length)++;
-
-    CuspEndPoint *pCuspEndPoint = NEW_ARRAY(*path_length, CuspEndPoint);
-
-    pCuspEndPoint[0].edge_class1 = edge_classes;
-
-    i = 0;
+    cusp_endpoint->next = NULL;
+    prev_edge_class = edge_class;
     for (node = node_begin->next; node->next != node_end; node = node->next) {
         cusp = node->y;
 
-        pCuspEndPoint[i].cusp_index = node->y;
-        pCuspEndPoint[i].pos = MIDDLE;
-
-        if (i != 0)
-            pCuspEndPoint[i].edge_class1 = pCuspEndPoint[i - 1].edge_class2;
+        endpoint = NEW_STRUCT( CuspEndPoint );
+        endpoint->next = cusp_endpoint;
+        endpoint->cusp_index = cusp;
+        endpoint->edge_class[START] = prev_edge_class;
+//        pCuspEndPoint[i].cusp_index = node->y;
+//        pCuspEndPoint[i].pos = MIDDLE;
 
         if (node->next->edge_class != -1) {
-            pCuspEndPoint[i].edge_class2 = node->next->edge_class;
-            i++;
+//            pCuspEndPoint[i].edge_class2 = node->next->edge_class;
             continue;
         }
 
         for (edge = g->edge_list_begin[cusp].next; edge != &g->edge_list_end[cusp]; edge = edge->next) {
             if (node->next->y == edge->y) {
-                pCuspEndPoint[i].edge_class2 = edge->edge_class;
+//                pCuspEndPoint[i].edge_class2 = edge->edge_class;
+                endpoint->edge_class[FINISH] = edge->edge_class;
                 break;
             }
         }
 
-        i++;
+        cusp_endpoint = endpoint;
+        prev_edge_class = cusp_endpoint->edge_class[FINISH];
     }
 
-    pCuspEndPoint[0].pos = FIRST;
-    pCuspEndPoint[*path_length - 1].cusp_index  = node->y;
-    pCuspEndPoint[*path_length - 1].edge_class1 = pCuspEndPoint[*path_length - 2].edge_class2;
-    pCuspEndPoint[*path_length - 1].edge_class2 = edge_classes;
-    pCuspEndPoint[*path_length - 1].pos = LAST;
+//    pCuspEndPoint[0].pos = FIRST;
+//    pCuspEndPoint[*path_length - 1].cusp_index  = node->y;
+//    pCuspEndPoint[*path_length - 1].edge_class1 = pCuspEndPoint[*path_length - 2].edge_class2;
+//    pCuspEndPoint[*path_length - 1].edge_class2 = edge_classes;
+//    pCuspEndPoint[*path_length - 1].pos = LAST;
 
-    return pCuspEndPoint;
+    return cusp_endpoint;
 }
 
 void find_edge_ends(Graph *g, Triangulation *manifold, int edge_class, int *start, int *end) {
