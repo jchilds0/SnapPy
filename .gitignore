@@ -52,3 +52,4 @@ quad_double/qd/lib/
 quad_double/qd/qd-*
 .idea
 dev/symplectic_basis/cmake-build-debug
+venv/
