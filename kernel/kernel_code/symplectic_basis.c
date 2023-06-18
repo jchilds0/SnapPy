@@ -40,7 +40,6 @@ typedef struct Queue {
 
 typedef struct EdgeNode {
     int                         y;                       /** cusp region index */
-    //int                         edge_class;              /** edge_class of the edge for edges in the end multi graph */
     struct EdgeNode             *next;                   /** next node in doubly linked list */
     struct EdgeNode             *prev;                   /** prev node in doubly linked list */
 } EdgeNode;
@@ -270,7 +269,6 @@ void                    calculate_holonomy(Triangulation *, int **, int);
 
 EndMultiGraph           *init_end_multi_graph(Triangulation *);
 void                    free_end_multi_graph(EndMultiGraph *);
-int                     insert_edge_end_multi_graph(Graph *, int, int, int, bool);
 Graph                   *spanning_tree(Graph *, int, int *);
 int                     **find_end_multi_graph_edge_classes(EndMultiGraph *, Triangulation *);
 int                     find_edge_class(Triangulation *, int, int);
@@ -644,7 +642,7 @@ int **get_symplectic_equations(Triangulation *manifold, bool *edge_classes, int 
     for (i = 0; i < end_multi_graph->num_edge_classes; i++)
         edge_classes[i] = !end_multi_graph->edge_classes[i];
 
-    edge_classes[multi_graph->e0] = FALSE;
+    edge_classes[end_multi_graph->e0] = FALSE;
 
     OscillatingCurves *oscillating_curves   = init_oscillating_curves(manifold, edge_classes);
 
@@ -2690,6 +2688,10 @@ EndMultiGraph *init_end_multi_graph(Triangulation *manifold) {
     multi_graph->e0 = find_same_color_edge(manifold, multi_graph, g);
 
     multi_graph->edge_classes = NEW_ARRAY(multi_graph->num_edge_classes, bool);
+    for (i = 0; i < multi_graph->num_edge_classes; i++) {
+        multi_graph->edge_classes[i] = FALSE;
+    }
+
     for (i = 0; i < multi_graph->num_cusps; i++) { 
         for (j = 0; j < multi_graph->num_cusps; j++) { 
             if (multi_graph->edges[i][j] == -1)
@@ -2715,25 +2717,6 @@ void free_end_multi_graph(EndMultiGraph *multi_graph) {
     my_free(multi_graph->edges);
     my_free(multi_graph);
 }
-
-int insert_edge_end_multi_graph(Graph *g, int x, int y, int edge_class, bool directed) {
-    // Ignore edge if it already exists
-    if (edge_exists(g, x, y))
-        return x;
-
-    EdgeNode *p = NEW_STRUCT( EdgeNode);
-    INSERT_AFTER(p, &g->edge_list_begin[x]);
-    p->y = y;
-    //p->edge_class = edge_class;
-    g->degree[x]++;
-
-    if (!directed) {
-        insert_edge_end_multi_graph(g, y, x, edge_class, TRUE);
-    }
-
-    return x;
-}
-
 
 void cusp_graph(Triangulation *manifold, Graph *g) {
     int vertex1, vertex2;
@@ -2869,26 +2852,6 @@ void color_graph(Graph *g) {
     free_queue(q);
 }
 
-//int *find_tree_edges(Graph *g, int num_edges) {
- //    int i, vertex;
- //   EdgeNode *node;
- //   int *edges = NEW_ARRAY(num_edges, int);
- //
- //   for (i = 0; i < num_edges; i++) {
- //       edges[i] = 0;
- //   }
- //
- //   // which vertex
- //   for (vertex = 0; vertex < g->num_vertices; vertex++) {
- //       // which edge
- //       for (node = g->edge_list_begin[vertex].next; node != &g->edge_list_end[vertex]; node = node->next) {
- //           edges[node->edge_class] = 1;
- //       }
- //   }
-
- //   return edges;
-//}
-
 /*
  * g1 is the colored spanning tree of g2, return the
  * edge class of the edge in g2 which connects
@@ -2947,7 +2910,6 @@ CuspEndPoint *find_multi_graph_path(EndMultiGraph *multi_graph, Triangulation *m
 
     *path_length = 0;
     *path_length = find_path_len(start, end, parent, *path_length);
-    // tempNode = NEW_STRUCT( EdgeNode );
 
     /*
      * Construct a path of even legnth through the end multi graph. 
@@ -2963,14 +2925,10 @@ CuspEndPoint *find_multi_graph_path(EndMultiGraph *multi_graph, Triangulation *m
 
         find_path(start, startE0, parent, node_begin);
 
-        // my_free(tempNode);
-        //tempNode = node_end->prev;
-
         init_search(g, processed, discovered, parent);
         bfs(g, endE0, processed, discovered, parent);
 
         find_path(endE0, end, parent, node_end->prev);
-        //tempNode->next->edge_class = e0;
     }
 
     cusp_end_point = graph_path_to_cusp_path(multi_graph, node_begin, node_end, edge_class);
