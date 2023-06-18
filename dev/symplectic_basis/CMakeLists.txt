@@ -1,6 +1,13 @@
+# To compile project 
+# - run 'cmake -S . -B build/' in the dev/symplectic_basis dir 
+# - run 'cmake --build build/'
+
+# For clangd copy 'dev/symplectic_basis/build/compile_commands.json' to 'build/'
+
 cmake_minimum_required(VERSION 3.12)
 
 project(SnapPea)
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 # Set the name of your program
 set(YOUR_PROGRAM symplectic_basis)
@@ -17,7 +24,7 @@ include_directories(${SNAPPEA_KERNEL}/addl_code ${SNAPPEA_KERNEL}/headers ${SNAP
 # Add source files
 file(GLOB KERNEL_SOURCES ${SNAPPEA_KERNEL}/*/*.c)
 file(GLOB HEADER_FILES ${SNAPPEA_KERNEL}/*/*.h)
-file(COPY ${CMAKE_SOURCE_DIR}/CuspedCensusData DESTINATION ${CMAKE_SOURCE_DIR}/build )      # Copy census data to be used by program
+file(COPY ${CMAKE_SOURCE_DIR}/CuspedCensusData DESTINATION ${CMAKE_SOURCE_DIR}/build)      # Copy census data to be used by program
 
 # Create executable target
 add_executable(${YOUR_PROGRAM} ${YOUR_PROGRAM}_main.c ${KERNEL_SOURCES} ${HEADER_FILES} ${CUSPED_CENSUS})
