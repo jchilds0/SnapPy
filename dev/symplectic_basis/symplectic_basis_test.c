@@ -75,10 +75,10 @@ void testDual(void) {
     }
 }
 
-int omega(int *v1, int *v2, int numCols) {
+int omega(int *v1, int *v2, int num_cols) {
     int i, yyval = 0;
 
-    for (i = 0; i < numCols / 3; i++) {
+    for (i = 0; i < num_cols / 3; i++) {
         yyval += ((v1[3 * i] - v1[3 * i + 2]) * (v2[3 * i + 1] - v2[3 * i + 2])
                   - (v1[3 * i + 1] - v1[3 * i + 2]) * (v2[3 * i] - v2[3 * i + 2]));
     }
