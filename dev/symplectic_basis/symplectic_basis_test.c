@@ -53,11 +53,11 @@ void testDual(void) {
 
             for (k = 0; k < dual_rows / 2; k ++) {
                 if (ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols)) == 2) {
-                    //printf("Passed\n");
+//                    printf("Passed\n");
                     continue;
                 }
 
-                //printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
+                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
                 //printMatrix(basis, dual_cols, dual_rows);
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
