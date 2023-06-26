@@ -16,7 +16,7 @@ set(YOUR_PROGRAM symplectic_basis)
 set(SNAPPEA_KERNEL ${PROJECT_SOURCE_DIR}/../../kernel)
 
 # Compiler options
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -fanalyzer")
 
 # Add include directories
 include_directories(${SNAPPEA_KERNEL}/addl_code ${SNAPPEA_KERNEL}/headers ${SNAPPEA_KERNEL}/real_type ${SNAPPEA_KERNEL}/unix_kit ${SNAPPEA_KERNEL}/)
