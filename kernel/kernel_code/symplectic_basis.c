@@ -236,13 +236,15 @@ void                    find_intersection_triangle(Triangulation *, ManifoldBoun
  * Train lines
  */
 
-void                    do_cusp_train_lines(ManifoldBoundary **, EndMultiGraph *);
-void                    find_train_line_endpoints(ManifoldBoundary **, EndMultiGraph *);
+void                    do_manifold_train_lines(ManifoldBoundary **, EndMultiGraph *);
+void                    do_cusp_train_lines(ManifoldBoundary *, EndMultiGraph *, PathEndPoint **, PathEndPoint **);
+void                    find_train_line_endpoints(ManifoldBoundary **, EndMultiGraph *, PathEndPoint ***, PathEndPoint ***);
 DualCurves              *do_single_cusp_train_line(ManifoldBoundary *, EndMultiGraph *, PathEndPoint *, PathEndPoint *, int, int);
 PathEndPoint            *find_path_endpoint_on_cusp(CuspRegion *, CuspRegion *, int, int);
 PathEndPoint            *find_matching_path_endpoint_on_cusp(CuspRegion *, CuspRegion *, PathEndPoint *, int, int);
 CuspRegion              *find_dive_region(CuspRegion *, CuspRegion *, PathEndPoint *);
 void                    copy_region_and_endpoint_to_path_endpoint(PathEndPoint *, PathEndPoint *, CuspRegion *);
+int                     find_edge_class_other_cusp_index(Triangulation *, int, int);
 
 /**
  * Construct Oscillating Curves and calculate holonomy
@@ -1747,51 +1749,91 @@ CuspTriangle *find_cusp_triangle(CuspTriangle *cusp_triangle_begin, CuspTriangle
 
 // ------------------------------------
 
-void do_cusp_train_lines(ManifoldBoundary **cusps, EndMultiGraph *multi_graph) {
+void do_manifold_train_lines(ManifoldBoundary **cusps, EndMultiGraph *multi_graph) {
+    int cusp_index, edge_class;
+    PathEndPoint ***start_endpoints = NEW_ARRAY(multi_graph->num_cusps, PathEndPoint **);
+    PathEndPoint ***finish_endpoints = NEW_ARRAY(multi_graph->num_cusps, PathEndPoint **);
 
+    for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
+        start_endpoints[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, PathEndPoint *);
+        finish_endpoints[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, PathEndPoint *);
+
+        for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
+            start_endpoints[cusp_index][edge_class] = NULL;
+            finish_endpoints[cusp_index][edge_class] = NULL;
+        }
+    }
+
+    find_train_line_endpoints(cusps, multi_graph, start_endpoints, finish_endpoints);
+
+    for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
+        do_cusp_train_lines(cusps[cusp_index], multi_graph, start_endpoints[cusp_index], finish_endpoints[cusp_index]);
+    }
+
+    // free memory
 }
 
-void find_train_line_endpoints(ManifoldBoundary **cusps, EndMultiGraph *multi_graph) {
-    int i, j;
+void do_cusp_train_lines(ManifoldBoundary *cusp, EndMultiGraph *multi_graph,
+                         PathEndPoint **start_endpoints, PathEndPoint **finish_endpoints) {
+    int edge_class1, edge_class2;
+
+    for (edge_class1 = 0; edge_class1 < multi_graph->num_edge_classes; edge_class1++) {
+        if (start_endpoints[edge_class1] == NULL)
+            continue;
+
+        for (edge_class2 = 0; edge_class2 < multi_graph->num_edge_classes; edge_class2++) {
+            if (finish_endpoints[edge_class2] == NULL)
+                continue;
+
+            do_single_cusp_train_line(cusp, multi_graph,
+                                      start_endpoints[edge_class1],
+                                      finish_endpoints[edge_class2],
+                                      edge_class1, edge_class2);
+        }
+    }
+}
+
+void find_train_line_endpoints(ManifoldBoundary **cusps, EndMultiGraph *multi_graph,
+                               PathEndPoint ***start_endpoints, PathEndPoint ***finish_endpoints) {
+    int cusp_index, other_cusp_index, edge_class, edge_index;
 
     // 0 - no endpoint, 1 - endpoint not found, 2 - endpoint found
-    // add edge_index to edge classes and endpoints arrays.
-    int **edge_classes= NEW_ARRAY(multi_graph->num_cusps, int *);
     Boolean *cusp_edge_classes;
     PathEndPoint *path_endpoint;
-    PathEndPoint ***endpoints = NEW_ARRAY(multi_graph->num_cusps, PathEndPoint **);
+    int **edge_classes = NEW_ARRAY(multi_graph->num_cusps, int *);
 
-    for (i = 0; i < multi_graph->num_cusps; i++) {
-        cusp_edge_classes = edge_classes_on_cusp(multi_graph, cusps[i]->cusp->index);
-        endpoints[i] = NEW_ARRAY(multi_graph->num_edge_classes, PathEndPoint *);
-        edge_classes[i] = NEW_ARRAY(multi_graph->num_edge_classes, int);
+    for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
+        cusp_edge_classes = edge_classes_on_cusp(multi_graph, cusps[cusp_index]->cusp->index);
+        edge_classes[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, int);
 
-        for (j = 0; j < multi_graph->num_edge_classes; j++) {
-            edge_classes[i][j] = (int) cusp_edge_classes[j];
-            endpoints[i][j] = NULL;
+        for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
+            edge_classes[cusp_index][edge_class] = cusp_edge_classes[edge_class] ? 1 : 0;
         }
 
         my_free(cusp_edge_classes);
     }
 
-    for (i = 0; i < multi_graph->num_cusps; i++) {
-        for (j = 0; j < multi_graph->num_edge_classes; j++) {
-            switch (edge_classes[i][j]) {
+    for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
+        for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
+            switch (edge_classes[cusp_index][edge_class]) {
                 case 0:
+                    path_endpoint = NULL;
+                    edge_index = 0;
                     break;
                 case 1:
-                    path_endpoint = find_path_endpoint_on_cusp(&cusps[i]->cusp_region_begin,
-                                                               &cusps[i]->cusp_region_end,
-                                                               i, 0);
-                    endpoints[i][j] = path_endpoint;
-                    edge_classes[i][j] = 2;
+                    path_endpoint = find_path_endpoint_on_cusp(&cusps[cusp_index]->cusp_region_begin,
+                                                               &cusps[cusp_index]->cusp_region_end,
+                                                               cusp_index, 0);
+                    edge_classes[cusp_index][edge_class] = 2;
+                    start_endpoints[cusp_index][edge_class] = path_endpoint;
                     break;
                 case 2:
-                    path_endpoint = find_matching_path_endpoint_on_cusp(&cusps[i]->cusp_region_begin,
-                                                                        &cusps[i]->cusp_region_end,
-                                                                        endpoints[]
-                                                                        i, 1);
-                    endpoints[i][j] = path_endpoint;
+                    other_cusp_index = find_edge_class_other_cusp_index(cusps[cusp_index]->manifold, edge_class, cusp_index);
+                    path_endpoint = find_matching_path_endpoint_on_cusp(&cusps[cusp_index]->cusp_region_begin,
+                                                                        &cusps[cusp_index]->cusp_region_end,
+                                                                        start_endpoints[other_cusp_index][edge_class],
+                                                                        cusp_index, 1);
+                    finish_endpoints[cusp_index][edge_class] = path_endpoint;
                     break;
                 default:
                     uFatalError("find_train_line_endpoints", "symplectic_basis");
@@ -1799,8 +1841,8 @@ void find_train_line_endpoints(ManifoldBoundary **cusps, EndMultiGraph *multi_gr
         }
     }
 
-    for (i = 0; i < multi_graph->num_cusps; i++)
-        my_free(edge_classes[i]);
+    for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++)
+        my_free(edge_classes[cusp_index]);
 
     my_free(edge_classes);
 }
@@ -1929,6 +1971,30 @@ void copy_region_and_endpoint_to_path_endpoint(PathEndPoint *endpoint1, PathEndP
             endpoint2->num_adj_curves[face][vertex] = region->num_adj_curves[face][vertex];
         }
     }
+}
+
+int find_edge_class_other_cusp_index(Triangulation *manifold, int edge_class, int cusp_index) {
+    EdgeClass *edge;
+    Tetrahedron *tet;
+    EdgeIndex edge_index;
+    VertexIndex vertex;
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        for (edge_index = 0; edge_index < 6; edge_index++) {
+            if (tet->edge_class[edge_index]->index != edge_class)
+                continue;
+
+            vertex = one_vertex_at_edge[edge_index];
+
+            if (tet->cusp[vertex]->index == cusp_index)
+                return tet->cusp[other_vertex_at_edge[edge_index]]->index;
+            else
+                return tet->cusp[vertex]->index;
+        }
+    }
+
+    uFatalError("find_edge_class_other_cusp_index", "symplectic_basis");
+    return 0;
 }
 
 // ------------------------------------
