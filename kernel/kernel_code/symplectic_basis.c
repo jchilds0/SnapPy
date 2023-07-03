@@ -207,6 +207,9 @@ void                    init_search(Graph *, Boolean *, Boolean *, int *);
 void                    bfs(Graph *, int, Boolean *, Boolean *, int *);
 void                    find_path(int, int, int *, EdgeNode *);
 Graph                   **find_connected_graph_components(Graph *);
+int                     *dfs_target_edges(Graph *, int *, int *, int, int *);
+Boolean                 check_neighbours(Graph *, int, int *, int *, int, int *, int *, const Boolean *);
+Boolean                 is_path_an_edge_cover(const int *, const int *, int, const int *, int);
 
 /**
  * Symplectic Basis
@@ -241,9 +244,9 @@ void                    find_intersection_triangle(Triangulation *, ManifoldBoun
  */
 
 void                    do_manifold_train_lines(ManifoldBoundary **, EndMultiGraph *);
-void                    find_edge_class_edges(ManifoldBoundary **, EndMultiGraph *, PathEndPoint ***, Boolean **);
+void                    find_edge_class_edges(ManifoldBoundary **, EndMultiGraph *, PathEndPoint ***);
 Graph                   *construct_edge_class_graph(CuspTriangle *, CuspTriangle *, Boolean *, int);
-EdgeNode                *find_primary_train_line(ManifoldBoundary *, PathEndPoint **, Boolean *)
+EdgeNode                *find_primary_train_line(ManifoldBoundary *, PathEndPoint **);
 void                    update_cusp_regions_along_train_line(ManifoldBoundary *);
 
 
@@ -500,7 +503,7 @@ Boolean edge_exists(Graph *g, int v1, int v2) {
 
 // ---------------------------------------------------------------
 
-// Breadth First Search from Skiena Algorithm Design Manual
+// Breadth First Search
 
 /*
  * Initialise default values for bfs arrays
@@ -606,6 +609,84 @@ Graph **find_connected_graph_components(Graph *g) {
     }
 
     return graphs;
+}
+
+/*
+ * Find a path which covers the set of edges 'edges' using depth first search
+ */
+
+int *dfs_target_edges(Graph *g, int *edges_start, int *edges_end, int num_edges, int *path_len) {
+    int i;
+    int *path = NEW_ARRAY(g->num_vertices + 1, int);
+    Boolean *visited = NEW_ARRAY(g->num_vertices, Boolean);
+
+    for (i = 0; i < g->num_vertices; i++) {
+        visited[i] = FALSE;
+    }
+
+    *path_len = 0;
+
+    if (check_neighbours(g, edges_start[0], edges_start, edges_end, num_edges, path, path_len, visited)) {
+        my_free(visited);
+        return path;
+    }
+
+    uFatalError("dfs_target_edges", "symplectic_basis");
+    return NULL;
+}
+
+Boolean check_neighbours(Graph *g, int start, int *edges_start, int *edges_end, int num_edges, int *path, int *path_len, const Boolean *visited) {
+    int i;
+    EdgeNode *node;
+    Boolean result, *current_visited = NEW_ARRAY(g->num_vertices, Boolean);
+
+    path[(*path_len)++] = start;
+    for (i = 0; i < g->num_vertices; i++) {
+        current_visited[i] = visited[i];
+    }
+
+    if (is_path_an_edge_cover(edges_start, edges_end, num_edges, path, *path_len)) {
+        my_free(current_visited);
+        return TRUE;
+    }
+
+    for (node = g->edge_list_begin[start].next; node != &g->edge_list_end; node = node->next) {
+        if (!current_visited[node->y] || node->y == path[0]) {
+            result = check_neighbours(g, node->y, edges_start, edges_end, num_edges, path, path_len, current_visited);
+
+            if (result == FALSE)
+                continue;
+
+            my_free(current_visited);
+            return TRUE;
+        }
+    }
+
+    my_free(current_visited);
+    (*path_len)--;
+    return FALSE;
+}
+
+Boolean is_path_an_edge_cover(const int *edges_begin, const int *edges_end, int num_edges, const int *path, int path_len) {
+    int i, j;
+    Boolean edge_cover = TRUE;
+    Boolean *edge_covered = NEW_ARRAY(num_edges, Boolean);
+
+    for (i = 0; i < path_len - 1; i++) {
+        for (j = 0; j < num_edges; j++) {
+            if ((edges_begin[j] == path[i] && edges_end[j] == path[i + 1])
+            || (edges_begin[j] == path[i + 1] && edges_end[j] == path[i]))
+                edge_covered[j] = TRUE;
+        }
+    }
+
+    for (j = 0; j < num_edges; j++) {
+        if (!edge_covered[j])
+            edge_cover = FALSE;
+    }
+
+    my_free(edge_covered);
+    return edge_cover;
 }
 
 // ---------------------------------------------------
@@ -1356,15 +1437,6 @@ CuspRegion *find_adj_region(CuspRegion *cusp_region_begin, CuspRegion *cusp_regi
 void init_train_line(ManifoldBoundary *cusp) {
     int i;
 
-    cusp->train_lines_begin = NEW_ARRAY(cusp->num_edge_classes, DualCurves);
-    cusp->train_lines_end   = NEW_ARRAY(cusp->num_edge_classes, DualCurves);
-
-    for (i = 0; i < cusp->num_edge_classes; i++) {
-        cusp->train_lines_begin[i].next = &cusp->train_lines_end[i];
-        cusp->train_lines_begin[i].prev = NULL;
-        cusp->train_lines_end[i].next = NULL;
-        cusp->train_lines_end[i].prev = &cusp->train_lines_begin[i];
-    }
 }
 
 DualCurves *init_dual_curve(int edge_class_start, int edge_class_finish) {
@@ -1829,44 +1901,68 @@ CuspTriangle *find_cusp_triangle(CuspTriangle *cusp_triangle_begin, CuspTriangle
 void do_manifold_train_lines(ManifoldBoundary **cusps, EndMultiGraph *multi_graph) {
     int cusp_index, edge_class;
     PathEndPoint ***endpoints = NEW_ARRAY(multi_graph->num_cusps, PathEndPoint **);
-    Boolean **edge_classes = NEW_ARRAY(multi_graph->num_cusps, Boolean *);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
         endpoints[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, PathEndPoint *);
-        edge_classes[cusp_index] = edge_classes_on_cusp(multi_graph, cusp_index);
 
         for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
             endpoints[cusp_index][edge_class] = NULL;
         }
     }
 
-    find_edge_class_edges(cusps, multi_graph, endpoints, edge_classes);
+    find_edge_class_edges(cusps, multi_graph, endpoints);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
-        edge_classes[cusp_index] = edge_classes_on_cusp(multi_graph, cusp_index);
-        cusps[cusp_index]->train_line_node = find_primary_train_line(cusps[cusp_index], endpoints[cusp_index], edge_classes[cusp_index]);
+        cusps[cusp_index]->train_line_node = find_primary_train_line(cusps[cusp_index], endpoints[cusp_index]);
         cusps[cusp_index]->train_line_endpoint = endpoints[cusp_index];
 
         update_cusp_regions_along_train_line(cusps[cusp_index]);
     }
 
+    my_free(endpoints);
+}
+
+void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph, PathEndPoint ***endpoints) {
+    int edge_class, cusp_index;
+    Boolean found_edge_class;
+    Boolean **edge_classes = NEW_ARRAY(multi_graph->num_cusps, Boolean *);
+    Graph *cusp_graph, **cusp_connected_graphs;
+    Queue *queue = init_queue(multi_graph->num_cusps);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
-        my_free(edge_classes[cusp_index]);
+        edge_classes[cusp_index] = edge_classes_on_cusp(multi_graph, cusp_index);
+        edge_classes[cusp_index][multi_graph->e0] = FALSE;
     }
 
-    my_free(endpoints);
-    my_free(edge_classes);
+    enqueue(queue, 0);
+
+    while (!empty_queue(queue)) {
+        cusp_index = dequeue(queue);
+
+        found_edge_class = FALSE;
+        for (edge_class = 0; edge_classes < multi_graph->num_edge_classes; edge_classes++) {
+            if (!edge_classes[cusp_index][edge_class])
+                found_edge_class = TRUE;
+        }
+
+        if (!found_edge_class)
+            continue;
+
+        // edge_classes[cusp_index] contains some true entries
+        cusp_graph = construct_edge_class_graph(&cusps[cusp_index]->cusp_triangle_begin,
+                                                &cusps[cusp_index]->cusp_triangle_end,
+                                                edge_classes[cusp_index],
+                                                multi_graph->num_edge_classes);
+
+        cusp_connected_graphs = find_connected_graph_components(cusp_graph);
+
+
+    }
 }
 
-void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph, PathEndPoint ***endpoints, Boolean **edge_classes) {
-    Graph *cusp_edges; 
-    
-}
 
-
-Graph *construct_edge_class_graph(CuspTriangle *triangle_begin, CuspTriangle *triangle_end, Boolean *edge_classes, 
-                                  int num_edge_classes) {
+Graph *construct_edge_class_graph(CuspTriangle *triangle_begin, CuspTriangle *triangle_end,
+                                  Boolean *edge_classes, int num_edge_classes) {
     Graph *g = init_graph(num_edge_classes, FALSE);
     CuspTriangle *tri;
     VertexIndex v1, v2;
@@ -1887,7 +1983,7 @@ Graph *construct_edge_class_graph(CuspTriangle *triangle_begin, CuspTriangle *tr
     return g;
 }
 
-EdgeNode *find_primary_train_line(ManifoldBoundary *cusp, PathEndPoint **edges, Boolean *edge_classes) {
+EdgeNode *find_primary_train_line(ManifoldBoundary *cusp, PathEndPoint **edges) {
 
 }
 
@@ -1903,7 +1999,9 @@ void do_oscillating_curves(ManifoldBoundary **cusps, OscillatingCurves *curves, 
     int i;
 
     for (i = 0; i < curves->num_curves; i++) {
-        do_one_dual_curve(cusps, curves, &curves->dual_curve_begin[i], &curves->dual_curve_end[i],
+        do_one_dual_curve(cusps, curves,
+                          &curves->dual_curve_begin[i],
+                          &curves->dual_curve_end[i],
                           multi_graph, curves->edge_class[i], i);
 
         print_debug_info(cusps[0]->manifold, cusps, curves, 2);
