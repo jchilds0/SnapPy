@@ -174,7 +174,8 @@ typedef struct ManifoldBoundary {
     CuspTriangle                cusp_triangle_end;      /** tail node of doubly linked list of cusp triangles */
     CuspRegion                  cusp_region_begin;      /** header node of doubly linked list of cusp regions */
     CuspRegion                  cusp_region_end;        /** tail node of doubly linked list of cusp regions */
-    EdgeNode                    *train_line_node;       /** array of header node of doubly linked list of train lines */
+    int                         train_line_len;
+    int                         *train_line_path;       /** train line */
     PathEndPoint                **train_line_endpoint;
 } ManifoldBoundary;
 
@@ -244,10 +245,15 @@ void                    find_intersection_triangle(Triangulation *, ManifoldBoun
  */
 
 void                    do_manifold_train_lines(ManifoldBoundary **, EndMultiGraph *);
-void                    find_edge_class_edges(ManifoldBoundary **, EndMultiGraph *, PathEndPoint ***);
+void                    find_edge_class_edges(ManifoldBoundary **, EndMultiGraph *, int **, int **);
+void                    find_edge_class_edges_on_cusp(ManifoldBoundary *, EndMultiGraph *, Graph **, Graph *, int *, int *);
+void                    update_edge_classes_on_cusp(ManifoldBoundary **, int, Boolean **, int, int, int **, int **);
 Graph                   *construct_edge_class_graph(CuspTriangle *, CuspTriangle *, Boolean *, int);
-EdgeNode                *find_primary_train_line(ManifoldBoundary *, PathEndPoint **);
+int                     *find_primary_train_line(ManifoldBoundary *, EndMultiGraph *, int *, int *, int *);
+PathEndPoint            **find_train_line_endpoints(ManifoldBoundary *);
 void                    update_cusp_regions_along_train_line(ManifoldBoundary *);
+CuspRegion              *get_region_from_index(CuspRegion *, CuspRegion *, int);
+CuspRegion              *find_adj_dive_region(CuspRegion *, CuspRegion *, CuspRegion *, int, int);
 
 
 /**
@@ -650,7 +656,7 @@ Boolean check_neighbours(Graph *g, int start, int *edges_start, int *edges_end, 
         return TRUE;
     }
 
-    for (node = g->edge_list_begin[start].next; node != &g->edge_list_end; node = node->next) {
+    for (node = g->edge_list_begin[start].next; node != &g->edge_list_end[start]; node = node->next) {
         if (!current_visited[node->y] || node->y == path[0]) {
             result = check_neighbours(g, node->y, edges_start, edges_end, num_edges, path, path_len, current_visited);
 
@@ -827,6 +833,7 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
             symp_eqns[i][j] = 0;
     }
 
+    do_manifold_train_lines(cusps, end_multi_graph);
     do_oscillating_curves(cusps, oscillating_curves, end_multi_graph);
     calculate_holonomy(manifold, symp_eqns, manifold->num_tetrahedra);
 
@@ -1895,26 +1902,34 @@ CuspTriangle *find_cusp_triangle(CuspTriangle *cusp_triangle_begin, CuspTriangle
  *
  * After finding the train tracks, we need to split each cusp region near a vertex 
  * corresponding to an edge class since we don't do this when we find train tracks, 
- * nor when we find a path along the train tracks..
+ * nor when we find a path along the train tracks.
  */
 
 void do_manifold_train_lines(ManifoldBoundary **cusps, EndMultiGraph *multi_graph) {
     int cusp_index, edge_class;
+    int **edges_begin = NEW_ARRAY(multi_graph->num_cusps, int *),
+        **edges_end = NEW_ARRAY(multi_graph->num_cusps, int *);
     PathEndPoint ***endpoints = NEW_ARRAY(multi_graph->num_cusps, PathEndPoint **);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
         endpoints[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, PathEndPoint *);
+        edges_begin[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, int);
+        edges_end[cusp_index] = NEW_ARRAY(multi_graph->num_edge_classes, int);
 
         for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
             endpoints[cusp_index][edge_class] = NULL;
         }
     }
 
-    find_edge_class_edges(cusps, multi_graph, endpoints);
+    find_edge_class_edges(cusps, multi_graph, edges_begin, edges_end);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
-        cusps[cusp_index]->train_line_node = find_primary_train_line(cusps[cusp_index], endpoints[cusp_index]);
-        cusps[cusp_index]->train_line_endpoint = endpoints[cusp_index];
+        cusps[cusp_index]->train_line_path = find_primary_train_line(cusps[cusp_index],
+                                                                     multi_graph,
+                                                                     edges_begin[cusp_index],
+                                                                     edges_end[cusp_index],
+                                                                     &cusps[cusp_index]->train_line_len);
+        cusps[cusp_index]->train_line_endpoint = find_train_line_endpoints(cusps[cusp_index]);
 
         update_cusp_regions_along_train_line(cusps[cusp_index]);
     }
@@ -1922,7 +1937,7 @@ void do_manifold_train_lines(ManifoldBoundary **cusps, EndMultiGraph *multi_grap
     my_free(endpoints);
 }
 
-void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph, PathEndPoint ***endpoints) {
+void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph, int **edges_begin, int **edges_end) {
     int edge_class, cusp_index;
     Boolean found_edge_class;
     Boolean **edge_classes = NEW_ARRAY(multi_graph->num_cusps, Boolean *);
@@ -1940,7 +1955,7 @@ void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph,
         cusp_index = dequeue(queue);
 
         found_edge_class = FALSE;
-        for (edge_class = 0; edge_classes < multi_graph->num_edge_classes; edge_classes++) {
+        for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
             if (!edge_classes[cusp_index][edge_class])
                 found_edge_class = TRUE;
         }
@@ -1956,10 +1971,20 @@ void find_edge_class_edges(ManifoldBoundary **cusps, EndMultiGraph *multi_graph,
 
         cusp_connected_graphs = find_connected_graph_components(cusp_graph);
 
+        // assign edges to edge classes
+        find_edge_class_edges_on_cusp(cusps[cusp_index],
+                                      multi_graph,
+                                      cusp_connected_graphs,
+                                      cusps[cusp_index]->dual_graph,
+                                      edges_begin[cusp_index],
+                                      edges_end[cusp_index]);
 
+
+
+        // update dive edges classes
+        update_edge_classes_on_cusp(cusps, cusp_index, edge_classes, multi_graph->num_cusps, multi_graph->num_edge_classes, edges_begin, edges_end);
     }
 }
-
 
 Graph *construct_edge_class_graph(CuspTriangle *triangle_begin, CuspTriangle *triangle_end,
                                   Boolean *edge_classes, int num_edge_classes) {
@@ -1983,7 +2008,124 @@ Graph *construct_edge_class_graph(CuspTriangle *triangle_begin, CuspTriangle *tr
     return g;
 }
 
-EdgeNode *find_primary_train_line(ManifoldBoundary *cusp, PathEndPoint **edges) {
+void find_edge_class_edges_on_cusp(ManifoldBoundary *cusp, EndMultiGraph *multi_graph, Graph **cusp_graphs, Graph *dual_graph,
+                                   int *edges_begin, int *edges_end) {
+    int edge_class, cusp_graph_index;
+    VertexIndex v1, v2;
+    FaceIndex face;
+    EdgeNode *node;
+    Boolean found;
+    Boolean *edge_classes = edge_classes_on_cusp(multi_graph, cusp->cusp->index);
+    CuspRegion *region;
+    CuspVertex *vertex1, *vertex2;
+
+    for (edge_class = 0; edge_class < multi_graph->num_edge_classes; edge_class++) {
+        if (!edge_classes[edge_class])
+            continue;
+
+        // find edge in cusp_graphs incident to edge_class
+        for (region = cusp->cusp_region_begin.next; region != &cusp->cusp_region_begin; region = region->next) {
+            for (face = 0; face < 4; face++) {
+                if (face == region->tet_vertex)
+                    continue;
+
+                if (!region->adj_cusp_triangle[face])
+                    continue;
+
+                v1 = remaining_face[region->tet_vertex][face];
+                v2 = remaining_face[face][region->tet_vertex];
+
+                vertex1 = &region->tri->vertices[v1];
+                vertex2 = &region->tri->vertices[v2];
+
+                if (vertex1->edge_class != edge_class && vertex2->edge_class != edge_class)
+                    continue;
+
+                if ((vertex1->edge_class == edge_class && !region->dive[face][v1]) ||
+                (vertex2->edge_class == edge_class && !region->dive[face][v2]))
+                    continue;
+
+                found = FALSE;
+                // is 'face' an edge of the cusp graphs?
+                for (cusp_graph_index = 0; cusp_graph_index < multi_graph->num_edge_classes; cusp_graph_index++) {
+                    if (cusp_graphs[cusp_graph_index] == NULL)
+                        continue;
+
+                    if (edge_exists(cusp_graphs[cusp_graph_index], vertex1->edge_class, vertex2->edge_class))
+                        found = TRUE;
+                }
+
+                if (!found)
+                    continue;
+
+                // region lies adjacent to an edge in the cusp graphs and can dive into the target edge class along face
+                edges_begin[edge_class] = region->index;
+                edges_end[edge_class]   = region->adj_cusp_regions[face]->index;
+            }
+        }
+    }
+}
+
+void update_edge_classes_on_cusp(ManifoldBoundary **cusps, int current_cusp_index, Boolean **edge_classes, int num_cusps, int num_edge_classes, int **edges_begin, int **edges_end) {
+    int cusp_index, other_cusp_index, edge_class;
+    VertexIndex v1, v2, vertex;
+    FaceIndex face;
+    CuspRegion *region1, *region2, *adj_region1, *adj_region2;
+    ManifoldBoundary *cusp = cusps[current_cusp_index];
+
+    for (edge_class = 0; edge_class < num_edge_classes; edge_class++) {
+        if (!edge_classes[current_cusp_index][edge_class])
+            continue;
+
+        region1 = get_region_from_index(&cusp->cusp_region_begin, &cusp->cusp_region_end, edges_begin[cusp->cusp->index][edge_class]);
+        region2 = get_region_from_index(&cusp->cusp_region_begin, &cusp->cusp_region_end, edges_end[cusp->cusp->index][edge_class]);
+
+        for (cusp_index = 0; cusp_index < num_cusps; cusp_index++) {
+            if (edge_classes[cusp_index][edge_class] && cusp_index != cusp->cusp->index)
+                other_cusp_index = cusp_index;
+        }
+
+        for (face = 0; face < 4; face++) {
+            if (face == region1->tet_vertex)
+                continue;
+
+            if (region1->adj_cusp_regions[face]->index == region2->index)
+                break;
+        }
+
+        v1 = remaining_face[region1->tet_vertex][face];
+        v2 = remaining_face[face][region1->tet_vertex];
+
+        if (region1->tri->vertices[v1].edge_class == edge_class)
+            vertex = v1;
+        else
+            vertex = v2;
+
+        edge_classes[other_cusp_index][edge_class] = FALSE;
+
+        adj_region1 = find_adj_dive_region(&cusps[other_cusp_index]->cusp_region_begin,
+                                           &cusps[other_cusp_index]->cusp_region_end,
+                                           region1, face, vertex);
+        adj_region2 = find_adj_dive_region(&cusps[other_cusp_index]->cusp_region_begin,
+                                           &cusps[other_cusp_index]->cusp_region_end,
+                                           region2,
+                                           EVALUATE(region1->tri->tet->gluing[face], face),
+                                           EVALUATE(region1->tri->tet->gluing[face], vertex));
+
+        edges_begin[other_cusp_index][edge_class] = adj_region1->index;
+        edges_end[other_cusp_index][edge_class] = adj_region2->index;
+    }
+}
+
+int *find_primary_train_line(ManifoldBoundary *cusp, EndMultiGraph *multi_graph, int *edges_start, int *edges_end, int *path_len) {
+    int *paths;
+
+    paths = dfs_target_edges(cusp->dual_graph, edges_start, edges_end, multi_graph->num_edge_classes, path_len);
+
+    return paths;
+}
+
+PathEndPoint **find_train_line_endpoints(ManifoldBoundary *cusp) {
 
 }
 
@@ -1991,7 +2133,46 @@ void update_cusp_regions_along_train_line(ManifoldBoundary *cusp) {
 
 }
 
+CuspRegion *get_region_from_index(CuspRegion *region_begin, CuspRegion *region_end, int index) {
+    CuspRegion *region, *retval = NULL;
 
+    for (region = region_begin->next; region != region_end; region = region->next) {
+        if (region->index != index)
+            continue;
+
+        retval = region;
+    }
+
+    if (retval == NULL) {
+        uFatalError("get_region_from_index", "symplectic_basis");
+        return NULL;
+    }
+
+    return retval;
+}
+
+CuspRegion *find_adj_dive_region(CuspRegion *region_begin, CuspRegion *region_end, CuspRegion *start_region, int face, int vertex) {
+    CuspRegion *region;
+
+    for (region = region_begin->next; region != region_end; region = region->next) {
+        if (region->tet_index != start_region->tet_index)
+            continue;
+
+        if (region->tet_vertex != vertex)
+            continue;
+
+        if (!region->adj_cusp_triangle[face])
+            continue;
+
+        if (!region->dive[face][start_region->tet_vertex])
+            continue;
+
+        return region;
+    }
+
+    uFatalError("find_adj_dive_region", "symplectic_basis");
+    return NULL;
+}
 
 // ------------------------------------
 
