@@ -16,7 +16,7 @@ int main(void) {
 
     int fromFile = 0;
 
-    int count = 1;
+    int count = 6;
     int numTet[] = {6, 7, 7, 7, 7, 7};
     int index[] = {776, 2208, 2652, 2942, 3140, 3507};
 
@@ -28,7 +28,7 @@ int main(void) {
                      "CuspedCensusData/7855.tri",
                      "CuspedCensusData/12442.tri"};
 
-    for (i = 0; i < count; i++) {
+    for (i = 5; i < count; i++) {
         if (fromFile) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
