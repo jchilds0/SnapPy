@@ -797,7 +797,7 @@ int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
  * Setup graph and cusp triangulation, and run construct dual curves.
  */
 
-static int debug = TRUE;
+static int debug = FALSE;
 
 int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, int *num_rows, int num_cols) {
     int i, j, k;
@@ -849,7 +849,7 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
             symp_eqns[i][j] = 0;
     }
 
-    do_manifold_train_lines(cusps, end_multi_graph);
+//    do_manifold_train_lines(cusps, end_multi_graph);
     do_oscillating_curves(cusps, oscillating_curves, end_multi_graph);
     calculate_holonomy(manifold, symp_eqns, manifold->num_tetrahedra);
 
@@ -2584,6 +2584,11 @@ Boolean is_valid_endpoint(CuspRegion *region, int edge_class, int edge_index, in
         return FALSE;
     }
 
+    if (region->adj_cusp_triangle[face] == TRUE && region->curve[face][vertex] == 0)
+        return TRUE;
+    else
+        return FALSE;
+
     return region->dive[face][vertex];
 }
 
@@ -2650,8 +2655,8 @@ PathEndPoint *find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoin
             region_index    = (Boolean) (region->tet_index != path_endpoint1->region->tet_index);
             region_vertex   = (Boolean) (region->tet_vertex != path_endpoint1->vertex);
             dive_vertex     = (Boolean) (vertex != path_endpoint1->region->tet_vertex);
-            region_dive     = (Boolean) !region->dive[path_endpoint1->face][vertex];
-            region_curve    = (Boolean) (region->num_adj_curves[path_endpoint1->face][vertex] != path_endpoint1->num_adj_curves[path_endpoint1->face][path_endpoint1->vertex]);
+            region_dive     = (Boolean) !region->adj_cusp_triangle[path_endpoint1->face]; //!region->dive[path_endpoint1->face][vertex];
+            region_curve    = (Boolean) region->curve[path_endpoint1->face][vertex]; //(region->num_adj_curves[path_endpoint1->face][vertex] != path_endpoint1->num_adj_curves[path_endpoint1->face][path_endpoint1->vertex]);
 
             if (region_index || region_vertex || dive_vertex || region_dive || region_curve)
                 continue;

@@ -47,7 +47,7 @@ void testDual(void) {
             if (j == 2208 || j == 2652 || j == 2942 || j == 3140 || j == 3507)
                 continue;
 
-            printf("Num Tet: %d Index: %d \n", index[i][0], j);
+//            printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
 
