@@ -1,6 +1,9 @@
+import random
 from datetime import datetime
 import snappy
 import unittest
+
+import spherogram
 from tqdm import tqdm
 from multiprocessing import Pool
 
@@ -116,8 +119,8 @@ class TestSymplecticBasis(unittest.TestCase):
 if __name__ == "__main__":
     # test_link_complements_pool(12, 50)
     # unittest.main()
-    for index in ERROR_MANIFOLDS:
-        M = snappy.HTLinkExteriors[index]
-        # print(M.identify()[0])
-        # basis = M.symplectic_basis()
-        M.save("CuspedCensusData/" + str(index) + '.tri')
+    for i in range(10):
+        L = spherogram.random_link(1000, num_components=random.randint(20, 40), alternating=True)
+        M = spherogram.Link.exterior(L)
+        print(M.num_cusps())
+        M.save("CuspedCensusData/link-" + str(i) + ".tri")
