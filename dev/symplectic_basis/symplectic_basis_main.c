@@ -18,7 +18,7 @@ int main(void) {
 
     int count = 7;
     int numTet[] = {6, 7, 7, 7, 7, 7};
-    int index[] = { 506, 2208, 2652, 2942, 3140, 3507};
+    int index[] = {785, 2208, 2652, 2942, 3140, 3507};
 
     char *error[] = {"CuspedCensusData/1.tri",
                      "CuspedCensusData/4.tri",
@@ -28,12 +28,22 @@ int main(void) {
                      "CuspedCensusData/7855.tri",
                      "CuspedCensusData/12442.tri"};
 
-    for (i = 1; i < count; i++) {
-        if (fromFile) {
+    char *link[] = {"CuspedCensusData/link-0.tri", 
+                    "CuspedCensusData/link-1.tri",
+                    "CuspedCensusData/link-2.tri",
+                    "CuspedCensusData/link-3.tri",
+                    "CuspedCensusData/link-4.tri"
+    };
+
+
+    for (i = 0; i < count; i++) {
+        if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
-        }
-        else {
+        } else if (fromFile == 2) {
+            printf("Triangulation: %s\n", link[i]);
+            theTriangulation = read_triangulation(link[i]);
+        } else {
             theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
             printf("Num Tet: %d Index: %d\n", numTet[i], index[i]);
         }
