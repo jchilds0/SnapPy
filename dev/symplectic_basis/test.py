@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # test_link_complements_pool(12, 50)
     # unittest.main()
     for i in range(10):
-        L = spherogram.random_link(1000, num_components=random.randint(20, 40), alternating=True)
+        L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
         M = spherogram.Link.exterior(L)
         print(M.num_cusps())
         M.save("CuspedCensusData/link-" + str(i) + ".tri")
