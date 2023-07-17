@@ -14,11 +14,11 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 0;
+    int fromFile = 2;
 
-    int count = 7;
+    int count = 1;
     int numTet[] = {6, 7, 7, 7, 7, 7};
-    int index[] = {785, 2208, 2652, 2942, 3140, 3507};
+    int index[] = {776, 2208, 2652, 2942, 3140, 3507};
 
     char *error[] = {"CuspedCensusData/1.tri",
                      "CuspedCensusData/4.tri",
