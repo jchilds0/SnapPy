@@ -1494,6 +1494,9 @@ void init_train_line(ManifoldBoundary *cusp) {
     cusp->train_line_path_end.next      = NULL;
     cusp->train_line_path_end.prev      = &cusp->train_line_path_begin;
 
+    cusp->extra_endpoint_e0.tri         = NULL;
+    cusp->extra_endpoint_e0.region      = NULL;
+    cusp->extra_endpoint_e0.node        = NULL;
 }
 
 DualCurves *init_dual_curve(int edge_class_start, int edge_class_finish) {
@@ -1694,6 +1697,16 @@ void print_debug_info(Triangulation *manifold, ManifoldBoundary **cusps, Oscilla
                     continue;
 
                 endpoint = &boundary->train_line_endpoint[j];
+                printf("        Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d Edge Class (%d, %d)\n",
+                       endpoint->region_index, endpoint->tri->tet_index,
+                       endpoint->tri->tet_vertex, endpoint->face, endpoint->vertex,
+                       endpoint->tri->vertices[endpoint->vertex].edge_class,
+                       endpoint->tri->vertices[endpoint->vertex].edge_index);
+            }
+
+            if (boundary->extra_endpoint_e0.tri != NULL) {
+                endpoint = &boundary->extra_endpoint_e0;
+
                 printf("        Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d Edge Class (%d, %d)\n",
                        endpoint->region_index, endpoint->tri->tet_index,
                        endpoint->tri->tet_vertex, endpoint->face, endpoint->vertex,
@@ -2403,6 +2416,9 @@ void do_train_line_segment_on_cusp(ManifoldBoundary **cusps, ManifoldBoundary *c
                             &cusp->train_line_path_end, start_endpoint, finish_endpoint);
     split_cusp_regions_along_train_line_segment(cusp, start_endpoint, finish_endpoint);
 
+    print_debug_info(cusp->manifold, cusps, NULL, 2);
+    print_debug_info(cusp->manifold, cusps, NULL, 1);
+
     finish_endpoint->node = cusp->train_line_path_end.prev;
     cusp->dual_graph = construct_cusp_region_dual_graph(cusp);
 }
@@ -2524,7 +2540,7 @@ void split_cusp_regions_along_train_line_segment(ManifoldBoundary *cusp, PathEnd
 
     for (node = path_begin->next; node != path_end && node->cusp_region_index != start_endpoint->region_index; node = node->next);
 
-    if (path_begin->next == path_end || node->next == path_end) {
+    if (path_begin->next == path_end || node == path_end) {
         // empty path
         return ;
     }
@@ -2572,8 +2588,8 @@ void update_cusp_triangle_train_line_endpoints(CuspRegion *cusp_region_start, Cu
     VertexIndex vertex1, vertex2;
     CuspRegion *current_region;
 
-    vertex1 = remaining_face[region->tet_vertex][path_endpoint->vertex];
-    vertex2 = remaining_face[path_endpoint->vertex][region->tet_vertex];
+    vertex1 = remaining_face[region->tet_vertex][node->next_face];
+    vertex2 = remaining_face[node->next_face][region->tet_vertex];
 
     for (current_region = cusp_region_start->next; current_region != cusp_region_end; current_region = current_region->next) {
         if (current_region == NULL || current_region->tet_index == -1)
@@ -2658,8 +2674,8 @@ CuspRegion *split_cusp_region_train_line_endpoint(CuspRegion *region, PathNode *
         region->dive[path_endpoint->vertex][vertex1]    = FALSE;
         region->dive[vertex1][vertex2]                  = FALSE;
         region->dive[path_endpoint->vertex][vertex2]    = FALSE;
-        region->adj_cusp_triangle[vertex1]              = FALSE;
-        region->adj_cusp_triangle[vertex2]              = FALSE;
+        region->adj_cusp_triangle[path_endpoint->vertex]= FALSE;
+        region->adj_cusp_triangle[path_endpoint->face == vertex1 ? vertex2 : vertex1] = FALSE;
     } else {
         uFatalError("split_cusp_region_train_line_endpoint", "symplectic_basis");
         return NULL;
@@ -2804,13 +2820,6 @@ void do_one_cusp_on_train_line(ManifoldBoundary *cusp, DualCurves *path) {
             break;
     }
 
-    for (; node->cusp_region_index != finish_region_index; node = node->next) {
-        if (node == &cusp->train_line_path_end)
-            uFatalError("do_one_cusp_on_train_line", "symplectic_basis");
-
-        // calculate combinatorial holonomy
-
-    }
 }
 
 /*
