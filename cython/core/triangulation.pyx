@@ -3039,10 +3039,10 @@ cdef class Triangulation():
 
         >>> M = Manifold("4_1")
         >>> M.symplectic_basis()                    # doctest:
-        [ 1  0  1  1]
-        [ 0  0  4  2]
+        [-1  0 -1 -1]
+        [ 2  0 -2  0]
         [-2 -1 -2 -1]
-        [ 0 -1 -2 -1]
+        [-2 -2 -4 -2]
 
         <https://arxiv.org/abs/2208.06969>
         """
@@ -3056,6 +3056,8 @@ cdef class Triangulation():
             raise ValueError('The Triangulation is empty.')
 
         eqns = []
+
+        # peripheral_curves(self.c_triangulation)
 
         # Cusp Equations
         for i in range(self.num_cusps()):

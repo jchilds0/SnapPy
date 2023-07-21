@@ -19,7 +19,7 @@ int main() {
 }
 
 void testDual(void) {
-    int **basis, dual_rows, dual_cols, i, j, k;
+    int **basis, dual_rows, dual_cols, i, j, k, retval1, retval2;
     Triangulation *theTriangulation;
 
     int failed[] = {0, 0, 0};
@@ -44,12 +44,19 @@ void testDual(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            printf("Num Tet: %d Index: %d \n", index[i][0], j);
+//            printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
 
             for (k = 0; k < dual_rows / 2; k ++) {
-                if (ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols)) == 2) {
+                retval1 = ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols));
+
+                if (2 * k + 2 < dual_rows)
+                    retval2 = ABS(omega(basis[2 * k], basis[2 * k + 2], dual_cols));
+                else
+                    retval2 = 0;
+
+                if (retval1 == 2 && retval2 == 0) {
 //                    printf("Passed\n");
                     continue;
                 }
