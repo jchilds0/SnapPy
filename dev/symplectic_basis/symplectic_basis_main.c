@@ -3,12 +3,15 @@
  */
 
 #include "SnapPea.h"
+#include "kernel.h"
 #include "unix_cusped_census.h"
 #include "unix_file_io.h"
 #include "addl_code.h"
 #include <stdio.h>
 
 void printMatrix(int**, int, int);
+int omega(int *, int *, int);
+void test_matrix(int **, int, int);
 
 int main(void) {
     int i, **eqns, num_rows, num_cols;
@@ -16,19 +19,15 @@ int main(void) {
 
     int fromFile = 1;
 
-    int count = 6;
+    int count = 3;
     int numTet[] = {6};
     int index[] = {596};
 
-    char *error[] = {"CuspedCensusData/1.tri",
-                     "CuspedCensusData/4.tri",
-                     "CuspedCensusData/35.tri",
-                     "CuspedCensusData/76.tri",
-                     "CuspedCensusData/7703.tri",
-                     "CuspedCensusData/7855.tri",
-                     "CuspedCensusData/12442.tri"};
+    char *error[] = {"CuspedCensusData/knot-0.tri",
+                     "CuspedCensusData/knot-1.tri",
+                     "CuspedCensusData/link-0.tri"};
 
-    char *link[] = {"CuspedCensusData/link-0.tri", 
+    char *link[] = {
                     "CuspedCensusData/link-1.tri",
                     "CuspedCensusData/link-2.tri",
                     "CuspedCensusData/link-3.tri",
@@ -54,6 +53,8 @@ int main(void) {
 
             eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
             printMatrix(eqns, num_cols, num_rows);
+            test_matrix(eqns, num_rows, num_cols);
+
             printf("---------------------------\n");
             free_symplectic_basis(eqns, num_rows);
             free_triangulation(theTriangulation);
@@ -62,6 +63,39 @@ int main(void) {
     }
 
     return 0;
+}
+
+void test_matrix(int **basis, int dual_rows, int dual_cols) {
+    int k, retval1, retval2;
+
+    for (k = 0; k < dual_rows / 2; k ++) {
+        retval1 = ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols));
+
+        if (2 * k + 2 < dual_rows)
+            retval2 = ABS(omega(basis[2 * k], basis[2 * k + 2], dual_cols));
+        else
+            retval2 = 0;
+
+        if (retval1 == 2 && retval2 == 0) {
+            continue;
+        }
+
+        printf("Failed");
+        return;
+    }
+
+    printf("Passed\n");
+}
+
+int omega(int *v1, int *v2, int num_cols) {
+    int i, yyval = 0;
+
+    for (i = 0; i < num_cols / 3; i++) {
+        yyval += ((v1[3 * i] - v1[3 * i + 2]) * (v2[3 * i + 1] - v2[3 * i + 2])
+                  - (v1[3 * i + 1] - v1[3 * i + 2]) * (v2[3 * i] - v2[3 * i + 2]));
+    }
+
+    return yyval;
 }
 
 

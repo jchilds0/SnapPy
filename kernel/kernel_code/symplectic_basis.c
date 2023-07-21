@@ -278,7 +278,6 @@ void                    do_one_cusp_to_new_edge_class(ManifoldBoundary *, DualCu
 void                    construct_cusp_region_dual_graph(ManifoldBoundary *);
 void                    print_debug_info(Triangulation *, ManifoldBoundary **, OscillatingCurves *, int);
 void                    find_path_endpoints(ManifoldBoundary *, DualCurves *, DualCurves *, int, int);
-Boolean                 is_valid_matching_endpoint(CuspRegion *, int, int, FaceIndex, VertexIndex);
 PathEndPoint            *find_single_endpoint(Graph *, PathEndPoint *, int, int);
 PathEndPoint            *find_single_matching_endpoint(Graph *, PathEndPoint *, PathEndPoint *, int, int);
 PathEndPoint            *find_train_line_endpoint(ManifoldBoundary *, PathEndPoint *, int, int, int);

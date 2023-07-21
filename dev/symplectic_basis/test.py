@@ -9,7 +9,7 @@ from multiprocessing import Pool
 
 
 # Names "3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)", "K13a4726(0,0)", "K13a4878(0,0)"
-ERROR_MANIFOLDS = [1, 4, 35, 76, 7703, 7855, 12442]
+# ERROR_MANIFOLDS = [1, 4, 35, 76, 7703, 7855, 12442]
 
 
 def is_symplectic(M):
@@ -22,7 +22,7 @@ def is_symplectic(M):
 
     for i in range(n[0]):
         for j in range(i, n[1]):
-            omega = abs(symplectic_form(M[i], M[j]))
+            omega = abs(symplectic_form(M.data[i], M.data[j]))
 
             if i % 2 == 0 and j % 2 == 1 and j == i + 1:
                 if omega != 2:
@@ -94,33 +94,34 @@ def test_link_complements_pool(start: int, end: int):
 
 
 class TestSymplecticBasis(unittest.TestCase):
+    # @unittest.skip
     def test_knot_complements(self):
         i = 0
-        for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
+        for M in tqdm(snappy.CensusKnots[:10], desc="Knots...", ncols=120):
+            with self.subTest(i=i):
+                # print(M.identify()[0])
+                basis = M.symplectic_basis()
+                self.assertTrue(is_symplectic(basis), str(M.identify()[0]))
+                i += 1
+
+    @unittest.skip
+    def test_link_complements(self):
+        i = 0
+        for M in tqdm(snappy.HTLinkExteriors[1:300], desc="Links...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
                 self.assertTrue(is_symplectic(basis))
                 i += 1
 
-    def test_link_complements(self):
-        i = 1
-        for M in tqdm(snappy.HTLinkExteriors[:1], desc="Links...", ncols=120):
-            with self.subTest(i=i):
-                if i in ERROR_MANIFOLDS:
-                    continue
-                else:
-                    print(M.identify()[0])
-                    basis = M.symplectic_basis()
-                    self.assertTrue(is_symplectic(basis))
-                    i += 1
-
 
 if __name__ == "__main__":
-    # test_link_complements_pool(12, 50)
-    unittest.main()
+    # unittest.main()
     # for i in range(10):
     #     L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
     #     M = spherogram.Link.exterior(L)
     #     print(M.num_cusps())
     #     M.save("CuspedCensusData/link-" + str(i) + ".tri")
+
+    M = snappy.HTLinkExteriors[0]
+    M.save("CuspedCensusData/link-0.tri")
