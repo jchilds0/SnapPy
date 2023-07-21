@@ -18,10 +18,10 @@ def is_symplectic(M):
     :param M: square matrix
     :return: true or false
     """
-    n = len(M)
+    n = M.dimensions()
 
-    for i in range(n):
-        for j in range(i, n):
+    for i in range(n[0]):
+        for j in range(i, n[1]):
             omega = abs(symplectic_form(M[i], M[j]))
 
             if i % 2 == 0 and j % 2 == 1 and j == i + 1:
@@ -100,27 +100,27 @@ class TestSymplecticBasis(unittest.TestCase):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
-                self.assertTrue(is_symplectic(basis.data))
+                self.assertTrue(is_symplectic(basis))
                 i += 1
 
     def test_link_complements(self):
-        i = 0
-        for M in tqdm(snappy.HTLinkExteriors[:300], desc="Links...", ncols=120):
+        i = 1
+        for M in tqdm(snappy.HTLinkExteriors[:1], desc="Links...", ncols=120):
             with self.subTest(i=i):
-                if str(M.identify()[0]) in ERROR_MANIFOLDS:
+                if i in ERROR_MANIFOLDS:
                     continue
                 else:
                     print(M.identify()[0])
                     basis = M.symplectic_basis()
-                    self.assertTrue(is_symplectic(basis.data))
+                    self.assertTrue(is_symplectic(basis))
                     i += 1
 
 
 if __name__ == "__main__":
     # test_link_complements_pool(12, 50)
-    # unittest.main()
-    for i in range(10):
-        L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
-        M = spherogram.Link.exterior(L)
-        print(M.num_cusps())
-        M.save("CuspedCensusData/link-" + str(i) + ".tri")
+    unittest.main()
+    # for i in range(10):
+    #     L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
+    #     M = spherogram.Link.exterior(L)
+    #     print(M.num_cusps())
+    #     M.save("CuspedCensusData/link-" + str(i) + ".tri")
