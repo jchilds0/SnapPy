@@ -17,15 +17,15 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 1;
+    int fromFile = 0;
 
-    int count = 3;
-    int numTet[] = {6};
-    int index[] = {596};
+    int count = 1;
+    int numTet[] = {5};
+    int index[] = {9};
 
     char *error[] = {"CuspedCensusData/knot-0.tri",
                      "CuspedCensusData/knot-1.tri",
-                     "CuspedCensusData/link-0.tri"};
+                     "CuspedCensusData/link-70k.tri"};
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",
@@ -75,6 +75,9 @@ void test_matrix(int **basis, int dual_rows, int dual_cols) {
             retval2 = ABS(omega(basis[2 * k], basis[2 * k + 2], dual_cols));
         else
             retval2 = 0;
+
+        if (2 * k + 3 < dual_rows)
+            retval2 += ABS(omega(basis[2 * k + 1], basis[2 * k + 3], dual_cols));
 
         if (retval1 == 2 && retval2 == 0) {
             continue;
