@@ -28,7 +28,7 @@ void testDual(void) {
                       {6, 0, 950},
                       {7, 0, 3550}
     };
-    int **passed = NEW_ARRAY(3, int *);
+    int *passed[3];
     passed[0] = NEW_ARRAY(index[0][2] - index[0][1], int);
     passed[1] = NEW_ARRAY(index[1][2] - index[1][1], int);
     passed[2] = NEW_ARRAY(index[2][2] - index[2][1], int);
@@ -56,12 +56,15 @@ void testDual(void) {
                 else
                     retval2 = 0;
 
+                if (2 * k + 3 < dual_rows)
+                    retval2 += ABS(omega(basis[2 * k + 1], basis[2 * k + 3], dual_cols));
+
                 if (retval1 == 2 && retval2 == 0) {
 //                    printf("Passed\n");
                     continue;
                 }
 
-//                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
+                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
                 //printMatrix(basis, dual_cols, dual_rows);
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
@@ -77,6 +80,10 @@ void testDual(void) {
     for (i = 0; i < 3; i++) {
         printf("    (Num. of Tet %d) Failed: %d out of %d tests\n", index[i][0], failed[i], count[i]);
     }
+
+    my_free(passed[0]);
+    my_free(passed[1]);
+    my_free(passed[2]);
 }
 
 int omega(int *v1, int *v2, int num_cols) {
