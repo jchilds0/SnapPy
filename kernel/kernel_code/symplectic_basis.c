@@ -166,7 +166,6 @@ typedef struct CuspRegion {
     int                         num_adj_curves[4][4];   /** stores the number of curves between a region and a face */
     int                         temp_adj_curves[4][4];  /** store the adj curve until pathfinding is complete */
     struct CuspRegion           *adj_cusp_regions[4];   /** index of the adjacent regions */
-    struct CuspRegion           *adj_dive_regions[4];   /** regions which are adjacent by diving through the manifold */
     struct CuspRegion           *next;                  /** next cusp region in doubly linked list */
     struct CuspRegion           *prev;                  /** prev cusp region in doubly linked list */
 } CuspRegion;
@@ -1305,8 +1304,8 @@ void set_cusp_region_data(CuspRegion *cusp_region_end, CuspTriangle *tri, const 
 
     // default values
     for (i = 0; i < 4; i++) {
-        region->adj_cusp_triangle[i] = 0;
-        region->adj_dive_regions[i]  = NULL;
+        region->adj_cusp_triangle[i] = FALSE;
+        region->adj_cusp_regions[i]  = NULL;
 
         for (j = 0; j < 4; j++) {
             region->curve[i][j]             = -1;
@@ -1361,35 +1360,49 @@ CuspRegion *find_adj_region(CuspRegion *cusp_region_begin, CuspRegion *cusp_regi
     int v1, v2, y_vertex1, y_vertex2, y_face, distance_v1, distance_v2, tet_index, tet_vertex;
     Boolean adj_face;
     CuspTriangle *tri = x->tri;
-    CuspRegion *y;
+    CuspRegion *region;
 
     v1 = (int) remaining_face[tri->tet_vertex][face];
     v2 = (int) remaining_face[face][tri->tet_vertex];
 
-    for (y = cusp_region_begin->next; y != cusp_region_end; y = y->next) {
-        y_vertex1    = EVALUATE(tri->tet->gluing[face], v1);
-        y_vertex2    = EVALUATE(tri->tet->gluing[face], v2);
-        y_face       = EVALUATE(tri->tet->gluing[face], face);
+    y_vertex1    = EVALUATE(tri->tet->gluing[face], v1);
+    y_vertex2    = EVALUATE(tri->tet->gluing[face], v2);
+    y_face       = EVALUATE(tri->tet->gluing[face], face);
 
-        tet_index    = (tri->neighbours[face]->tet_index == y->tet_index);
-        tet_vertex   = (tri->neighbours[face]->tet_vertex == y->tet_vertex);
+    // Check current adj region first
+    if (x->adj_cusp_regions[face] != NULL) {
+        distance_v1      = (x->curve[face][v1] == x->adj_cusp_regions[face]->curve[y_face][y_vertex1]);
+        distance_v2      = (x->curve[face][v2] == x->adj_cusp_regions[face]->curve[y_face][y_vertex2]);
+        adj_face         = x->adj_cusp_regions[face]->adj_cusp_triangle[y_face];
+
+        if (distance_v1 && distance_v2 && adj_face)
+            return x->adj_cusp_regions[face];
+    }
+
+    /*
+     * We search through the regions in reverse as the new regions
+     * are added to the end of the doubly linked list
+     */
+    for (region = cusp_region_end->prev; region != cusp_region_begin; region = region->prev) {
+        tet_index    = (tri->neighbours[face]->tet_index == region->tet_index);
+        tet_vertex   = (tri->neighbours[face]->tet_vertex == region->tet_vertex);
 
         if (!tet_index || !tet_vertex)
             continue;
 
-        distance_v1      = (x->curve[face][v1] == y->curve[y_face][y_vertex1]);
-        distance_v2      = (x->curve[face][v2] == y->curve[y_face][y_vertex2]);
-        adj_face         = y->adj_cusp_triangle[y_face];
+        distance_v1      = (x->curve[face][v1] == region->curve[y_face][y_vertex1]);
+        distance_v2      = (x->curve[face][v2] == region->curve[y_face][y_vertex2]);
+        adj_face         = region->adj_cusp_triangle[y_face];
 
         // missing distance
-        if (y->curve[y_face][y_vertex1] == -1 || y->curve[y_face][y_vertex2] == -1)
+        if (region->curve[y_face][y_vertex1] == -1 || region->curve[y_face][y_vertex2] == -1)
             uFatalError("find_adj_region", "symplectic_basis");
 
         if (distance_v1 && distance_v2 && adj_face)
-            return y;
+            return region;
     }
 
-    // We didn't find a cusp y
+    // We didn't find a cusp region
     //uFatalError("find_cusp_region", "symplectic_basis");
     return NULL;
 }
