@@ -19,7 +19,7 @@ int main() {
 }
 
 void testDual(void) {
-    int **basis, dual_rows, dual_cols, i, j, k, retval1, retval2;
+    int **basis, dual_rows, dual_cols, i, j, k, l, retval1, retval2;
     Triangulation *theTriangulation;
 
     int failed[] = {0, 0, 0};
@@ -48,23 +48,21 @@ void testDual(void) {
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
 
-            for (k = 0; k < dual_rows / 2; k ++) {
+            for (k = 0; 2 * k + 1 < dual_rows; k++) {
                 retval1 = ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols));
 
-                if (2 * k + 2 < dual_rows)
-                    retval2 = ABS(omega(basis[2 * k], basis[2 * k + 2], dual_cols));
-                else
-                    retval2 = 0;
-
-                if (2 * k + 3 < dual_rows)
-                    retval2 += ABS(omega(basis[2 * k + 1], basis[2 * k + 3], dual_cols));
+                retval2 = 0;
+                for (l = 2 * k + 2; 2 * l < dual_rows; l++) {
+                    retval2 += ABS(omega(basis[2 * k], basis[2 * l], dual_cols));
+                    retval2 += ABS(omega(basis[2 * k + 1], basis[2 * l], dual_cols));
+                }
 
                 if (retval1 == 2 && retval2 == 0) {
 //                    printf("Passed\n");
                     continue;
                 }
 
-                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
+//                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
                 //printMatrix(basis, dual_cols, dual_rows);
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
