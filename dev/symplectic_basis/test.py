@@ -97,17 +97,16 @@ class TestSymplecticBasis(unittest.TestCase):
     # @unittest.skip
     def test_knot_complements(self):
         i = 0
-        for M in tqdm(snappy.CensusKnots[:10], desc="Knots...", ncols=120):
+        for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
                 self.assertTrue(is_symplectic(basis), str(M.identify()[0]))
                 i += 1
 
-    @unittest.skip
     def test_link_complements(self):
         i = 0
-        for M in tqdm(snappy.HTLinkExteriors[1:300], desc="Links...", ncols=120):
+        for M in tqdm(snappy.HTLinkExteriors[1:1000], desc="Links...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
@@ -116,12 +115,12 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # unittest.main()
+    unittest.main()
     # for i in range(10):
     #     L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
     #     M = spherogram.Link.exterior(L)
     #     print(M.num_cusps())
     #     M.save("CuspedCensusData/link-" + str(i) + ".tri")
 
-    M = snappy.HTLinkExteriors[0]
-    M.save("CuspedCensusData/link-0.tri")
+    # M = snappy.HTLinkExteriors[0]
+    # M.save("CuspedCensusData/link-0.tri")
