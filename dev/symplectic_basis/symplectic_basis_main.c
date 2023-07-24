@@ -17,11 +17,11 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 0;
+    int fromFile = 1;
 
-    int count = 1;
+    int count = 3;
     int numTet[] = {5};
-    int index[] = {9};
+    int index[] = {7};
 
     char *error[] = {"CuspedCensusData/knot-0.tri",
                      "CuspedCensusData/knot-1.tri",
@@ -52,7 +52,7 @@ int main(void) {
                 continue;
 
             eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
-            printMatrix(eqns, num_cols, num_rows);
+//            printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 
             printf("---------------------------\n");
@@ -83,7 +83,7 @@ void test_matrix(int **basis, int dual_rows, int dual_cols) {
             continue;
         }
 
-        printf("Failed");
+        printf("Failed\n");
         return;
     }
 
