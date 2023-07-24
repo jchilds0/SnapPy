@@ -69,6 +69,14 @@ def find_manifold(start: int):
             return True
 
 
+def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
+    for i in range(n):
+        L = spherogram.random_link(n_tet, n_cusps, alternating=True)
+        M = spherogram.Link.exterior(L)
+        print(M.num_cusps())
+        M.save(f"CuspedCensusData/link-{n_tet}-{n_cusps}-{i}.tri")
+
+
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
     for i in range(start, end):
@@ -94,7 +102,6 @@ def test_link_complements_pool(start: int, end: int):
 
 
 class TestSymplecticBasis(unittest.TestCase):
-    # @unittest.skip
     def test_knot_complements(self):
         i = 0
         for M in tqdm(snappy.CensusKnots, desc="Knots...", ncols=120):
@@ -104,6 +111,7 @@ class TestSymplecticBasis(unittest.TestCase):
                 self.assertTrue(is_symplectic(basis), str(M.identify()[0]))
                 i += 1
 
+    # @unittest.skip
     def test_link_complements(self):
         i = 0
         for M in tqdm(snappy.HTLinkExteriors[1:1000], desc="Links...", ncols=120):
@@ -113,14 +121,17 @@ class TestSymplecticBasis(unittest.TestCase):
                 self.assertTrue(is_symplectic(basis))
                 i += 1
 
+    @unittest.skip
+    def test_random_links(self):
+        iterations = 10
+
+        for i in tqdm(range(iterations), desc="Random Links...", ncols=120):
+            with self.subTest(i=i):
+                L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
+                M = spherogram.Link.exterior(L)
+                basis = M.symplectic_basis()
+                self.assertTrue(is_symplectic(basis))
+
 
 if __name__ == "__main__":
     unittest.main()
-    # for i in range(10):
-    #     L = spherogram.random_link(100, num_components=random.randint(3, 10), alternating=True)
-    #     M = spherogram.Link.exterior(L)
-    #     print(M.num_cusps())
-    #     M.save("CuspedCensusData/link-" + str(i) + ".tri")
-
-    # M = snappy.HTLinkExteriors[0]
-    # M.save("CuspedCensusData/link-0.tri")
