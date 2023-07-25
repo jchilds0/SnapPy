@@ -3069,7 +3069,7 @@ cdef class Triangulation():
 
         eqns = []
 
-        # peripheral_curves(self.c_triangulation)
+        peripheral_curves(self.c_triangulation)
 
         # Cusp Equations
         for i in range(self.num_cusps()):
