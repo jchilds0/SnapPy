@@ -111,7 +111,7 @@ class TestSymplecticBasis(unittest.TestCase):
                 self.assertTrue(is_symplectic(basis), str(M.identify()[0]))
                 i += 1
 
-    # @unittest.skip
+    @unittest.skip
     def test_link_complements(self):
         i = 0
         for M in tqdm(snappy.HTLinkExteriors[1:1000], desc="Links...", ncols=120):

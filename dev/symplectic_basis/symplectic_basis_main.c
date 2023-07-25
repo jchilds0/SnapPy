@@ -20,8 +20,8 @@ int main(void) {
     int fromFile = 1;
 
     int count = 3;
-    int numTet[] = {5};
-    int index[] = {7};
+    int numTet[] = {6};
+    int index[] = {443};
 
     char *error[] = {"CuspedCensusData/knot-0.tri",
                      "CuspedCensusData/knot-1.tri",
