@@ -19,13 +19,11 @@ int main(void) {
 
     int fromFile = 1;
 
-    int count = 3;
+    int count = 1;
     int numTet[] = {6};
     int index[] = {443};
 
-    char *error[] = {"CuspedCensusData/knot-0.tri",
-                     "CuspedCensusData/knot-1.tri",
-                     "CuspedCensusData/link-70k.tri"};
+    char *error[] = {"CuspedCensusData/link-70k.tri"};
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",
@@ -52,7 +50,7 @@ int main(void) {
                 continue;
 
             eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
-//            printMatrix(eqns, num_cols, num_rows);
+            printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 
             printf("---------------------------\n");
