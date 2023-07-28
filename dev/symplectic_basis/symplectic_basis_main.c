@@ -17,11 +17,11 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 1;
+    int fromFile = 0;
 
     int count = 1;
     int numTet[] = {6};
-    int index[] = {443};
+    int index[] = {774};
 
     char *error[] = {"CuspedCensusData/link-70k.tri"};
 
