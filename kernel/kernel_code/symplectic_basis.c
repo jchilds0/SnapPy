@@ -3507,27 +3507,27 @@ void update_adj_curve_along_path(ManifoldBoundary **cusps, OscillatingCurves *cu
     ManifoldBoundary *cusp;
     Triangulation *manifold = cusps[0]->manifold;
 
-//    // Update regions curve data
-//    for (curve = dual_curve_begin->next; curve != dual_curve_end; curve = curve->next)
-//        update_adj_curve_on_cusp(cusps[curve->cusp_index]);
-//
-//    // update endpoint curve data
-//    for (i = 0; i < curve_index; i++) {
-//        // which oscillating curve
-//
-//        for (curve = curves->dual_curve_begin[i].next; curve != &curves->dual_curve_end[i]; curve = curve->next) {
-//            // which component of the curve
-//
-//            for (j = 0; j < 2; j++) {
-//                // which end point
-//
-////                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_begin->next, 0);
-////                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_end->prev, 0);
-//                for (path = dual_curve_begin->next; path != dual_curve_end; path = path->next)
-//                    update_adj_curve_at_endpoint(&curve->endpoints[j], path, 0);
-//            }
-//        }
-//    }
+    // Update regions curve data
+    for (curve = dual_curve_begin->next; curve != dual_curve_end; curve = curve->next)
+        update_adj_curve_on_cusp(cusps[curve->cusp_index]);
+
+    // update endpoint curve data
+    for (i = 0; i < curve_index; i++) {
+        // which oscillating curve
+
+        for (curve = curves->dual_curve_begin[i].next; curve != &curves->dual_curve_end[i]; curve = curve->next) {
+            // which component of the curve
+
+            for (j = 0; j < 2; j++) {
+                // which end point
+
+//                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_begin->next, 0);
+//                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_end->prev, 0);
+                for (path = dual_curve_begin->next; path != dual_curve_end; path = path->next)
+                    update_adj_curve_at_endpoint(&curve->endpoints[j], path, 0);
+            }
+        }
+    }
 
     // update train line endpoints
     for (i = 0; i < manifold->num_cusps; i++) {
