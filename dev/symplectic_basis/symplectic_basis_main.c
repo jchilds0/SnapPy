@@ -20,8 +20,8 @@ int main(void) {
     int fromFile = 1;
 
     int count = 1;
-    int numTet[] = {6};
-    int index[] = {568};
+    int numTet[] = {};
+    int index[] = {};
 
     char *error[] = {"CuspedCensusData/link-70k.tri"};
 
