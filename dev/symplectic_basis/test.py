@@ -36,6 +36,7 @@ def symplectic_form(u, v):
 def process_manifold(i: int):
     index = random.randint(1, 200000)
     M = snappy.HTLinkExteriors[index]
+
     if len(M.identify()) > 0:
         label = M.identify()[0]
     else:
@@ -45,7 +46,7 @@ def process_manifold(i: int):
         return True
 
     with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-        print(index)
+        # print(index)
         basis = M.symplectic_basis()
         result = is_symplectic(basis)
 
@@ -90,7 +91,6 @@ def test_link_complements_pool(start: int, end: int):
             for j, res in enumerate(result):
                 if not res:
                     passed = 'Failed'
-                    break
 
         with open("logs/total.log", "a") as file:
             file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    {passed}\n")
@@ -129,7 +129,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # test_link_complements_pool(0, 1)
+    test_link_complements_pool(0, 1)
     # unittest.main()
-    M = snappy.HTLinkExteriors[159285]
-    M.symplectic_basis()
+    # M = snappy.HTLinkExteriors[159285]
+    # M.symplectic_basis()

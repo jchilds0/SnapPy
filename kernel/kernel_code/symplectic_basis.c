@@ -734,8 +734,8 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
     label_triangulation_edges(manifold);
 
     CuspStructure **cusps                   = NEW_ARRAY(manifold->num_cusps, CuspStructure *);
-    Cusp *cusp                              = manifold->cusp_list_begin.next;
     EndMultiGraph *end_multi_graph          = init_end_multi_graph(manifold);
+    Cusp *cusp;
 
     for (i = 0; i < end_multi_graph->num_edge_classes; i++)
         edge_classes[i] = end_multi_graph->edge_classes[i] == TRUE ? FALSE : TRUE;
@@ -745,8 +745,12 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
     OscillatingCurves *dual_curves   = init_oscillating_curves(manifold, edge_classes);
 
     for (i = 0; i < manifold->num_cusps; i++) {
+        for (cusp = manifold->cusp_list_begin.next; cusp != &manifold->cusp_list_end && cusp->index != i; cusp = cusp->next);
+
+        if (cusp == &manifold->cusp_list_end)
+            uFatalError("get_symplectic_equations", "symplectic_basis");
+
         cusps[i] = init_cusp_structure(manifold, cusp);
-        cusp = cusp->next;
     }
 
     Tetrahedron *tet;
