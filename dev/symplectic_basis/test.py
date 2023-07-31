@@ -8,10 +8,6 @@ from tqdm import tqdm
 from multiprocessing import Pool
 
 
-# Names "3_1(0,0)", "5_1(0,0)", "8_19(0,0)", "9_1(0,0)", "K13a4726(0,0)", "K13a4878(0,0)"
-# ERROR_MANIFOLDS = [1, 4, 35, 76, 7703, 7855, 12442]
-
-
 def is_symplectic(M):
     """
     Test if the matrix M is symplectic
@@ -38,24 +34,27 @@ def symplectic_form(u, v):
 
 
 def process_manifold(i: int):
-    M = snappy.HTLinkExteriors[i]
-    label = M.identify()
+    index = random.randint(1, 200000)
+    M = snappy.HTLinkExteriors[index]
+    if len(M.identify()) > 0:
+        label = M.identify()[0]
+    else:
+        label = ""
 
-    if i in ERROR_MANIFOLDS:
+    if i == 0:
         return True
 
     with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-        test = "Testing: " + str(i) + ' ' + str(label)
-        file.write(test)
-
+        print(index)
         basis = M.symplectic_basis()
-        result = is_symplectic(basis.data)
+        result = is_symplectic(basis)
 
         if result:
-            string = "Passed\n"
+            string = "Passed"
         else:
-            string = "Failed\n"
-        file.write((60 - len(test)) * " " + str(string))
+            string = "Failed"
+
+        file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
     return result
 
@@ -80,25 +79,21 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
     for i in range(start, end):
-        passed = True
+        passed = 'Passed'
 
         with open("logs/total.log", "a") as file:
-            file.write("[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   " + "Testing: " + str(scale * i) + " - " + str(scale * (i + 1) - 1) + "\n")
+            file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * i)} - {str(scale * (i + 1) - 1)}\n")
 
         with Pool() as pool:
             result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
             for j, res in enumerate(result):
                 if not res:
-                    passed = False
+                    passed = 'Failed'
                     break
 
         with open("logs/total.log", "a") as file:
-            time = "[" + datetime.now().strftime("%d-%m-%y %H:%M:%S") + "]   "
-            if passed:
-                file.write(time + "Passed\n")
-            else:
-                file.write(time + "Failed\n")
+            file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    {passed}\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -114,7 +109,7 @@ class TestSymplecticBasis(unittest.TestCase):
     @unittest.skip
     def test_link_complements(self):
         i = 0
-        for M in tqdm(snappy.HTLinkExteriors[1:1000], desc="Links...", ncols=120):
+        for M in tqdm(snappy.HTLinkExteriors[1:5000], desc="Links...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
@@ -134,4 +129,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # test_link_complements_pool(0, 1)
+    # unittest.main()
+    M = snappy.HTLinkExteriors[159285]
+    M.symplectic_basis()
