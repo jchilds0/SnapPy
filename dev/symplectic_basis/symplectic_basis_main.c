@@ -21,9 +21,9 @@ int main(void) {
 
     int count = 1;
     int numTet[] = {6};
-    int index[] = {774};
+    int index[] = {568};
 
-    char *error[] = {"CuspedCensusData/knot-799.tri"};
+    char *error[] = {"CuspedCensusData/link-70k.tri"};
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",
