@@ -54,7 +54,7 @@ def process_manifold(i: int):
         string = "Failed"
 
     with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-        file.write(f"Testing: {str(index)} {(10 - len(str(index))) * ' '} {str(label)} {(30 - len(str(label))) * ' '} {string} \n")
+        file.write(f"Testing: {str(i)} {(10 - len(str(i))) * ' '} {str(label)} {(30 - len(str(label))) * ' '} {string} \n")
 
     return result
 
