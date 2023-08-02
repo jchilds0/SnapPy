@@ -86,7 +86,7 @@ def test_link_complements_pool(start: int, end: int):
         #     process_manifold(i)
 
         with Pool() as pool:
-            result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
+            result = list(pool.imap(process_manifold, range(scale * i, scale * (i + 1))))
 
             with open("logs/total.log", "a") as file:
                 file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
