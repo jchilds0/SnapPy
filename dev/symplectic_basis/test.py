@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import snappy
 import unittest
 
@@ -34,8 +34,8 @@ def symplectic_form(u, v):
 
 
 def process_manifold(i: int):
-    index = random.randint(1, 200000)
-    M = snappy.HTLinkExteriors[index]
+    # index = random.randint(1, 200000)
+    M = snappy.HTLinkExteriors[i]
 
     if len(M.identify()) > 0:
         label = M.identify()[0]
@@ -45,17 +45,16 @@ def process_manifold(i: int):
     if i == 0:
         return True
 
+    basis = M.symplectic_basis()
+    result = is_symplectic(basis)
+
+    if result:
+        string = "Passed"
+    else:
+        string = "Failed"
+
     with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-        # print(index)
-        basis = M.symplectic_basis()
-        result = is_symplectic(basis)
-
-        if result:
-            string = "Passed"
-        else:
-            string = "Failed"
-
-        file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
+        file.write(f"Testing: {str(index)} {(10 - len(str(index))) * ' '} {str(label)} {(30 - len(str(label))) * ' '} {string} \n")
 
     return result
 
@@ -80,20 +79,17 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
     for i in range(start, end):
-        passed = 'Passed'
-
         with open("logs/total.log", "a") as file:
             file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * i)} - {str(scale * (i + 1) - 1)}\n")
+
+        # for i in range(scale * i, scale * (i + 1)):
+        #     process_manifold(i)
 
         with Pool() as pool:
             result = pool.imap(process_manifold, range(scale * i, scale * (i + 1)))
 
-            for j, res in enumerate(result):
-                if not res:
-                    passed = 'Failed'
-
-        with open("logs/total.log", "a") as file:
-            file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    {passed}\n")
+            with open("logs/total.log", "a") as file:
+                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -129,7 +125,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements_pool(0, 1)
+    test_link_complements_pool(0, 5)
     # unittest.main()
     # M = snappy.HTLinkExteriors[159285]
     # M.symplectic_basis()
