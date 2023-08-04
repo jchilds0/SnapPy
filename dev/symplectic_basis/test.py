@@ -102,10 +102,10 @@ class TestSymplecticBasis(unittest.TestCase):
                 self.assertTrue(is_symplectic(basis), str(M.identify()[0]))
                 i += 1
 
-    @unittest.skip
+    # @unittest.skip
     def test_link_complements(self):
         i = 0
-        for M in tqdm(snappy.HTLinkExteriors[1:5000], desc="Links...", ncols=120):
+        for M in tqdm(snappy.HTLinkExteriors[1:1000], desc="Links...", ncols=120):
             with self.subTest(i=i):
                 # print(M.identify()[0])
                 basis = M.symplectic_basis()
@@ -125,7 +125,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements_pool(0, 5)
-    # unittest.main()
+    # test_link_complements_pool(0, 5)
+    unittest.main()
     # M = snappy.HTLinkExteriors[159285]
     # M.symplectic_basis()

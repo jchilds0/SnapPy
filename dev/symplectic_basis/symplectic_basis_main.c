@@ -23,7 +23,7 @@ int main(void) {
     int numTet[] = {};
     int index[] = {};
 
-    char *error[] = {"CuspedCensusData/link-115956.tri"};
+    char *error[] = {"CuspedCensusData/link-3862.tri"};
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",
