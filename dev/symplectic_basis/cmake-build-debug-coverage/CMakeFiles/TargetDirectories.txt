@@ -1,0 +1,6 @@
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/symplectic_basis.dir
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/symplectic_basis_test.dir
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/clean-all.dir
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/test.dir
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/edit_cache.dir
+/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage/CMakeFiles/rebuild_cache.dir

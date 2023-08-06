@@ -20,10 +20,10 @@ int main(void) {
     int fromFile = 1;
 
     int count = 1;
-    int numTet[] = {};
-    int index[] = {};
+    int numTet[] = {5};
+    int index[] = {4};
 
-    char *error[] = {"CuspedCensusData/link-3862.tri"};
+    char *error[] = {"CuspedCensusData/link-115956.tri"};
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",

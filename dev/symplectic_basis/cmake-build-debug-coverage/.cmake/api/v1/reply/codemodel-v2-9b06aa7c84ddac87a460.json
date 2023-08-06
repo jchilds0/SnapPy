@@ -1,0 +1,78 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "SnapPea",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "clean-all::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-clean-all-Debug-bd30e919d448917985de.json",
+					"name" : "clean-all",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "symplectic_basis::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-symplectic_basis-Debug-65bf126a7f3c7f9306ec.json",
+					"name" : "symplectic_basis",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "symplectic_basis_test::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-symplectic_basis_test-Debug-43ea7097ceb3debb84c2.json",
+					"name" : "symplectic_basis_test",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage",
+		"source" : "/home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 4
+	}
+}
