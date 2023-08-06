@@ -1,4 +1,0 @@
-/home/josh/Documents/clion-2023/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_C_FLAGS=--coverage -G "CodeBlocks - Unix Makefiles" -S /home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis -B /home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage
--- Configuring done
--- Generating done
--- Build files have been written to: /home/josh/Documents/Honours-Research-Project/development/SnapPy/dev/symplectic_basis/cmake-build-debug-coverage
