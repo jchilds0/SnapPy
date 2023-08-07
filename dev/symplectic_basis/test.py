@@ -1,11 +1,12 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 import snappy
 import unittest
 
 import spherogram
 from tqdm import tqdm
 from multiprocessing import Pool
+import itertools
 
 
 def is_symplectic(M):
@@ -77,19 +78,21 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
 
 
 def test_link_complements_pool(start: int, end: int):
-    scale = 1000
-    for i in range(start, end):
-        with open("logs/total.log", "a") as file:
-            file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * i)} - {str(scale * (i + 1) - 1)}\n")
+    scale = 5000
+    with open("logs/total.log", "a") as file:
+        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
 
         # for i in range(scale * i, scale * (i + 1)):
         #     process_manifold(i)
 
-        with Pool() as pool:
-            result = list(pool.imap(process_manifold, range(scale * i, scale * (i + 1))))
+    with Pool(maxtasksperchild=50) as pool:
+        result = pool.imap(process_manifold, range(scale * start, scale * end))
+
+        for _ in range(start, end):
+            lst = list(itertools.islice(result, scale))
 
             with open("logs/total.log", "a") as file:
-                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
+                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -125,7 +128,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # test_link_complements_pool(0, 5)
-    unittest.main()
+    test_link_complements_pool(0, 100)
+    # unittest.main()
     # M = snappy.HTLinkExteriors[159285]
     # M.symplectic_basis()
