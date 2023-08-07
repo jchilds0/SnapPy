@@ -78,14 +78,14 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
 
 
 def test_link_complements_pool(start: int, end: int):
-    scale = 5000
+    scale = 1000
     with open("logs/total.log", "a") as file:
         file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
 
         # for i in range(scale * i, scale * (i + 1)):
         #     process_manifold(i)
 
-    with Pool(maxtasksperchild=50) as pool:
+    with Pool(maxtasksperchild=25) as pool:
         result = pool.imap(process_manifold, range(scale * start, scale * end))
 
         for _ in range(start, end):
