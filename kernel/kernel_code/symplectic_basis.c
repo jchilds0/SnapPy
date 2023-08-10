@@ -259,7 +259,7 @@ void                    find_edge_class_edges(CuspStructure **, EndMultiGraph *)
 void                    find_edge_class_edges_on_cusp(CuspStructure *, EndMultiGraph *, const Boolean *, const int *);
 void                    find_e0_edges_on_cusp(CuspStructure **, EndMultiGraph *, const int *);
 Boolean                 *update_edge_classes_on_cusp(CuspStructure **, Boolean **, int, int, int);
-void                    find_primary_train_line(CuspStructure *, EndMultiGraph *);
+void                    find_primary_train_line(CuspStructure **, CuspStructure *, EndMultiGraph *);
 void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 int                     next_valid_endpoint_index(PathEndPoint *, int, int);
@@ -473,22 +473,20 @@ int insert_edge(Graph *g, int x, int y, Boolean directed) {
  */
 
 void delete_edge(Graph *g, int vertex_x, int vertex_y, Boolean directed) {
-    EdgeNode *node, *deleted_node;
+    EdgeNode *node;
 
-    node = &g->edge_list_begin[vertex_x];
+    for (node = g->edge_list_begin[vertex_x].next;
+        node != &g->edge_list_end[vertex_x] && node->y != vertex_y;
+        node = node->next);
 
-    while (node->next->y != vertex_y  && (node = node->next) != NULL);
-
-    if (node == NULL)
+    if (node == &g->edge_list_end[vertex_x])
         return;
 
-    deleted_node = node->next;
-    node->next = node->next->next;
-    node->next->next->prev = node;
-    my_free(deleted_node);
+    REMOVE_NODE(node)
+    my_free(node);
 
     if (!directed) {
-        delete_edge(g, vertex_y, vertex_x, directed);
+        delete_edge(g, vertex_y, vertex_x, TRUE);
     }
 }
 
@@ -567,7 +565,9 @@ void find_path(int start, int end, int *parents, EdgeNode *node) {
 
     INSERT_AFTER(new_node, node);
 
-    if ((start == end) || (end == -1)) {
+    if (end == -1) {
+        uFatalError("find_path", "symplectic_basis");
+    } else if (start == end) {
         new_node->y = start;
     } else {
         find_path(start, parents[end], parents, node);
@@ -1533,6 +1533,8 @@ void construct_cusp_region_dual_graph(CuspStructure *cusp) {
     cusp->dual_graph = graph1;
 }
 
+// TODO: write debug to file, add path node info.
+
 /*
  * flag
  *  - 0: Gluing info
@@ -1638,8 +1640,8 @@ void print_debug_info(Triangulation *manifold, CuspStructure **cusps, Oscillatin
             printf("Boundary %d\n", i);
 
             cusp = cusps[i];
-            for (j = 0; j < cusp->num_cusp_triangles; j++) {
-                printf("    Cusp Triangle (Tet Index %d Tet Vertex %d", j / 4, j % 4);
+            for (j = 0; j < 4 * cusp->manifold->num_tetrahedra; j++) {
+                printf("    Cusp Triangle (Tet Index %d Tet Vertex %d)\n", j / 4, j % 4);
                 for (region = cusp->cusp_region_begin[j].next;
                      region != &cusp->cusp_region_end[j]; region = region->next) {
                     v1 = edgesThreeToFour[region->tet_vertex][0];
@@ -1904,7 +1906,7 @@ void do_manifold_train_lines(CuspStructure **cusps, EndMultiGraph *multi_graph) 
     find_edge_class_edges(cusps, multi_graph);
 
     for (cusp_index = 0; cusp_index < multi_graph->num_cusps; cusp_index++) {
-        find_primary_train_line(cusps[cusp_index], multi_graph);
+        find_primary_train_line(cusps, cusps[cusp_index], multi_graph);
         update_adj_curve_on_cusp(cusps[cusp_index]);
     }
 
@@ -2208,7 +2210,7 @@ Boolean *update_edge_classes_on_cusp(CuspStructure **cusps, Boolean **edge_class
  * through a cusp which passes along each target edge.
  */
 
-void find_primary_train_line(CuspStructure *cusp, EndMultiGraph *multi_graph) {
+void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMultiGraph *multi_graph) {
     int endpoint_start_index, endpoint_finish_index;
     PathEndPoint *start, *finish;
 
@@ -2235,6 +2237,7 @@ void find_primary_train_line(CuspStructure *cusp, EndMultiGraph *multi_graph) {
     tri_endpoint_to_region_endpoint(cusp, start);
     tri_endpoint_to_region_endpoint(cusp, finish);
 
+//    print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
     do_initial_train_line_segment_on_cusp(cusp, start, finish);
 
     endpoint_start_index = endpoint_finish_index;
@@ -2248,6 +2251,8 @@ void find_primary_train_line(CuspStructure *cusp, EndMultiGraph *multi_graph) {
 
         tri_endpoint_to_region_endpoint(cusp, finish);
 
+//        construct_cusp_region_dual_graph(cusp);
+//        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
         do_train_line_segment_on_cusp(cusp, start, finish);
 
         // update endpoint indices
@@ -2325,7 +2330,7 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     EdgeNode *edge_node;
     CuspRegion *region;
     Boolean *processed, *discovered;
-    int start, start_index, *parent;
+    int start, start_index, visited, *parent;
 
     node_begin->next = node_end;
     node_begin->prev = NULL;
@@ -2360,17 +2365,20 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
 
     if (start_endpoint->face == cusp->train_line_path_end.prev->prev_face) {
         // curve dives along the face it passes through
+
         start = start_endpoint->region_index;
-        discovered[start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index] = TRUE;
-    } else if (start_endpoint->vertex == cusp->train_line_path_end.prev->prev_face) {
-        // curve dives through the vertex opposite the face it passes through
-        start = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
-        discovered[start_endpoint->region_index] = TRUE;
+        visited = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
+//        discovered[start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index] = TRUE;
     } else {
+        // curve dives through the vertex opposite the face it passes through or
         // curve travells around the vertex it dives through
+
         start = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
-        discovered[start_endpoint->region_index] = TRUE;
+        visited = start_endpoint->region_index;
+//        discovered[start_endpoint->region_index] = TRUE;
     }
+
+    delete_edge(cusp->dual_graph, visited, start, cusp->dual_graph->directed);
 
     bfs(cusp->dual_graph, start, processed, discovered, parent);
     find_path(start, finish_endpoint->region_index, parent, node_begin);
@@ -2588,9 +2596,9 @@ void update_cusp_triangle_train_line_endpoints(CuspRegion *cusp_region_start, Cu
     }
 }
 
-void split_cusp_region_train_line_endpoint(CuspRegion *region_end, CuspRegion *region, PathNode *node, 
+void split_cusp_region_train_line_endpoint(CuspRegion *region_end, CuspRegion *region, PathNode *node,
                                            PathEndPoint *path_endpoint, int index, int split_type) {
-    VertexIndex vertex1, vertex2;
+    VertexIndex vertex1, vertex2, other_vertex;
     CuspRegion *new_region = NEW_STRUCT(CuspRegion);
 
     copy_region(region, new_region);
@@ -2607,50 +2615,37 @@ void split_cusp_region_train_line_endpoint(CuspRegion *region_end, CuspRegion *r
     if (split_type == 0) {
         if (node->next_face == path_endpoint->vertex) {
             // curve dives through the face opposite the next face
-            new_region->curve[node->next_face][vertex1]++;
-            new_region->dive[vertex1][vertex2]                  = region->dive[vertex1][vertex2];
-            new_region->dive[path_endpoint->vertex][vertex2]    = region->dive[path_endpoint->vertex][vertex2];
-            new_region->dive[vertex1][path_endpoint->vertex]    = (Boolean) (region->dive[vertex1][path_endpoint->vertex] && vertex2 == path_endpoint->face);
-            new_region->dive[vertex2][path_endpoint->vertex]    = (Boolean) (region->dive[vertex2][path_endpoint->vertex] && vertex2 == path_endpoint->face);
-            new_region->adj_cusp_triangle[vertex2]              = FALSE;
+            other_vertex = (VertexIndex) (path_endpoint->face == vertex1 ? vertex2 : vertex1);
 
-            region->curve[node->next_face][vertex2]++;
-            region->dive[vertex1][vertex2]                      = FALSE;
-            region->dive[path_endpoint->vertex][vertex2]        = FALSE;
-            region->dive[vertex1][path_endpoint->vertex]        = (Boolean) (vertex1 == path_endpoint->face);
-            region->dive[vertex2][path_endpoint->vertex]        = (Boolean) (vertex1 == path_endpoint->face);
-            region->adj_cusp_triangle[vertex1]                  = FALSE;
+            new_region->curve[node->next_face][path_endpoint->face]++;
+            new_region->dive[path_endpoint->face][other_vertex]   = region->dive[path_endpoint->face][other_vertex];
+            new_region->dive[path_endpoint->vertex][other_vertex] = region->dive[path_endpoint->vertex][other_vertex];
+            new_region->adj_cusp_triangle[other_vertex]           = FALSE;
+
+            region->curve[node->next_face][other_vertex]++;
+            region->dive[path_endpoint->face][other_vertex]       = FALSE;
+            region->dive[path_endpoint->vertex][other_vertex]     = FALSE;
+            region->adj_cusp_triangle[path_endpoint->face]        = FALSE;
         } else {
-            new_region->curve[node->next_face][path_endpoint->vertex]++;
-            new_region->dive[vertex1][vertex2]                  = region->dive[vertex1][vertex2];
-            new_region->dive[path_endpoint->vertex][vertex2]    = region->dive[path_endpoint->vertex][vertex2];
-            new_region->dive[vertex2][vertex1]                  = region->dive[vertex2][vertex1];
-            new_region->dive[path_endpoint->vertex][vertex1]    = region->dive[path_endpoint->vertex][vertex1];
+            new_region->curve[node->next_face][path_endpoint->face]++;
+            new_region->dive[vertex1][path_endpoint->vertex]        = region->dive[vertex1][path_endpoint->vertex];
+            new_region->dive[vertex2][path_endpoint->vertex]        = region->dive[vertex2][path_endpoint->vertex];
+            new_region->adj_cusp_triangle[path_endpoint->face]      = FALSE;
+            new_region->adj_cusp_triangle[path_endpoint->vertex]    = FALSE;
 
-            region->curve[node->next_face][node->next_face == vertex1 ? vertex2 : vertex1]++;
-            region->dive[vertex1][vertex2]                      = FALSE;
-            region->dive[path_endpoint->vertex][vertex2]        = FALSE;
-            region->dive[vertex2][vertex1]                      = FALSE;
-            region->dive[path_endpoint->vertex][vertex1]        = FALSE;
-            region->adj_cusp_triangle[path_endpoint->face]      = FALSE;
-            region->adj_cusp_triangle[path_endpoint->vertex]    = FALSE;
+            region->curve[node->next_face][path_endpoint->vertex]++;
+            region->dive[vertex1][path_endpoint->vertex]        = FALSE;
+            region->dive[vertex2][path_endpoint->vertex]        = FALSE;
         }
     } else if (split_type == 1 || split_type == 2) {
-        new_region->curve[path_endpoint->face][path_endpoint->vertex]++;
-        new_region->dive[path_endpoint->face][path_endpoint->vertex]    = FALSE;
-        new_region->dive[vertex2][vertex1]                              = region->dive[vertex2][vertex1];
-        new_region->dive[path_endpoint->vertex][vertex1]                = region->dive[path_endpoint->vertex][vertex1];
-        new_region->dive[vertex1][vertex2]                              = region->dive[vertex1][vertex2];
-        new_region->dive[path_endpoint->vertex][vertex2]                = region->dive[path_endpoint->vertex][vertex2];
+        other_vertex = (VertexIndex) (path_endpoint->face == vertex1 ? vertex2 : vertex1);
+        new_region->curve[path_endpoint->face][other_vertex]++;
+        new_region->dive[path_endpoint->face][path_endpoint->vertex] = region->dive[path_endpoint->face][path_endpoint->vertex];
+        new_region->adj_cusp_triangle[path_endpoint->vertex] = FALSE;
+        new_region->adj_cusp_triangle[other_vertex] = FALSE;
 
-        region->curve[path_endpoint->face][path_endpoint->face == vertex1 ? vertex2 : vertex1]++;
-        region->dive[path_endpoint->face][path_endpoint->face == vertex1 ? vertex2 : vertex1] = FALSE;
-        region->dive[vertex2][vertex1]                  = FALSE;
-        region->dive[path_endpoint->vertex][vertex1]    = FALSE;
-        region->dive[vertex1][vertex2]                  = FALSE;
-        region->dive[path_endpoint->vertex][vertex2]    = FALSE;
-        region->adj_cusp_triangle[path_endpoint->vertex]= FALSE;
-        region->adj_cusp_triangle[path_endpoint->face == vertex1 ? vertex2 : vertex1] = FALSE;
+        region->curve[path_endpoint->face][path_endpoint->vertex]++;
+        region->dive[path_endpoint->face][path_endpoint->vertex] = FALSE;
     } else
         uFatalError("split_cusp_region_train_line_endpoint", "symplectic_basis");
 
@@ -2759,6 +2754,12 @@ void copy_path_endpoint(PathEndPoint *endpoint1, PathEndPoint *endpoint2) {
     endpoint1->region_index = endpoint2->region_index;
     endpoint1->region = endpoint2->region;
     endpoint1->node = endpoint2->node;
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            endpoint1->num_adj_curves[i][j] = endpoint2->num_adj_curves[i][j];
+        }
+    }
 }
 
 /*
@@ -3567,16 +3568,16 @@ void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curve
         cusp = cusps[i];
 
         if (cusp->extra_endpoint_e0.tri != NULL) {
-            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_begin->next, 0);
-            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_end->prev, 0);
+            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_begin->next, 1);
+            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_end->prev, 1);
         }
 
         for (j = 0; j < manifold->num_tetrahedra; j++) {
             if (cusp->train_line_endpoint[j].tri == NULL)
                 continue;
 
-            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_begin->next, 0);
-            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_end->prev, 0);
+            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_begin->next, 1);
+            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_end->prev, 1);
         }
     }
 }
@@ -3588,7 +3589,7 @@ void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curve
  */
 
 void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *path, int pos) {
-    int i, face1, face2;
+    int i;
     PathEndPoint *curve_end_point;
 
     for (i = 0; i < 2; i++) {
@@ -3596,7 +3597,8 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *p
 
         // Cusp Triangle
         if (curve_end_point->tri->tet_index != path_endpoint->tri->tet_index ||
-            curve_end_point->tri->tet_vertex != path_endpoint->tri->tet_vertex)
+            curve_end_point->tri->tet_vertex != path_endpoint->tri->tet_vertex ||
+            curve_end_point->face != path_endpoint->face)
             continue;
 
         // Dive vertex
@@ -3604,31 +3606,13 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *p
             continue;
 
         // update path data
-        face1 = (int) remaining_face[path_endpoint->tri->tet_vertex][path_endpoint->vertex];
-        face2 = (int) remaining_face[path_endpoint->vertex][path_endpoint->tri->tet_vertex];
+        if (path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex] >
+            curve_end_point->num_adj_curves[path_endpoint->face][path_endpoint->vertex])
+            path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex]++;
 
-        if (curve_end_point->face == face1 && path_endpoint->face == face2) {
-            path_endpoint->num_adj_curves[face1][path_endpoint->vertex]++;
-
-        } else if (curve_end_point->face == face2 && path_endpoint->face == face1) {
-            path_endpoint->num_adj_curves[face2][path_endpoint->vertex]++;
-
-        } else if (curve_end_point->face == face1 && path_endpoint->face == face1) {
-            if (path_endpoint->num_adj_curves[face1][path_endpoint->vertex] >=
-                curve_end_point->num_adj_curves[face1][path_endpoint->vertex])
-                path_endpoint->num_adj_curves[face1][path_endpoint->vertex]++;
-            else
-                path_endpoint->num_adj_curves[face2][path_endpoint->vertex]++;
-
-        } else if (curve_end_point->face == face2 && path_endpoint->face == face2) {
-            if (path_endpoint->num_adj_curves[face2][path_endpoint->vertex] >=
-                curve_end_point->num_adj_curves[face2][path_endpoint->vertex])
-                path_endpoint->num_adj_curves[face2][path_endpoint->vertex]++;
-            else
-                path_endpoint->num_adj_curves[face1][path_endpoint->vertex]++;
-
-        } else
-            uFatalError("update_adj_curve_at_endpoint", "symplectic_basis");
+        if (pos && path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex] ==
+                   curve_end_point->num_adj_curves[path_endpoint->face][path_endpoint->vertex])
+            path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex]++;
     }
 }
 

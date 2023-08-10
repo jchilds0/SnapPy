@@ -52,6 +52,6 @@ if __name__ == "__main__":
     pos = nx.spring_layout(graphs[0][0])
     for i, graph in enumerate(graphs):
         plt.figure(i)
-        nx.draw(graph[0], pos=nx.spring_layout(graph[0], pos=pos, fixed=graphs[0][0].nodes(), dim=2), with_labels=True, font_weight="bold")
+        nx.draw(graph[0], pos=nx.spring_layout(graph[0]), with_labels=True, font_weight="bold")
 
     plt.show()

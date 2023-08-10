@@ -20,10 +20,14 @@ int main(void) {
     int fromFile = 1;
 
     int count = 1;
-    int numTet[] = {5};
-    int index[] = {4};
+    int numTet[] = {6};
+    int index[] = {503};
 
-    char *error[] = {"CuspedCensusData/link-115956.tri"};
+    char *error[] = {
+            "CuspedCensusData/link-105538.tri", /* discovered: dual graph construction, remove edge: curve holonomy incorrect */
+//            "CuspedCensusData/link-115956.tri", /* train line path not found */
+            "CuspedCensusData/link-159285.tri"  /* incorrect curve holonomy */
+    };
 
     char *link[] = {
                     "CuspedCensusData/link-1.tri",
