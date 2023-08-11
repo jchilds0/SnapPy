@@ -95,7 +95,7 @@ typedef struct PathEndPoint {
     FaceIndex                   face;                   /** face containg the short rectangle carrying the curve */
     VertexIndex                 vertex;                 /** vertex we dive through the manifold along */
     int                         region_index;           /** index of the region the endpoint lies in */
-    int                         num_adj_curves[4][4];   /** where the curve dives into the manifold */
+    int                         num_adj_curves;         /** where the curve dives into the manifold */
     struct PathNode             *node;                  /** pointer to the path node which connects to the endpoint */
     struct CuspRegion           *region;                /** pointer to the region the endpoint lies in */
     struct CuspTriangle         *tri;                   /** pointer to the cusp triangle the endpoint lies in */
@@ -1376,25 +1376,15 @@ void init_train_line(CuspStructure *cusp) {
     cusp->train_line_endpoint = NEW_ARRAY(cusp->manifold->num_tetrahedra, PathEndPoint);
 
     for (edge_class = 0; edge_class < cusp->manifold->num_tetrahedra; edge_class++) {
-        cusp->train_line_endpoint[edge_class].tri = NULL;
-        cusp->train_line_endpoint[edge_class].region = NULL;
-
-        for (f = 0; f < 4; f++) {
-            for (v = 0; v < 4; v++) {
-                cusp->train_line_endpoint[edge_class].num_adj_curves[f][v] = 0;
-            }
-        }
+        cusp->train_line_endpoint[edge_class].tri               = NULL;
+        cusp->train_line_endpoint[edge_class].region            = NULL;
+        cusp->train_line_endpoint[edge_class].num_adj_curves    = 0;
     }
 
-    cusp->extra_endpoint_e0.tri         = NULL;
-    cusp->extra_endpoint_e0.region      = NULL;
-    cusp->extra_endpoint_e0.node        = NULL;
-
-    for (f = 0; f < 4; f++) {
-        for (v = 0; v < 4; v++) {
-            cusp->extra_endpoint_e0.num_adj_curves[f][v] = 0;
-        }
-    }
+    cusp->extra_endpoint_e0.tri                 = NULL;
+    cusp->extra_endpoint_e0.region              = NULL;
+    cusp->extra_endpoint_e0.node                = NULL;
+    cusp->extra_endpoint_e0.num_adj_curves      = 0;
 }
 
 CurveComponent *init_curve_component(int edge_class_start, int edge_class_finish, int cusp_index) {
@@ -1412,14 +1402,9 @@ CurveComponent *init_curve_component(int edge_class_start, int edge_class_finish
     path->cusp_index            = cusp_index;
 
     for (i = 0; i < 2; i++) {
-        path->endpoints[i].tri = NULL;
-        path->endpoints[i].region = NULL;
-
-        for (f = 0; f < 4; f++) {
-            for (v = 0; v < 4; v++) {
-                path->endpoints[i].num_adj_curves[f][v] = 0;
-            }
-        }
+        path->endpoints[i].tri              = NULL;
+        path->endpoints[i].region           = NULL;
+        path->endpoints[i].num_adj_curves   = 0;
     }
 
     return path;
@@ -1816,7 +1801,7 @@ void print_debug_info(Triangulation *manifold, CuspStructure **cusps, Oscillatin
                            path->endpoints[k].tri->tet_vertex, path->endpoints[k].face, path->endpoints[k].vertex,
                            path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_class,
                            path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_index,
-                           path->endpoints[k].num_adj_curves[path->endpoints[k].face][path->endpoints[k].vertex]);
+                           path->endpoints[k].num_adj_curves);
                 }
 
                 j++;
@@ -2712,12 +2697,19 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
 
         if (path->edge_class[START] == multi_graph->e0 && orientation == START && cusps[path->cusp_index]->extra_endpoint_e0.tri != NULL) {
             copy_path_endpoint(&path->endpoints[START], &cusps[path->cusp_index]->extra_endpoint_e0);
+            copy_path_endpoint(&path->endpoints[FINISH],
+                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[FINISH]]);
+        } else if (path->edge_class[FINISH] == multi_graph->e0 && orientation == FINISH && cusps[path->cusp_index]->extra_endpoint_e0.tri != NULL) {
+            copy_path_endpoint(&path->endpoints[START],
+                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[START]]);
+            copy_path_endpoint(&path->endpoints[FINISH], &cusps[path->cusp_index]->extra_endpoint_e0);
         } else {
-            copy_path_endpoint(&path->endpoints[START], &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[START]]);
+            copy_path_endpoint(&path->endpoints[START],
+                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[START]]);
+            copy_path_endpoint(&path->endpoints[FINISH],
+                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[FINISH]]);
         }
 
-        copy_path_endpoint(&path->endpoints[FINISH],
-                           &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[FINISH]]);
         do_curve_component_on_train_line(cusps[path->cusp_index], path);
         update_path_holonomy(path, edge_class);
     }
@@ -2754,12 +2746,7 @@ void copy_path_endpoint(PathEndPoint *endpoint1, PathEndPoint *endpoint2) {
     endpoint1->region_index = endpoint2->region_index;
     endpoint1->region = endpoint2->region;
     endpoint1->node = endpoint2->node;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            endpoint1->num_adj_curves[i][j] = endpoint2->num_adj_curves[i][j];
-        }
-    }
+    endpoint1->num_adj_curves = endpoint2->num_adj_curves;
 }
 
 /*
@@ -2953,10 +2940,7 @@ void find_single_endpoint(Graph *g, PathEndPoint *path_endpoint, int edge_class,
             path_endpoint->vertex           = vertex;
             path_endpoint->face             = face;
             path_endpoint->region_index     = i;
-
-            for (j = 0; j < 4; j++)
-                for (k = 0; k < 4; k++)
-                    path_endpoint->num_adj_curves[j][k] = region->num_adj_curves[j][k];
+            path_endpoint->num_adj_curves   = region->num_adj_curves[path_endpoint->face][path_endpoint->vertex];
 
             return ;
         }
@@ -2990,7 +2974,7 @@ void find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoint1, PathE
         region_index    = (Boolean) (region->tet_index != path_endpoint1->tri->tet_index);
         region_vertex   = (Boolean) (region->tet_vertex != path_endpoint1->vertex);
         region_dive     = (Boolean) !region->dive[path_endpoint1->face][path_endpoint1->tri->tet_vertex];
-        region_curve    = (Boolean) (region->num_adj_curves[path_endpoint1->face][path_endpoint1->tri->tet_vertex] != path_endpoint1->num_adj_curves[path_endpoint1->face][path_endpoint1->vertex]);
+        region_curve    = (Boolean) (region->num_adj_curves[path_endpoint1->face][path_endpoint1->tri->tet_vertex] != path_endpoint1->num_adj_curves);
 
         if (region_index || region_vertex || region_dive || region_curve)
             continue;
@@ -3000,10 +2984,7 @@ void find_single_matching_endpoint(Graph *g, PathEndPoint *path_endpoint1, PathE
         path_endpoint2->vertex          = path_endpoint1->tri->tet_vertex;
         path_endpoint2->face            = path_endpoint1->face;
         path_endpoint2->region_index    = i;
-
-        for (j = 0; j < 4; j++)
-            for (k = 0; k < 4; k++)
-                path_endpoint2->num_adj_curves[j][k] = region->num_adj_curves[j][k];
+        path_endpoint2->num_adj_curves  = region->num_adj_curves[path_endpoint2->face][path_endpoint2->vertex];
 
         return ;
     }
@@ -3042,7 +3023,7 @@ void find_train_line_endpoint(CuspStructure *cusp, PathEndPoint *endpoint, int e
 
         if (is_train_line) {
             region_curve    = (Boolean) (region->num_adj_curves[train_line_endpoint->face][train_line_endpoint->vertex] !=
-                                         train_line_endpoint->num_adj_curves[train_line_endpoint->face][train_line_endpoint->vertex]);
+                                         train_line_endpoint->num_adj_curves);
         } else {
             region_curve    = (Boolean) (region->num_adj_curves[train_line_endpoint->face][train_line_endpoint->vertex] != 0);
         }
@@ -3055,10 +3036,7 @@ void find_train_line_endpoint(CuspStructure *cusp, PathEndPoint *endpoint, int e
         endpoint->vertex          = train_line_endpoint->vertex;
         endpoint->face            = train_line_endpoint->face;
         endpoint->region_index    = region->index;
-
-        for (j = 0; j < 4; j++)
-            for (k = 0; k < 4; k++)
-                endpoint->num_adj_curves[j][k] = region->num_adj_curves[j][k];
+        endpoint->num_adj_curves  = region->num_adj_curves[endpoint->face][endpoint->vertex];
 
         return ;
     }
@@ -3606,13 +3584,8 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *p
             continue;
 
         // update path data
-        if (path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex] >
-            curve_end_point->num_adj_curves[path_endpoint->face][path_endpoint->vertex])
-            path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex]++;
-
-        if (pos && path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex] ==
-                   curve_end_point->num_adj_curves[path_endpoint->face][path_endpoint->vertex])
-            path_endpoint->num_adj_curves[path_endpoint->face][path_endpoint->vertex]++;
+        if (path_endpoint->num_adj_curves >= curve_end_point->num_adj_curves)
+            path_endpoint->num_adj_curves++;
     }
 }
 

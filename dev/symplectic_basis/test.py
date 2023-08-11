@@ -54,8 +54,8 @@ def process_manifold(i: int):
     else:
         string = "Failed"
 
-    # with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
-    print(f"Testing: {str(index)} {(10 - len(str(index))) * ' '} {str(label)} {(30 - len(str(label))) * ' '} {string}")
+    with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
+        file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
     return result
 
@@ -128,6 +128,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    random.seed("SnapPy-Symplectic")
     test_link_complements_pool(0, 1)
     # unittest.main()
     # M = snappy.HTLinkExteriors[159285]

@@ -24,9 +24,8 @@ int main(void) {
     int index[] = {503};
 
     char *error[] = {
-            "CuspedCensusData/link-105538.tri", /* discovered: dual graph construction, remove edge: curve holonomy incorrect */
 //            "CuspedCensusData/link-115956.tri", /* train line path not found */
-            "CuspedCensusData/link-159285.tri"  /* incorrect curve holonomy */
+            "CuspedCensusData/link-159285.tri"  /* find_matching_endpoints */
     };
 
     char *link[] = {
