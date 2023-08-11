@@ -8,6 +8,10 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import itertools
 
+with open("links", "r") as file:
+    lst = file.readline()
+    manifolds = [int(x) for x in lst.split(',')[:-1]]
+
 
 def is_symplectic(M):
     """
@@ -35,7 +39,8 @@ def symplectic_form(u, v):
 
 
 def process_manifold(i: int):
-    index = random.randint(1, 400000)
+    # index = random.randint(1, 200000)
+    index = i
     M = snappy.HTLinkExteriors[index]
 
     if len(M.identify()) > 0:
@@ -54,7 +59,8 @@ def process_manifold(i: int):
     else:
         string = "Failed"
 
-    with open("logs/links-" + str(i // 1000) + ".log", "a") as file:
+    with open("logs/links-" + str(0) + ".log", "a") as file:
+        # file.write(f"{index},")
         file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
     return result
@@ -77,16 +83,24 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
         M.save(f"CuspedCensusData/link-{n_tet}-{n_cusps}-{i}.tri")
 
 
+def test_link_complements(start: int, end: int):
+    scale = 1000
+    with open("logs/total.log", "a") as file:
+        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
+
+    result = [process_manifold(i) for i in range(scale * start, scale * end)]
+
+    with open("logs/total.log", "a") as file:
+        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
+
+
 def test_link_complements_pool(start: int, end: int):
     scale = 1000
     with open("logs/total.log", "a") as file:
         file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
 
-        # for i in range(scale * i, scale * (i + 1)):
-        #     process_manifold(i)
-
     with Pool(maxtasksperchild=25) as pool:
-        result = pool.imap(process_manifold, range(scale * start, scale * end))
+        result = pool.imap(process_manifold, range(2000))
 
         for _ in range(start, end):
             lst = list(itertools.islice(result, scale))
@@ -131,5 +145,3 @@ if __name__ == "__main__":
     random.seed("SnapPy-Symplectic")
     test_link_complements_pool(0, 1)
     # unittest.main()
-    # M = snappy.HTLinkExteriors[159285]
-    # M.symplectic_basis()

@@ -19,30 +19,21 @@ int main(void) {
 
     int fromFile = 1;
 
-    int count = 1;
+    int count = 2;
     int numTet[] = {6};
     int index[] = {503};
 
     char *error[] = {
 //            "CuspedCensusData/link-115956.tri", /* train line path not found */
-            "CuspedCensusData/link-159285.tri"  /* find_matching_endpoints */
-    };
-
-    char *link[] = {
-                    "CuspedCensusData/link-1.tri",
-                    "CuspedCensusData/link-2.tri",
-                    "CuspedCensusData/link-3.tri",
-                    "CuspedCensusData/link-4.tri"
+            "CuspedCensusData/link-159285.tri",  /* find_matching_endpoints */
+            "CuspedCensusData/link-179680.tri"  /* dual graph */
     };
 
 
-    for (i = 0; i < count; i++) {
+    for (i = 1; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
-        } else if (fromFile == 2) {
-            printf("Triangulation: %s\n", link[i]);
-            theTriangulation = read_triangulation(link[i]);
         } else {
             theTriangulation = GetCuspedCensusManifold("", numTet[i], oriented_manifold, index[i]);
             printf("Num Tet: %d Index: %d\n", numTet[i], index[i]);

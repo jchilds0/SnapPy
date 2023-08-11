@@ -662,7 +662,7 @@ int *gluing_equations_for_edge_class(Triangulation *manifold, int edgeClass) {
  * Setup graph and cusp triangulation, and run construct dual curves.
  */
 
-static int debug = FALSE;
+static int debug = TRUE;
 
 int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, int *num_rows, int num_cols) {
     int i, j, k;
@@ -1424,8 +1424,8 @@ OscillatingCurves *init_oscillating_curves(Triangulation *manifold, const Boolea
         if (edge_classes[i])
             curves->num_curves++;
 
-    curves->curve_begin          = NEW_ARRAY(curves->num_curves, CurveComponent );
-    curves->curve_end            = NEW_ARRAY(curves->num_curves, CurveComponent );
+    curves->curve_begin               = NEW_ARRAY(curves->num_curves, CurveComponent );
+    curves->curve_end                 = NEW_ARRAY(curves->num_curves, CurveComponent );
     curves->edge_class                = NEW_ARRAY(curves->num_curves, int);
 
     j = 0;
@@ -2222,7 +2222,7 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
     tri_endpoint_to_region_endpoint(cusp, start);
     tri_endpoint_to_region_endpoint(cusp, finish);
 
-//    print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
+    print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
     do_initial_train_line_segment_on_cusp(cusp, start, finish);
 
     endpoint_start_index = endpoint_finish_index;
@@ -2236,8 +2236,7 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
 
         tri_endpoint_to_region_endpoint(cusp, finish);
 
-//        construct_cusp_region_dual_graph(cusp);
-//        print_debug_info(cusps[0]->manifold, cusps, NULL, 7);
+        print_debug_info(cusps[0]->manifold, cusps, NULL, 2);
         do_train_line_segment_on_cusp(cusp, start, finish);
 
         // update endpoint indices
@@ -2498,9 +2497,9 @@ void split_cusp_regions_along_train_line_segment(CuspStructure *cusp, PathEndPoi
     CuspRegion *p_region;
     Graph *g = cusp->dual_graph;
 
-    for (node = path_begin->next; node != path_end && node->cusp_region_index != start_endpoint->region_index; node = node->next);
+    for (node = path_end->prev; node != path_begin && node->cusp_region_index != start_endpoint->region_index; node = node->prev);
 
-    if (path_begin->next == path_end || node == path_end) {
+    if (path_begin->next == path_end || node == path_begin) {
         // empty path
         return ;
     }
