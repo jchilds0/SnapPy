@@ -17,20 +17,22 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 1;
+    int fromFile = 0;
 
-    int count = 2;
-    int numTet[] = {6};
-    int index[] = {503};
+    int count = 1;
+    int numTet[] = {5};
+    int index[] = {4};
 
     char *error[] = {
+            "CuspedCensusData/link-81188.tri",  /* graph path to path node */
+            "CuspedCensusData/link-83001.tri",  /* update adj curve at endpoint */
 //            "CuspedCensusData/link-115956.tri", /* train line path not found */
             "CuspedCensusData/link-159285.tri",  /* find_matching_endpoints */
             "CuspedCensusData/link-179680.tri"  /* dual graph */
     };
 
 
-    for (i = 1; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
@@ -43,7 +45,7 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols);
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
             printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 

@@ -8,9 +8,18 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import itertools
 
-with open("links", "r") as file:
+
+if len(snappy.HTLinkExteriors(crossings=15)) == 0:
+    file_name = "links-linux"
+else:
+    file_name = "links"
+
+with open(file_name, "r") as file:
     lst = file.readline()
-    manifolds = [int(x) for x in lst.split(',')[:-1]]
+    print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Building test set")
+    manifolds = list(set([int(x) for x in lst.split(',')[:-1]]))
+    manifolds_tri = [snappy.HTLinkExteriors[i] for i in manifolds]
+    manifolds_labels = [M.identify()[0] for M in manifolds_tri if len(M.identify()) > 0]
 
 
 def is_symplectic(M):
@@ -35,20 +44,26 @@ def is_symplectic(M):
 
 
 def symplectic_form(u, v):
-    return sum([u[2 * i] * v[2 * i + 1] - u[2 * i + 1] * v[2 * i] for i in range(len(u) // 2)])
+    return sum([u[2 * i] * v[2 * i + 1] - u[2 * i + 1] * v[2 * i]
+                for i in range(len(u) // 2)])
 
 
-def process_manifold(i: int):
-    # index = random.randint(1, 200000)
-    index = i
+def save_manifold(index: int):
     M = snappy.HTLinkExteriors[index]
+    M.save(f"CuspedCensusData/link-{index}.tri")
 
-    if len(M.identify()) > 0:
-        label = M.identify()[0]
+
+def process_manifold(i: int, output: bool = True):
+    if output is False:
+        M = snappy.HTLinkExteriors[i]
+        index = i
+        label = M.identify()[0] if len(M.identify()) > 0 else ""
     else:
-        label = ""
+        M = manifolds_tri[i]
+        index = manifolds[i]
+        label = manifolds_labels[i]
 
-    if i == 0:
+    if index == 0:
         return True
 
     basis = M.symplectic_basis()
@@ -59,9 +74,9 @@ def process_manifold(i: int):
     else:
         string = "Failed"
 
-    with open("logs/links-" + str(0) + ".log", "a") as file:
-        # file.write(f"{index},")
-        file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
+    if output:
+        with open("logs/links-0.log", "a") as file:
+            file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
     return result
 
@@ -83,30 +98,49 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
         M.save(f"CuspedCensusData/link-{n_tet}-{n_cusps}-{i}.tri")
 
 
-def test_link_complements(start: int, end: int):
+def generate_tests(output_file: str):
+    print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Generating symplectic basis tests")
+    for _ in range(2000):
+        index = random.randint(1, len(snappy.HTLinkExteriors) - 1)
+        process_manifold(index, output=False)
+        print(index)
+
+        with open(output_file, "a") as file:
+            file.write(f"{index},")
+
+
+def test_link_complements(start: int, end: int, manifolds_list: bool):
     scale = 1000
     with open("logs/total.log", "a") as file:
         file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
 
-    result = [process_manifold(i) for i in range(scale * start, scale * end)]
+    if manifolds_list:
+        result = [process_manifold(i) for i in range(len(manifolds))]
+    else:
+        result = [process_manifold(i) for i in range(scale * start, scale * end)]
 
     with open("logs/total.log", "a") as file:
         file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
 
 
-def test_link_complements_pool(start: int, end: int):
+def test_link_complements_pool(start: int, end: int, manifolds_list: bool):
     scale = 1000
     with open("logs/total.log", "a") as file:
         file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
 
     with Pool(maxtasksperchild=25) as pool:
-        result = pool.imap(process_manifold, range(2000))
+        if manifolds_list:
+            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing from Manifold List")
+            result = pool.imap(process_manifold, range(len(manifolds)))
+        else:
+            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing from {scale * start} to {end * scale}")
+            result = pool.imap(process_manifold, range(start * scale, end * scale))
 
         for _ in range(start, end):
             lst = list(itertools.islice(result, scale))
 
-            with open("logs/total.log", "a") as file:
-                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}\n")
+            #with open("logs/total.log", "a") as file:
+            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -142,6 +176,7 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    random.seed("SnapPy-Symplectic")
-    test_link_complements_pool(0, 1)
+    test_link_complements_pool(0, 1, True)
+    # test_link_complements(0, 1, True)
+    # generate_tests("links-linux")
     # unittest.main()

@@ -46,7 +46,7 @@ void testDual(void) {
 
             printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
-            basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols);
+            basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols, 0);
 
             for (k = 0; 2 * k + 1 < dual_rows; k++) {
                 retval1 = ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols));
