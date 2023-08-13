@@ -18,7 +18,7 @@ enum pos {
     FINISH
 };
 
-extern int debug = 0;
+static int debug;
 
 /**
  * Queue
@@ -250,6 +250,8 @@ CurveComponent          *init_curve_component(int, int, int);
 OscillatingCurves       *init_oscillating_curves(Triangulation *, const Boolean *);
 void                    free_oscillating_curves(OscillatingCurves *);
 void                    find_intersection_triangle(Triangulation *, CuspStructure *);
+void                    construct_cusp_region_dual_graph(CuspStructure *);
+void                    log_structs(Triangulation *, CuspStructure **, OscillatingCurves *, char *);
 
 /**
  * Train lines
@@ -268,7 +270,7 @@ void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPo
 int                     next_valid_endpoint_index(PathEndPoint *, int, int);
 void                    tri_endpoint_to_region_endpoint(CuspStructure *, PathEndPoint *);
 void                    graph_path_to_path_node(Graph *, EdgeNode *, EdgeNode *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
-void                    split_cusp_regions_along_train_line_segment(CuspStructure *, PathEndPoint *, PathEndPoint *);
+void                    split_cusp_regions_along_train_line_segment(CuspStructure *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
 void                    update_cusp_triangle_train_line_endpoints(CuspRegion *, CuspRegion *, CuspRegion *, PathNode *, PathEndPoint *, int);
 void                    split_cusp_region_train_line_endpoint(CuspRegion *, CuspRegion *, PathNode *, PathEndPoint *, int, int);
 
@@ -279,12 +281,12 @@ void                    split_cusp_region_train_line_endpoint(CuspRegion *, Cusp
 void                    do_oscillating_curves(CuspStructure **, OscillatingCurves *, EndMultiGraph *);
 void                    do_one_oscillating_curve(CuspStructure **, OscillatingCurves *, EndMultiGraph *, int, int);
 void                    copy_path_endpoint(PathEndPoint *, PathEndPoint *);
-void                    do_curve_component_on_train_line(CuspStructure *, CurveComponent *);
 PathNode                *copy_path_node(PathNode *);
+CurveComponent          *setup_train_line_component(CuspStructure *, EndMultiGraph *, CurveComponent *, CurveComponent *, CuspEndPoint *, int);
+void                    do_curve_component_on_train_line(CuspStructure *, CurveComponent *);
+CurveComponent          *setup_first_curve_component(CuspStructure *, EndMultiGraph *, CuspEndPoint *, CurveComponent *, CurveComponent *);
+CurveComponent          *setup_last_curve_component(CuspStructure *, EndMultiGraph *, CuspEndPoint *, CurveComponent *, CurveComponent *);
 void                    do_curve_component_to_new_edge_class(CuspStructure *, CurveComponent *);
-void                    construct_cusp_region_dual_graph(CuspStructure *);
-void                    log_structs(Triangulation *, CuspStructure **, OscillatingCurves *, char *);
-void                    find_path_endpoints(CuspStructure *, CurveComponent *, CurveComponent *, int, Boolean, Boolean);
 void                    find_single_endpoint(Graph *, PathEndPoint *, int, int);
 void                    find_single_matching_endpoint(Graph *, PathEndPoint *, PathEndPoint *, int, int);
 void                    find_train_line_endpoint(CuspStructure *, PathEndPoint *, int, int, int, Boolean);
@@ -2313,6 +2315,7 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     EdgeNode *node_begin = NEW_STRUCT( EdgeNode );
     EdgeNode *node_end = NEW_STRUCT( EdgeNode );
     EdgeNode *edge_node;
+    PathNode *start_node;
     CuspRegion *region;
     Boolean *processed, *discovered;
     int start, start_index, visited, *parent;
@@ -2373,9 +2376,11 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     my_free(parent);
 
     // split along curve
-    graph_path_to_path_node(cusp->dual_graph, node_begin, node_end,&cusp->train_line_path_begin,
-                            &cusp->train_line_path_end, start_endpoint, finish_endpoint);
-    split_cusp_regions_along_train_line_segment(cusp, start_endpoint, finish_endpoint);
+    start_node = cusp->train_line_path_end.prev;
+    graph_path_to_path_node(cusp->dual_graph, node_begin, node_end,
+                            &cusp->train_line_path_begin, &cusp->train_line_path_end, 
+                            start_endpoint, finish_endpoint);
+    split_cusp_regions_along_train_line_segment(cusp, start_node, &cusp->train_line_path_end, start_endpoint, finish_endpoint);
 
     finish_endpoint->node = cusp->train_line_path_end.prev;
 
@@ -2490,17 +2495,25 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
     endpoint_edge_node_to_path_node(g->regions[edge_node->y], path_end, edge_node, finish_endpoint, FINISH);
 }
 
-void split_cusp_regions_along_train_line_segment(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint) {
+void split_cusp_regions_along_train_line_segment(CuspStructure *cusp, PathNode *path_begin, PathNode *path_end, 
+                                                 PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint) {
     int index = cusp->num_cusp_regions, split_type, region_index;
-    PathNode *node,
-             *path_begin = &cusp->train_line_path_begin,
-             *path_end = &cusp->train_line_path_end;
+    PathNode *node;
     CuspRegion *p_region;
     Graph *g = cusp->dual_graph;
 
-    for (node = path_end->prev; node != path_begin && node->cusp_region_index != start_endpoint->region_index; node = node->prev);
+    if (path_begin->tri->tet_index == start_endpoint->tri->tet_index 
+        && path_begin->tri->tet_vertex == start_endpoint->tri->tet_vertex) {
+        node = path_begin;
+    } else if (path_begin->next->tri->tet_index == start_endpoint->tri->tet_index 
+               && path_begin->next->tri->tet_vertex == start_endpoint->tri->tet_vertex) {
+        node = path_begin->prev;
+    } else {
+        uFatalError("split_cusp_regions_along_train_line_segment", "symplectic_basis");
+        return;
+    }
 
-    if (path_begin->next == path_end || node == path_begin) {
+    if (node->next == path_end) {
         // empty path
         return ;
     }
@@ -2677,15 +2690,7 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
     curve_begin->edge_class[FINISH] = edge_class;
     curve_end->edge_class[START]    = edge_class;
 
-    // first curve component
-    path = init_curve_component(cusp_end_point->edge_class[START],
-                                cusp_end_point->edge_class[FINISH],
-                                cusp_end_point->cusp_index);
-    INSERT_BEFORE(path, curve_end);
-
-    construct_cusp_region_dual_graph(cusps[path->cusp_index]);
-    find_path_endpoints(cusps[path->cusp_index],curve_begin, path, multi_graph->e0, TRUE,
-                        (Boolean) (cusp_end_point->next->next != NULL));
+    path = setup_first_curve_component(cusps[cusp_end_point->cusp_index], multi_graph, cusp_end_point, curve_begin, curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
     update_path_holonomy(path, edge_class);
 
@@ -2703,40 +2708,12 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
     for (endpoint = cusp_end_point->next; endpoint->next != NULL; endpoint = endpoint->next) {
         orientation = (orientation == START ? FINISH : START);
 
-        path = init_curve_component(endpoint->edge_class[orientation],
-                                    endpoint->edge_class[orientation == START ? FINISH : START],
-                                    endpoint->cusp_index);
-
-        INSERT_BEFORE(path, curve_end);
-
-        if (path->edge_class[START] == multi_graph->e0 && orientation == START && cusps[path->cusp_index]->extra_endpoint_e0.tri != NULL) {
-            copy_path_endpoint(&path->endpoints[START], &cusps[path->cusp_index]->extra_endpoint_e0);
-            copy_path_endpoint(&path->endpoints[FINISH],
-                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[FINISH]]);
-        } else if (path->edge_class[FINISH] == multi_graph->e0 && orientation == FINISH && cusps[path->cusp_index]->extra_endpoint_e0.tri != NULL) {
-            copy_path_endpoint(&path->endpoints[START],
-                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[START]]);
-            copy_path_endpoint(&path->endpoints[FINISH], &cusps[path->cusp_index]->extra_endpoint_e0);
-        } else {
-            copy_path_endpoint(&path->endpoints[START],
-                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[START]]);
-            copy_path_endpoint(&path->endpoints[FINISH],
-                               &cusps[path->cusp_index]->train_line_endpoint[path->edge_class[FINISH]]);
-        }
-
+        path = setup_train_line_component(cusps[endpoint->cusp_index], multi_graph, curve_begin, curve_end, endpoint, orientation);
         do_curve_component_on_train_line(cusps[path->cusp_index], path);
         update_path_holonomy(path, edge_class);
     }
 
-    // last curve component
-    path = init_curve_component(endpoint->edge_class[START],
-                                endpoint->edge_class[FINISH],
-                                endpoint->cusp_index);
-    INSERT_BEFORE(path, curve_end);
-
-    construct_cusp_region_dual_graph(cusps[path->cusp_index]);
-    find_path_endpoints(cusps[path->cusp_index], curve_begin, path, multi_graph->e0, FALSE,
-                        (Boolean) (cusp_end_point->next->next != NULL));
+    path = setup_last_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint, curve_begin, curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
     update_path_holonomy(path, edge_class);
 
@@ -2769,6 +2746,46 @@ void copy_path_endpoint(PathEndPoint *endpoint1, PathEndPoint *endpoint2) {
     endpoint1->region = endpoint2->region;
     endpoint1->node = endpoint2->node;
     endpoint1->num_adj_curves = endpoint2->num_adj_curves;
+}
+
+PathNode *copy_path_node(PathNode *node) {
+    PathNode *new_node = NEW_STRUCT( PathNode );
+
+    new_node->next = NULL;
+    new_node->prev = NULL;
+    new_node->next_face = node->next_face;
+    new_node->prev_face = node->prev_face;
+    new_node->inside_vertex = node->inside_vertex;
+    new_node->cusp_region_index = node->cusp_region_index;
+    new_node->tri = node->tri;
+
+    return new_node;
+}
+
+CurveComponent *setup_train_line_component(CuspStructure *cusp, EndMultiGraph *multi_graph, 
+                                CurveComponent *curve_begin, CurveComponent *curve_end, 
+                                CuspEndPoint *endpoint, int orientation) {
+    CurveComponent *path; 
+
+    path = init_curve_component(endpoint->edge_class[orientation],
+                                endpoint->edge_class[orientation == START ? FINISH : START],
+                                endpoint->cusp_index);
+
+    INSERT_BEFORE(path, curve_end);
+
+    if (path->edge_class[START] == multi_graph->e0 && orientation == START && cusp->extra_endpoint_e0.tri != NULL) {
+        copy_path_endpoint(&path->endpoints[START], &cusp->extra_endpoint_e0);
+        copy_path_endpoint(&path->endpoints[FINISH], &cusp->train_line_endpoint[path->edge_class[FINISH]]);
+    } else if (path->edge_class[FINISH] == multi_graph->e0 && orientation == FINISH 
+        && cusp->extra_endpoint_e0.tri != NULL) {
+        copy_path_endpoint(&path->endpoints[START], &cusp->train_line_endpoint[path->edge_class[START]]);
+        copy_path_endpoint(&path->endpoints[FINISH], &cusp->extra_endpoint_e0);
+    } else {
+        copy_path_endpoint(&path->endpoints[START], &cusp->train_line_endpoint[path->edge_class[START]]);
+        copy_path_endpoint(&path->endpoints[FINISH], &cusp->train_line_endpoint[path->edge_class[FINISH]]);
+    }
+
+    return path;
 }
 
 /*
@@ -2818,18 +2835,37 @@ void do_curve_component_on_train_line(CuspStructure *cusp, CurveComponent *curve
     curve->curves_end.prev->next_face = curve->endpoints[FINISH].face;
 }
 
-PathNode *copy_path_node(PathNode *node) {
-    PathNode *new_node = NEW_STRUCT( PathNode );
+CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
+                                            CurveComponent *curves_begin, CurveComponent *curves_end) {
+    CurveComponent *path;
+    path = init_curve_component(endpoint->edge_class[START],
+                                endpoint->edge_class[FINISH],
+                                endpoint->cusp_index);
+    INSERT_BEFORE(path, curves_end);
 
-    new_node->next = NULL;
-    new_node->prev = NULL;
-    new_node->next_face = node->next_face;
-    new_node->prev_face = node->prev_face;
-    new_node->inside_vertex = node->inside_vertex;
-    new_node->cusp_region_index = node->cusp_region_index;
-    new_node->tri = node->tri;
+    construct_cusp_region_dual_graph(cusp);
+    find_single_endpoint(cusp->dual_graph, &path->endpoints[START], path->edge_class[START], START);
+    find_train_line_endpoint(cusp, &path->endpoints[FINISH], path->edge_class[FINISH],
+                             START, multi_graph->e0, (Boolean) (endpoint->next->next != NULL));
+    return path;
+}
 
-    return new_node;
+CurveComponent *setup_last_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
+                                           CurveComponent *curves_begin, CurveComponent *curves_end) {
+    CurveComponent *path;
+    path = init_curve_component(endpoint->edge_class[START],
+                                endpoint->edge_class[FINISH],
+                                endpoint->cusp_index);
+    INSERT_BEFORE(path, curves_end);
+
+    construct_cusp_region_dual_graph(cusp);
+    find_single_matching_endpoint(cusp->dual_graph, &curves_begin->next->endpoints[START],
+                                  &path->endpoints[START], path->edge_class[START], FINISH);
+
+    find_single_matching_endpoint(cusp->dual_graph, &path->prev->endpoints[FINISH],
+                                  &path->endpoints[FINISH], path->edge_class[FINISH], FINISH);
+
+    return path;
 }
 
 /*
@@ -2882,40 +2918,6 @@ void do_curve_component_to_new_edge_class(CuspStructure *cusp, CurveComponent *c
     my_free(node_end);
 }
 
-
-/*
- * Find the indices of the cusp triangles which dive through the manifold
- * along the given edge class.
- */
-
-void find_path_endpoints(CuspStructure *cusp, CurveComponent *path_start, CurveComponent *path, int e0,
-                         Boolean is_first_endpoint, Boolean is_train_line) {
-    if (is_first_endpoint) {
-        find_single_endpoint(cusp->dual_graph,
-                             &path->endpoints[START],
-                             path->edge_class[START],
-                             START);
-
-        find_train_line_endpoint(cusp,
-                                 &path->endpoints[FINISH],
-                                 path->edge_class[FINISH],
-                                 START,
-                                 e0,
-                                 is_train_line);
-    } else {
-        find_single_matching_endpoint(cusp->dual_graph,
-                                      &path_start->next->endpoints[START],
-                                      &path->endpoints[START],
-                                      path->edge_class[START],
-                                      FINISH);
-
-        find_single_matching_endpoint(cusp->dual_graph,
-                                      &path->prev->endpoints[FINISH],
-                                      &path->endpoints[FINISH],
-                                      path->edge_class[FINISH],
-                                      FINISH);
-    }
-}
 
 /*
  * Find a cusp region which can dive along a face into a vertex of
@@ -3547,22 +3549,6 @@ void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curve
     for (curve = dual_curve_begin->next; curve != dual_curve_end; curve = curve->next)
         update_adj_curve_on_cusp(cusps[curve->cusp_index]);
 
-    // update endpoint curve data
-    for (i = 0; i < curve_index; i++) {
-        // which oscillating curve
-
-        for (curve = curves->curve_begin[i].next; curve != &curves->curve_end[i]; curve = curve->next) {
-            // which component of the curve
-
-            for (j = 0; j < 2; j++) {
-                // which end point
-
-                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_begin->next, 0);
-                update_adj_curve_at_endpoint(&curve->endpoints[j], dual_curve_end->prev, 0);
-            }
-        }
-    }
-
     // update train line endpoints
     for (i = 0; i < manifold->num_cusps; i++) {
         cusp = cusps[i];
@@ -3595,19 +3581,13 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *p
     for (i = 0; i < 2; i++) {
         curve_end_point = &path->endpoints[i];
 
-        // Cusp Triangle
         if (curve_end_point->tri->tet_index != path_endpoint->tri->tet_index ||
             curve_end_point->tri->tet_vertex != path_endpoint->tri->tet_vertex ||
-            curve_end_point->face != path_endpoint->face)
+            curve_end_point->face != path_endpoint->face ||
+            curve_end_point->vertex != path_endpoint->vertex)
             continue;
 
-        // Dive vertex
-        if (curve_end_point->vertex != path_endpoint->vertex)
-            continue;
-
-        // update path data
-        if (path_endpoint->num_adj_curves >= curve_end_point->num_adj_curves)
-            path_endpoint->num_adj_curves++;
+        path_endpoint->num_adj_curves++;
     }
 }
 

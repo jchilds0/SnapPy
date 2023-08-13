@@ -706,7 +706,7 @@ cdef extern from "SnapPea.h":
     extern Real volume(c_Triangulation *manifold, int *precision) except *
     extern Boolean mark_fake_cusps(c_Triangulation   *manifold) except *
 
-    extern int** get_symplectic_basis(c_Triangulation *manifold, int *, int *) except *
+    extern int** get_symplectic_basis(c_Triangulation *manifold, int *, int *, int) except *
     extern void free_symplectic_basis(int **, int) except *
     extern void register_callbacks(void (*begin_callback)(),
                                    void (*middle_callback)(),

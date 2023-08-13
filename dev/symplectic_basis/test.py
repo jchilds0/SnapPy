@@ -139,8 +139,10 @@ def test_link_complements_pool(start: int, end: int, manifolds_list: bool):
         for _ in range(start, end):
             lst = list(itertools.islice(result, scale))
 
-            #with open("logs/total.log", "a") as file:
             print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}")
+
+            with open("logs/total.log", "a") as file:
+                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):

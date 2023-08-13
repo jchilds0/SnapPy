@@ -3099,7 +3099,7 @@ cdef class Triangulation():
                 free_cusp_equation(eqn)
 
         # Dual Curve Equations
-        g_eqns = get_symplectic_basis(self.c_triangulation, &dual_rows, &num_cols)
+        g_eqns = get_symplectic_basis(self.c_triangulation, &dual_rows, &num_cols, 0)
 
         for i in range(dual_rows):
             eqns.append([g_eqns[i][j] for j in range(num_cols)])

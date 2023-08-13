@@ -17,11 +17,11 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 0;
+    int fromFile = 1;
 
-    int count = 1;
-    int numTet[] = {5};
-    int index[] = {4};
+    int count = 4;
+    int numTet[] = {6};
+    int index[] = {503};
 
     char *error[] = {
             "CuspedCensusData/link-81188.tri",  /* graph path to path node */
