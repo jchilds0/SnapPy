@@ -2,24 +2,18 @@ import random
 from datetime import datetime
 import snappy
 import unittest
-
 import spherogram
 from tqdm import tqdm
-from multiprocessing import Pool
-import itertools
 
+start = 0
+end = 1
+scale = 1000
+test = "random"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
-    file_name = "links-linux"
+    file_name = "small-db"
 else:
-    file_name = "links"
-
-with open(file_name, "r") as file:
-    lst = file.readline()
-    print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Building test set")
-    manifolds = list(set([int(x) for x in lst.split(',')[:-1]]))
-    manifolds_tri = [snappy.HTLinkExteriors[i] for i in manifolds]
-    manifolds_labels = [M.identify()[0] for M in manifolds_tri if len(M.identify()) > 0]
+    file_name = "large-db"
 
 
 def is_symplectic(M):
@@ -53,15 +47,9 @@ def save_manifold(index: int):
     M.save(f"CuspedCensusData/link-{index}.tri")
 
 
-def process_manifold(i: int, output: bool = True):
-    if output is False:
-        M = snappy.HTLinkExteriors[i]
-        index = i
-        label = M.identify()[0] if len(M.identify()) > 0 else ""
-    else:
-        M = manifolds_tri[i]
-        index = manifolds[i]
-        label = manifolds_labels[i]
+def process_manifold(index: int, output: bool = True):
+    M = snappy.HTLinkExteriors[index]
+    label = M.identify()[0] if len(M.identify()) > 0 else ""
 
     if index == 0:
         return True
@@ -81,15 +69,6 @@ def process_manifold(i: int, output: bool = True):
     return result
 
 
-def find_manifold(start: int):
-    scale = 1000
-    for i in range(scale * start, scale * (start + 1)):
-        M = snappy.HTLinkExteriors[i]
-
-        if len(M.identify()) == 0:
-            return True
-
-
 def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
     for i in range(n):
         L = spherogram.random_link(n_tet, n_cusps, alternating=True)
@@ -98,51 +77,43 @@ def random_link_exteriors(n: int, n_tet: int, n_cusps: int):
         M.save(f"CuspedCensusData/link-{n_tet}-{n_cusps}-{i}.tri")
 
 
-def generate_tests(output_file: str):
+def generate_tests(output: bool):
     print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Generating symplectic basis tests")
     for _ in range(2000):
         index = random.randint(1, len(snappy.HTLinkExteriors) - 1)
         process_manifold(index, output=False)
         print(index)
 
-        with open(output_file, "a") as file:
-            file.write(f"{index},")
+        if output:
+            with open(file_name, "a") as file:
+                file.write(f"{index}\n")
 
 
-def test_link_complements(start: int, end: int, manifolds_list: bool):
-    scale = 1000
+def testing_string(num: int = 0):
+    time = datetime.now().strftime('%d-%m-%y %H:%M:%S')
+
+    if test == "random":
+        return f"[{time}]    Testing ({test}): {num} manifolds\n"
+    elif test == "sequence":
+        return f"[{time}]    Testing ({test}): {scale * start} - {scale * end}\n"
+
+
+def test_link_complements():
+    with open(file_name, "r") as file:
+        lst = file.readlines()
+
+    manifolds = list(set([int(x[:-1]) for x in lst]))
+
     with open("logs/total.log", "a") as file:
-        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
+        file.write(testing_string(len(manifolds)))
 
-    if manifolds_list:
+    if test == "random":
         result = [process_manifold(i) for i in range(len(manifolds))]
     else:
         result = [process_manifold(i) for i in range(scale * start, scale * end)]
 
     with open("logs/total.log", "a") as file:
-        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(result)} / {len(result)}\n")
-
-
-def test_link_complements_pool(start: int, end: int, manifolds_list: bool):
-    scale = 1000
-    with open("logs/total.log", "a") as file:
-        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing: {str(scale * start)} - {str(scale * end - 1)}\n")
-
-    with Pool(maxtasksperchild=25) as pool:
-        if manifolds_list:
-            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing from Manifold List")
-            result = pool.imap(process_manifold, range(len(manifolds)))
-        else:
-            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Testing from {scale * start} to {end * scale}")
-            result = pool.imap(process_manifold, range(start * scale, end * scale))
-
-        for _ in range(start, end):
-            lst = list(itertools.islice(result, scale))
-
-            print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}")
-
-            with open("logs/total.log", "a") as file:
-                file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]  Passed: {sum(lst)} / {len(lst)}\n")
+        file.write(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    Passed: {sum(result)} / {len(result)}\n")
 
 
 class TestSymplecticBasis(unittest.TestCase):
@@ -178,7 +149,10 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements_pool(0, 1, True)
-    # test_link_complements(0, 1, True)
-    # generate_tests("links-linux")
+    # test_link_complements()
+    # generate_tests(True)
     # unittest.main()
+
+    L = spherogram.random_link(30, alternating=True)
+    M = spherogram.Link.exterior(L)
+    M.save("CuspedCensusData/link-random.tri")

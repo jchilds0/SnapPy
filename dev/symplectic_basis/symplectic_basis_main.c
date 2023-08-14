@@ -19,20 +19,23 @@ int main(void) {
 
     int fromFile = 1;
 
-    int count = 4;
-    int numTet[] = {6};
-    int index[] = {503};
+    int count = 8;
+    int numTet[] = {7};
+    int index[] = {1252};
 
     char *error[] = {
-            "CuspedCensusData/link-81188.tri",  /* graph path to path node */
-            "CuspedCensusData/link-83001.tri",  /* update adj curve at endpoint */
-//            "CuspedCensusData/link-115956.tri", /* train line path not found */
+            "CuspedCensusData/link-60819.tri",  /* curve holonomy */
+            "CuspedCensusData/link-83001.tri",  /* find matching endpoints */
             "CuspedCensusData/link-159285.tri",  /* find_matching_endpoints */
-            "CuspedCensusData/link-179680.tri"  /* dual graph */
+            "CuspedCensusData/link-81188.tri",  /* train line path not found */
+            "CuspedCensusData/link-115956.tri", /* train line path not found */
+            "CuspedCensusData/link-179680.tri",  /* train line path not found */
+            "CuspedCensusData/link-395567.tri",  /* working */
+            "CuspedCensusData/link-random.tri"  /* working */
     };
 
 
-    for (i = 0; i < count; i++) {
+    for (i = 7; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
