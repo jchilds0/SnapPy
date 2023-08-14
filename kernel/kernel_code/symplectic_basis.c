@@ -37,8 +37,8 @@ typedef struct Queue {
  */
 
 typedef struct EdgeNode {
-    int                         y;                       
-    struct EdgeNode             *next;                  
+    int                         y;
+    struct EdgeNode             *next;
     struct EdgeNode             *prev;                 
 } EdgeNode;
 
@@ -223,6 +223,8 @@ void                    init_search(Graph *, Boolean *, Boolean *, int *);
 void                    bfs(Graph *, int, Boolean *, Boolean *, int *);
 void                    find_path(int, int, int *, EdgeNode *);
 Boolean                 cycle_exists(Graph *, int, Boolean *, Boolean *, int *, int *, int *);
+int                     **ford_fulkerson(Graph *, int, int);
+int                     augment_path(Graph *, int **, Boolean *, int, int, int);
 
 /**
  * Symplectic Basis
@@ -259,8 +261,7 @@ void                    log_structs(Triangulation *, CuspStructure **, Oscillati
  */
 
 void                    do_manifold_train_lines(CuspStructure **, EndMultiGraph *);
-int                     *find_tet_index_for_edge_classes(Triangulation *);
-Boolean                 set_edge_class_for_tet(Triangulation *, Tetrahedron *, int *);
+int                     *find_tet_index_for_edge_classes(Triangulation *, EndMultiGraph *);
 void                    find_edge_class_edges(CuspStructure **, EndMultiGraph *);
 void                    find_edge_class_edges_on_cusp(CuspStructure *, EndMultiGraph *, const Boolean *, const int *);
 void                    find_e0_edges_on_cusp(CuspStructure **, EndMultiGraph *, const int *);
@@ -624,6 +625,66 @@ Boolean cycle_exists(Graph *g, int start, Boolean *processed, Boolean *discovere
     return FALSE;
 }
 
+int **ford_fulkerson(Graph *g, int source, int sink) {
+    int i, j, augment;
+    int **residual_network = NEW_ARRAY(g->num_vertices, int *);
+    EdgeNode *node;
+    Boolean *visited = NEW_ARRAY(g->num_vertices, Boolean);
+
+    for (i = 0; i < g->num_vertices; i++) {
+        residual_network[i] = NEW_ARRAY(g->num_vertices, int);
+
+        for (j = 0; j < g->num_vertices; j++)
+            residual_network[i][j] = -1;
+    }
+
+
+    for (i = 0; i < g->num_vertices; i++) {
+        for (node = g->edge_list_begin[i].next; node != &g->edge_list_end[i]; node = node->next) {
+            residual_network[i][node->y] = 1;
+            residual_network[node->y][i] = 0;
+        }
+    }
+
+    augment = 1;
+    while (augment > 0) {
+        for (i = 0; i < g->num_vertices; i++)
+            visited[i] = FALSE;
+
+        augment = augment_path(g, residual_network, visited, source, sink, INT_MAX);
+    }
+
+    my_free(visited);
+    return residual_network;
+}
+
+int augment_path(Graph *g, int **residual_network, Boolean *visited, int u, int t, int bottleneck) {
+    int residual, augment, v;
+    EdgeNode *node;
+
+    if (u == t)
+        return bottleneck;
+
+    visited[u] = TRUE;
+
+    for (node = g->edge_list_begin[u].next; node != &g->edge_list_end[u]; node = node->next) {
+        v = node->y;
+        residual = residual_network[u][v];
+
+        if (residual > 0 && !visited[v]) {
+            augment = augment_path(g, residual_network, visited, v, t, MIN(bottleneck, residual));
+
+            if (augment > 0) {
+                residual_network[u][v] -= augment;
+                residual_network[v][u] += augment;
+                return augment;
+            }
+        }
+    }
+
+    return 0;
+}
+
 // ---------------------------------------------------
 
 // Symplectic Basis
@@ -778,6 +839,13 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
     do_manifold_train_lines(cusps, end_multi_graph);
     do_oscillating_curves(cusps, dual_curves, end_multi_graph);
     calculate_holonomy(manifold, symp_eqns, manifold->num_tetrahedra);
+
+    if (debug) {
+        for (i = 0; i < manifold->num_cusps; i++) {
+            printf("%d, ", cusps[i]->num_cusp_regions);
+        }
+        printf("\n");
+    }
 
     free_end_multi_graph(end_multi_graph);
     free_oscillating_curves(dual_curves);
@@ -1957,44 +2025,57 @@ void do_manifold_train_lines(CuspStructure **cusps, EndMultiGraph *multi_graph) 
  * no two endpoints lie on the same cusp triangle.
  */
 
-int *find_tet_index_for_edge_classes(Triangulation *manifold) {
-    int i, num_edge_classes = manifold->num_tetrahedra;
+int *find_tet_index_for_edge_classes(Triangulation *manifold, EndMultiGraph *multi_graph) {
+    int i, j, num_edge_classes = manifold->num_tetrahedra;
+    int edge_source = 2 * num_edge_classes, tet_sink = 2 * num_edge_classes + 1;
     int *edge_class_to_tet_index = NEW_ARRAY(num_edge_classes, int);
+    int **residual_network;
+    Graph *g = init_graph(2 * num_edge_classes + 2, TRUE);
+    Tetrahedron *tet;
+
+    for (i = 0; i < num_edge_classes; i++)
+        edge_class_to_tet_index[i] = -1;
+
+    /*
+     * We build a graph with a vertex for each edge class and tetrahedron,
+     * and edges for edge class which lie in a given tetrahedron.
+     * A bipartite matching then gives the assignment required.
+     */
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        for (i = 0; i < 6; i++) {
+            if (multi_graph->edge_classes[tet->edge_class[i]->index] || tet->edge_class[i]->index == multi_graph->e0)
+                insert_edge(g, tet->edge_class[i]->index, num_edge_classes + tet->index, g->directed);
+        }
+    }
+
+    /*
+     * Convert the graph to a maximum flow problem
+     */
+    for (i = 0; i < num_edge_classes; i++)
+        insert_edge(g, edge_source, i, g->directed);
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next)
+        insert_edge(g, num_edge_classes + tet->index, tet_sink, g->directed);
+
+    residual_network = ford_fulkerson(g, edge_source, tet_sink);
 
     for (i = 0; i < num_edge_classes; i++) {
-        edge_class_to_tet_index[i] = -1;
-    }
+        for (j = num_edge_classes; j < 2 * num_edge_classes; j++)
+            if (residual_network[j][i] == 1)
+                edge_class_to_tet_index[i] = j - num_edge_classes;
 
-    if (!set_edge_class_for_tet(manifold, manifold->tet_list_begin.next, edge_class_to_tet_index))
-        uFatalError("find_tet_index_for_edge_classes", "symplectic_basis");
-
-    return edge_class_to_tet_index;
-}
-
-/*
- * Assign tet indices to edge class by recursively checking all possible 
- * assignments until we find a valid one, and if not raise an error 
- */
-
-Boolean set_edge_class_for_tet(Triangulation *manifold, Tetrahedron *tet, int *edge_class_to_tet_index) {
-    int i;
-
-    if (tet == &manifold->tet_list_end)
-        return TRUE;
-
-    for (i = 0; i < 6; i++) {
-        if (edge_class_to_tet_index[tet->edge_class[i]->index] != -1)
-            continue;
-
-        edge_class_to_tet_index[tet->edge_class[i]->index] = tet->index;
-        if (set_edge_class_for_tet(manifold, tet->next, edge_class_to_tet_index)) {
-            return TRUE;
+        if ((multi_graph->edge_classes[i] || i == multi_graph->e0) && edge_class_to_tet_index[i] == -1) {
+            uFatalError("find_tet_index_for_edge_classes", "symplectic_basis");
         }
-
-        edge_class_to_tet_index[tet->edge_class[i]->index] = -1;
     }
 
-    return FALSE;
+    for (i = 0; i < 2 * num_edge_classes + 2; i++)
+        my_free(residual_network[i]);
+
+    free_graph(g);
+    my_free(residual_network);
+    return edge_class_to_tet_index;
 }
 
 /*
@@ -2007,7 +2088,7 @@ Boolean set_edge_class_for_tet(Triangulation *manifold, Tetrahedron *tet, int *e
 
 void find_edge_class_edges(CuspStructure **cusps, EndMultiGraph *multi_graph) {
     int edge_class, cusp_index, other_cusp_index;
-    int *edge_class_to_tet_index = find_tet_index_for_edge_classes(cusps[0]->manifold);
+    int *edge_class_to_tet_index = find_tet_index_for_edge_classes(cusps[0]->manifold, multi_graph);
     Boolean found_edge_class;
     Boolean *visited_cusps, **edge_classes = NEW_ARRAY(multi_graph->num_cusps, Boolean *);
     Queue *queue = init_queue(multi_graph->num_cusps);
@@ -3949,7 +4030,7 @@ void color_graph(Graph *g) {
  * g2 which connects vertices in g1 of the same color
  */
 
-int find_same_color_edge(Triangulation  *manifold, EndMultiGraph *multi_graph, Graph *g2) {
+int find_same_color_edge(Triangulation *manifold, EndMultiGraph *multi_graph, Graph *g2) {
     int cusp;
     EdgeNode *node;
     Graph *g1 = multi_graph->multi_graph;

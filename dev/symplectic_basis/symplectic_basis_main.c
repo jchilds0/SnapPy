@@ -48,7 +48,7 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 0);
             printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 
