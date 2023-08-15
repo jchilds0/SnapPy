@@ -35,7 +35,7 @@ int main(void) {
     };
 
 
-    for (i = 7; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);

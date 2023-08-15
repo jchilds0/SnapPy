@@ -1,7 +1,13 @@
 /**
  *  Symplectic Basis
  *
- *  Computes the symplectic basis of a cusped 3-manifold
+ *  Computes a symplectic basis of a triangulated knot or link exterior with
+ *  orientable torus cusps. This symplectic matrix extends the Neumann-Zagier
+ *  matrix to one which is symplectic up to factors of 2, and which arises
+ *  from the triangulation of the manifold.
+ *
+ *  See - https://arxiv.org/abs/2208.06969
+ *
  */
 
 #include <stdio.h>
@@ -221,7 +227,7 @@ Boolean                 edge_exists(Graph *, int, int);
 
 void                    init_search(Graph *, Boolean *, Boolean *, int *);
 void                    bfs(Graph *, int, Boolean *, Boolean *, int *);
-void                    find_path(int, int, int *, EdgeNode *);
+void                    find_path(int, int, int *, EdgeNode *, EdgeNode *);
 Boolean                 cycle_exists(Graph *, int, Boolean *, Boolean *, int *, int *, int *);
 int                     **ford_fulkerson(Graph *, int, int);
 int                     augment_path(Graph *, int **, Boolean *, int, int, int);
@@ -564,10 +570,11 @@ void bfs(Graph *g, int start, Boolean *processed, Boolean *discovered, int *pare
 }
 
 /*
- * Recover the path through the graph from the parents array
+ * Recover the path through the graph from the parents array and store
+ * in the doubly linked list node_begin -> ... -> node_end.
  */
 
-void find_path(int start, int end, int *parents, EdgeNode *node) {
+void find_path(int start, int end, int *parents, EdgeNode *node_begin, EdgeNode *node_end) {
     int u;
 
     if (start != end && parents[end] == -1) {
@@ -578,14 +585,14 @@ void find_path(int start, int end, int *parents, EdgeNode *node) {
     while (u != start) {
         EdgeNode *new_node = NEW_STRUCT(EdgeNode);
         new_node->y = u;
-        INSERT_AFTER(new_node, node);
+        INSERT_AFTER(new_node, node_begin);
 
         u = parents[u];
     };
 
     EdgeNode *new_node = NEW_STRUCT(EdgeNode);
     new_node->y = start;
-    INSERT_AFTER(new_node, node);
+    INSERT_AFTER(new_node, node_begin);
 }
 
 /*
@@ -2409,7 +2416,7 @@ void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *st
 
     init_search(cusp->dual_graph, processed, discovered, parent);
     bfs(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent);
-    find_path(start_endpoint->region_index, finish_endpoint->region_index, parent, node_begin);
+    find_path(start_endpoint->region_index, finish_endpoint->region_index, parent, node_begin, node_end);
 
     my_free(processed);
     my_free(discovered);
@@ -2480,6 +2487,13 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     if (start_endpoint->region == NULL)
         uFatalError("do_train_line_segment_on_cusp", "symplectic_basis");
 
+    /*
+     * We require curves run between distinct sides of each cusp triangle
+     * it enters. Hence, we need to remove the edge of the dual graph
+     * corresponding to the last curve segment we drew. This edge will be
+     * added back when the dual graph is reconstructed.
+     */
+
     if (start_endpoint->face == cusp->train_line_path_end.prev->prev_face) {
         // curve dives along the face it passes through
 
@@ -2518,7 +2532,7 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
         cycle_path(cusp->dual_graph, &node_begin, &node_end, processed, discovered, parent,
                    start, visited, finish_endpoint->region_index, cycle_start, cycle_end);
     } else {
-        find_path(start, finish_endpoint->region_index, parent, &node_begin);
+        find_path(start, finish_endpoint->region_index, parent, &node_begin, &node_end);
     }
 
     my_free(processed);
@@ -2810,10 +2824,10 @@ void cycle_path(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
     temp_end.prev = &temp_begin;
 
     // find a path from start -> cycle_end
-    find_path(start, cycle_end, parent, node_begin);
+    find_path(start, cycle_end, parent, node_begin, node_end);
 
     // duplicate the path start -> cycle_start, and reverse it
-    find_path(start, cycle_start, parent, &temp_begin);
+    find_path(start, cycle_start, parent, &temp_begin, &temp_end);
     for (node = temp_end.prev; node != &temp_begin; node = node->prev) {
         temp_node = NEW_STRUCT( EdgeNode );
         temp_node->y = node->y;
@@ -2830,7 +2844,7 @@ void cycle_path(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
     // find a path from visited -> target
     init_search(g, processed, discovered, parent);
     bfs(g, prev, processed, discovered, parent);
-    find_path(prev, finish, parent, node_end->prev);
+    find_path(prev, finish, parent, node_end->prev, node_end);
 }
 
 // ------------------------------------
@@ -3077,7 +3091,7 @@ void do_curve_component_to_new_edge_class(CuspStructure *cusp, CurveComponent *c
     bfs(cusp->dual_graph, curve->endpoints[START].region_index, processed, discovered, parent);
 
     find_path(curve->endpoints[START].region_index, curve->endpoints[FINISH].region_index,
-              parent, node_begin);
+              parent, node_begin, node_end);
     graph_path_to_dual_curve(cusp->dual_graph, node_begin, node_end,
                              &curve->curves_begin,&curve->curves_end,
                              &curve->endpoints[START], &curve->endpoints[FINISH]);
@@ -4098,17 +4112,17 @@ CuspEndPoint *find_multi_graph_path(EndMultiGraph *multi_graph, Triangulation *m
      * determined by the edge classes in the end multi graph and e0.
      */
     if (*path_length % 2 == 1) {
-        find_path(start, end, parent, node_begin);
+        find_path(start, end, parent, node_begin, node_end);
     } else {
         init_search(g, processed, discovered, parent);
         bfs(g, start, processed, discovered, parent);
 
-        find_path(start, startE0, parent, node_begin);
+        find_path(start, startE0, parent, node_begin, node_end);
 
         init_search(g, processed, discovered, parent);
         bfs(g, endE0, processed, discovered, parent);
 
-        find_path(endE0, end, parent, node_end->prev);
+        find_path(endE0, end, parent, node_end->prev, node_end);
     }
 
     cusp_end_point = graph_path_to_cusp_path(multi_graph, node_begin, node_end, edge_class);
