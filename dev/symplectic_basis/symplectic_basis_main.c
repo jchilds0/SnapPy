@@ -31,7 +31,7 @@ int main(void) {
             "CuspedCensusData/link-115956.tri", /* train line path not found */
             "CuspedCensusData/link-179680.tri",  /* train line path not found */
             "CuspedCensusData/link-395567.tri",  /* working */
-            "CuspedCensusData/link-random.tri"  /* working */
+            "CuspedCensusData/link-random100.tri"  /* working */
     };
 
 
@@ -48,7 +48,7 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 0);
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
             printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 

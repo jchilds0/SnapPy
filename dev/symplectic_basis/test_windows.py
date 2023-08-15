@@ -11,9 +11,9 @@ scale = 1000
 test = "random"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
-    file_name = "links-linux"
+    file_name = "small-db"
 else:
-    file_name = "links"
+    file_name = "large-db"
 
 
 def process_manifold(index: int, output: bool = True):
@@ -70,7 +70,7 @@ def test_link_complements_pool(manifolds):
 
 if __name__ == "__main__":
     with open(file_name, "r") as file:
-        lst = file.readline()
+        lst = file.readlines()
 
     manifolds = list(set([int(x[:-1]) for x in lst]))
     test_link_complements_pool(manifolds)

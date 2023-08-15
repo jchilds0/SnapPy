@@ -568,19 +568,24 @@ void bfs(Graph *g, int start, Boolean *processed, Boolean *discovered, int *pare
  */
 
 void find_path(int start, int end, int *parents, EdgeNode *node) {
-    EdgeNode *new_node = NEW_STRUCT(EdgeNode);
-    //new_node->edge_class = -1;
+    int u;
 
-    INSERT_AFTER(new_node, node);
-
-    if (end == -1) {
+    if (start != end && parents[end] == -1) {
         uFatalError("find_path", "symplectic_basis");
-    } else if (start == end) {
-        new_node->y = start;
-    } else {
-        find_path(start, parents[end], parents, node);
-        new_node->y = end;
     }
+
+    u = end;
+    while (u != start) {
+        EdgeNode *new_node = NEW_STRUCT(EdgeNode);
+        new_node->y = u;
+        INSERT_AFTER(new_node, node);
+
+        u = parents[u];
+    };
+
+    EdgeNode *new_node = NEW_STRUCT(EdgeNode);
+    new_node->y = start;
+    INSERT_AFTER(new_node, node);
 }
 
 /*
