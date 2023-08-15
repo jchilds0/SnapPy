@@ -262,7 +262,6 @@ void                    log_structs(Triangulation *, CuspStructure **, Oscillati
 
 void                    do_manifold_train_lines(CuspStructure **, EndMultiGraph *);
 int                     *find_tet_index_for_edge_classes(Triangulation *, EndMultiGraph *);
-Boolean                 set_edge_class_for_tet(Triangulation *, Tetrahedron *, int *);
 void                    find_edge_class_edges(CuspStructure **, EndMultiGraph *);
 void                    find_edge_class_edges_on_cusp(CuspStructure *, EndMultiGraph *, const Boolean *, const int *);
 void                    find_e0_edges_on_cusp(CuspStructure **, EndMultiGraph *, const int *);
@@ -2027,54 +2026,56 @@ void do_manifold_train_lines(CuspStructure **cusps, EndMultiGraph *multi_graph) 
  */
 
 int *find_tet_index_for_edge_classes(Triangulation *manifold, EndMultiGraph *multi_graph) {
-    int i, num_edge_classes = manifold->num_tetrahedra;
+    int i, j, num_edge_classes = manifold->num_tetrahedra;
+    int edge_source = 2 * num_edge_classes, tet_sink = 2 * num_edge_classes + 1;
     int *edge_class_to_tet_index = NEW_ARRAY(num_edge_classes, int);
+    int **residual_network;
+    Graph *g = init_graph(2 * num_edge_classes + 2, TRUE);
+    Tetrahedron *tet;
+
+    for (i = 0; i < num_edge_classes; i++)
+        edge_class_to_tet_index[i] = -1;
+
+    /*
+     * We build a graph with a vertex for each edge class and tetrahedron,
+     * and edges for edge class which lie in a given tetrahedron.
+     * A bipartite matching then gives the assignment required.
+     */
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
+        for (i = 0; i < 6; i++) {
+            if (multi_graph->edge_classes[tet->edge_class[i]->index] || tet->edge_class[i]->index == multi_graph->e0)
+                insert_edge(g, tet->edge_class[i]->index, num_edge_classes + tet->index, g->directed);
+        }
+    }
+
+    /*
+     * Convert the graph to a maximum flow problem
+     */
+    for (i = 0; i < num_edge_classes; i++)
+        insert_edge(g, edge_source, i, g->directed);
+
+    for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next)
+        insert_edge(g, num_edge_classes + tet->index, tet_sink, g->directed);
+
+    residual_network = ford_fulkerson(g, edge_source, tet_sink);
 
     for (i = 0; i < num_edge_classes; i++) {
-        if (multi_graph->edge_classes[i] || i == multi_graph->e0)
-            edge_class_to_tet_index[i] = -1;
-        else
-            edge_class_to_tet_index[i] = -2;
-    }
+        for (j = num_edge_classes; j < 2 * num_edge_classes; j++)
+            if (residual_network[j][i] == 1)
+                edge_class_to_tet_index[i] = j - num_edge_classes;
 
-    if (!set_edge_class_for_tet(manifold, manifold->tet_list_begin.next, edge_class_to_tet_index))
-        uFatalError("find_tet_index_for_edge_classes", "symplectic_basis");
-
-    return edge_class_to_tet_index;
-}
-
-/*
- * Assign tet indices to edge class by recursively checking all possible
- * assignments until we find a valid one, and if not raise an error
- */
-
-Boolean set_edge_class_for_tet(Triangulation *manifold, Tetrahedron *tet, int *edge_class_to_tet_index) {
-    int i;
-    Boolean found = FALSE;
-
-    if (tet == &manifold->tet_list_end)
-        return TRUE;
-
-    for (i = 0; i < 6; i++)
-        if (edge_class_to_tet_index[tet->edge_class[i]->index] != -2)
-            found = TRUE;
-
-    if (!found)
-        return set_edge_class_for_tet(manifold, tet->next, edge_class_to_tet_index);
-
-    for (i = 0; i < 6; i++) {
-        if (edge_class_to_tet_index[tet->edge_class[i]->index] >= 0)
-            continue;
-
-        edge_class_to_tet_index[tet->edge_class[i]->index] = tet->index;
-        if (set_edge_class_for_tet(manifold, tet->next, edge_class_to_tet_index)) {
-            return TRUE;
+        if ((multi_graph->edge_classes[i] || i == multi_graph->e0) && edge_class_to_tet_index[i] == -1) {
+            uFatalError("find_tet_index_for_edge_classes", "symplectic_basis");
         }
-
-        edge_class_to_tet_index[tet->edge_class[i]->index] = -1;
     }
 
-    return FALSE;
+    for (i = 0; i < 2 * num_edge_classes + 2; i++)
+        my_free(residual_network[i]);
+
+    free_graph(g);
+    my_free(residual_network);
+    return edge_class_to_tet_index;
 }
 
 /*
