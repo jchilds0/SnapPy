@@ -8,7 +8,7 @@ import random
 start = 0
 end = 1
 scale = 1000
-test = "random"
+test = "sequence"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
     file_name = "small-db"
@@ -22,7 +22,7 @@ def process_manifold(index: int, output: bool = True):
 
     M = snappy.HTLinkExteriors[index]
     label = M.identify()[0] if len(M.identify()) > 0 else ""
-    print(label)
+    # print(label)
 
     if index == 0:
         return True
@@ -38,6 +38,8 @@ def process_manifold(index: int, output: bool = True):
     if output and result is False:
         with open("logs/links-0.log", "a") as file:
             file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
+
+    print(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}")
 
     return result
 
