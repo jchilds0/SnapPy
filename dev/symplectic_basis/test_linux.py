@@ -3,10 +3,12 @@ import snappy
 from test_base import is_symplectic, testing_string
 from multiprocessing import Pool
 import itertools
+import random
 
 start = 0
 end = 1
 scale = 1000
+num_tests = 2000
 test = "random"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
@@ -16,11 +18,13 @@ else:
 
 print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    Building test set")
 
-with open(file_name, "r") as file:
-    lst = file.readlines()
-    manifolds = list(set([int(x[:-1]) for x in lst]))
-    manifolds_tri = [snappy.HTLinkExteriors[i] for i in manifolds]
-    manifolds_labels = [M.identify()[0] for M in manifolds_tri if len(M.identify()) > 0]
+# with open(file_name, "r") as file:
+    # lst = file.readlines()
+    # manifolds = list(set([int(x[:-1]) for x in lst]))
+
+manifolds = [random.randint(1, len(snappy.HTLinkExteriors)) for _ in range(num_tests)]
+manifolds_tri = [snappy.HTLinkExteriors[i] for i in manifolds]
+manifolds_labels = [M.identify()[0] for M in manifolds_tri if len(M.identify()) > 0]
 
 
 def process_manifold(i: int, output: bool = True):
@@ -39,9 +43,9 @@ def process_manifold(i: int, output: bool = True):
     else:
         string = "Failed"
 
-    if output:
-        with open("logs/links-0.log", "a") as file:
-            file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
+    # if output:
+        # with open("logs/links-0.log", "a") as file:
+    print(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}")
 
     return result
 
