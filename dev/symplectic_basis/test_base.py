@@ -152,6 +152,6 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements()
-    # generate_tests(True)
+    # test_link_complements()
+    generate_tests(True)
     # unittest.main()

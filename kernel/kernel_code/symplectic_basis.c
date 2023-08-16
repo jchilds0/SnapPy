@@ -3516,28 +3516,24 @@ void split_cusp_region_path_interior(CuspRegion *region_end, CuspRegion *region,
     v2 = (int) remaining_face[node->inside_vertex][region->tet_vertex];
 
     /*
-     * Region becomes the cusp region closest to the inside vertex and
-     * new_region becomes the cusp region on the other side of the oscillating curve
+     * new_region becomes the cusp region closest to the inside vertex and
+     * region becomes the cusp region on the other side of the oscillating curve
      */
     copy_region(region, new_region);
     new_region->index = index;
 
     // Update new region
-    new_region->curve[v1][node->inside_vertex]++;
-    new_region->curve[v2][node->inside_vertex]++;
-    new_region->dive[node->inside_vertex][v1]       = region->dive[node->inside_vertex][v1];
-    new_region->dive[v2][v1]                        = region->dive[v2][v1];
-    new_region->dive[node->inside_vertex][v2]       = region->dive[node->inside_vertex][v2];
-    new_region->dive[v1][v2]                        = region->dive[v1][v2];
+    new_region->curve[v1][v2]++;
+    new_region->curve[v2][v1]++;
+    new_region->dive[v1][node->inside_vertex]           = region->dive[v1][node->inside_vertex];
+    new_region->dive[v2][node->inside_vertex]           = region->dive[v2][node->inside_vertex];
+    new_region->adj_cusp_triangle[node->inside_vertex]  = FALSE;
 
     // Update region
-    region->curve[v2][v1]++;
-    region->curve[v1][v2]++;
-    region->dive[v2][v1]                            = FALSE;
-    region->dive[node->inside_vertex][v1]           = FALSE;
-    region->dive[v1][v2]                            = FALSE;
-    region->dive[node->inside_vertex][v2]           = FALSE;
-    region->adj_cusp_triangle[node->inside_vertex]  = FALSE;
+    region->curve[v1][node->inside_vertex]++;
+    region->curve[v2][node->inside_vertex]++;
+    region->dive[v1][node->inside_vertex]           = FALSE;
+    region->dive[v2][node->inside_vertex]           = FALSE;
 
     INSERT_BEFORE(new_region, region_end);
 }

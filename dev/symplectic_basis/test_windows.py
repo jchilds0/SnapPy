@@ -8,7 +8,7 @@ import random
 start = 0
 end = 1
 scale = 1000
-test = "sequence"
+test = "random"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
     file_name = "small-db"
@@ -17,7 +17,7 @@ else:
 
 
 def process_manifold(index: int, output: bool = True):
-    if test == "sequence":
+    if test == "random":
         index = random.randint(1, len(snappy.HTLinkExteriors) - 1)
 
     M = snappy.HTLinkExteriors[index]
@@ -35,7 +35,7 @@ def process_manifold(index: int, output: bool = True):
     else:
         string = "Failed"
 
-    if output and result is False:
+    if output:
         with open("logs/links-0.log", "a") as file:
             file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
@@ -46,7 +46,7 @@ def process_manifold(index: int, output: bool = True):
 
 def test_link_complements_pool(manifolds):
     with open("logs/total.log", "a") as file:
-        if test == "random":
+        if test == "database":
             length = len(manifolds)
         else:
             length = scale * (end - start)
@@ -55,19 +55,20 @@ def test_link_complements_pool(manifolds):
         print(testing_string(length))
 
     with Pool(maxtasksperchild=25) as pool:
-        if test == "random":
+        if test == "database":
             result = pool.imap(process_manifold, manifolds)
         else:
             result = pool.imap(process_manifold, range(start * scale, end * scale))
 
-        for _ in range(start, end):
-            lst = list(itertools.islice(result, scale))
+        # for _ in range(start, end):
+        #     lst = list(itertools.islice(result, scale))
 
-            time = datetime.now().strftime('%d-%m-%y %H:%M:%S')
-            print(f"[{time}]    Passed: {sum(lst)} / {len(lst)}")
+        lst = list(result)
+        time = datetime.now().strftime('%d-%m-%y %H:%M:%S')
+        print(f"[{time}]    Passed: {sum(lst)} / {len(lst)}")
 
-            with open("logs/total.log", "a") as file:
-                file.write(f"[{time}]    Passed: {sum(lst)} / {len(lst)}\n")
+        with open("logs/total.log", "a") as file:
+            file.write(f"[{time}]    Passed: {sum(lst)} / {len(lst)}\n")
 
 
 if __name__ == "__main__":
