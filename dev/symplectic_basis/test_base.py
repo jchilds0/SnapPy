@@ -153,6 +153,8 @@ if __name__ == "__main__":
     # generate_tests(True)
     # unittest.main()
 
-    L = spherogram.random_link(30, alternating=True)
-    M = spherogram.Link.exterior(L)
-    M.save("CuspedCensusData/link-random.tri")
+    M = snappy.HTLinkExteriors[60820]
+    print(M.identify())
+    print(M.symplectic_basis())
+    # is_symplectic(M.symplectic_basis())
+

@@ -79,7 +79,7 @@ typedef struct EndMultiGraph {
  */
 
 struct extra {
-    int                         curve[4][4];            /** oscillating curve holonomy for a cusp triangle */
+    int                         curve[3];            /** oscillating curve holonomy for a cusp triangle */
 };
 
 /**
@@ -747,9 +747,8 @@ int **get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes, i
         tet->extra = NEW_ARRAY(manifold->num_tetrahedra, Extra);
 
         for (i = 0; i < manifold->num_tetrahedra; i++)
-            for (j = 0; j < 4; j++)
-                for (k = 0; k < 4; k++)
-                    tet->extra[i].curve[j][k] = 0;
+            for (j = 0; j < 3; j++)
+                tet->extra[i].curve[j] = 0;
     }
 
     if (debug) {
@@ -1765,9 +1764,10 @@ void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurv
                 for (path_node = path->curves_begin.next; 
                     path_node != &path->curves_end; 
                     path_node = path_node->next)
-                    printf("        Node %d: (Tet Index %d, Tet Vertex %d) Next Face: %d, Prev Face: %d, Inside Vertex: %d\n", 
+                    printf("        Node %d: (Tet Index %d, Tet Vertex %d) Next Face: %d, Prev Face: %d, Inside Vertex: %d, Inside Edge: %d\n",
                            path_node->cusp_region_index, path_node->tri->tet_index, path_node->tri->tet_vertex, 
-                           path_node->next_face, path_node->prev_face, path_node->inside_vertex
+                           path_node->next_face, path_node->prev_face, path_node->inside_vertex,
+                           edge3_between_faces[path_node->next_face][path_node->prev_face]
                            );
                 j++;
             }
@@ -2497,6 +2497,7 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
     EdgeNode *edge_node, *node;
     PathNode *path_node;
     CuspRegion *region;
+    VertexIndex v1, v2;
 
     if (node_begin->next == node_end) {
         // path len 0
@@ -2535,6 +2536,7 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
         node->y = start_endpoint->region_index;
     }
 
+
     for (face = 0; face < 4; face++) {
         if (!start_endpoint->region->adj_cusp_triangle[face])
             continue;
@@ -2547,6 +2549,14 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
 
     if (path_end->prev->next_face == -1)
         uFatalError("graph_path_to_path_node", "symplectic_basis");
+
+    v1 = remaining_face[start_endpoint->region->tet_vertex][path_end->prev->prev_face];
+    v2 = remaining_face[path_end->prev->prev_face][start_endpoint->region->tet_vertex];
+
+    if (path_end->prev->next_face == v1)
+        path_end->prev->inside_vertex = v2;
+    else
+        path_end->prev->inside_vertex = v1;
 
     for (edge_node = node_begin->next->next; edge_node->next != node_end; edge_node = edge_node->next)
         interior_edge_node_to_path_node(g->regions[edge_node->y], path_end, edge_node);
@@ -3217,6 +3227,9 @@ void endpoint_edge_node_to_path_node(CuspRegion *region, PathNode *path_end, Edg
     path_node->cusp_region_index = edge_node->y;
     path_node->tri = region->tri;
 
+    vertex1 = remaining_face[region->tet_vertex][path_endpoint->vertex];
+    vertex2 = remaining_face[path_endpoint->vertex][region->tet_vertex];
+
     if (pos == START) {
         path_node->next_face = -1;
         for (face = 0; face < 4; face++) {
@@ -3227,29 +3240,38 @@ void endpoint_edge_node_to_path_node(CuspRegion *region, PathNode *path_end, Edg
             path_node->next_face = face;
         }
 
-//         next node isn't in an adjacent region
+        // next node isn't in an adjacent region
         if (path_node->next_face == -1)
             uFatalError("endpoint_edge_node_to_path_node", "symplectic_basis");
 
         path_node->prev_face = path_endpoint->face;
+
+        if (path_node->next_face == path_endpoint->vertex) {
+            if (path_endpoint->face == vertex1)
+                path_node->inside_vertex = vertex2;
+            else
+                path_node->inside_vertex = vertex1;
+        } else if (path_node->next_face == path_endpoint->face) {
+            path_node->inside_vertex = -1;
+        } else {
+            path_node->inside_vertex = path_endpoint->vertex;
+        }
     } else {
         path_node->prev_face = EVALUATE(path_end->prev->tri->tet->gluing[path_end->prev->next_face], path_end->prev->next_face);
         path_node->next_face = path_endpoint->face;
+
+        if (path_node->prev_face == path_endpoint->vertex) {
+            if (path_endpoint->face == vertex1)
+                path_node->inside_vertex = vertex2;
+            else
+                path_node->inside_vertex = vertex1;
+        } else if (path_node->prev_face == path_endpoint->face) {
+            path_node->inside_vertex = -1;
+        } else {
+            path_node->inside_vertex = path_endpoint->vertex;
+        }
     }
 
-    vertex1 = remaining_face[region->tet_vertex][path_endpoint->vertex];
-    vertex2 = remaining_face[path_endpoint->vertex][region->tet_vertex];
-
-    if (path_node->prev_face == path_endpoint->vertex) {
-        if (path_endpoint->face == vertex1)
-            path_node->inside_vertex = vertex2;
-        else
-            path_node->inside_vertex = vertex1;
-    } else if (path_node->prev_face == path_endpoint->face) {
-        path_node->inside_vertex = -1;
-    } else {
-        path_node->inside_vertex = path_endpoint->vertex;
-    }
 
     INSERT_BEFORE(path_node, path_end);
 }
@@ -3708,10 +3730,18 @@ void update_adj_curve_on_cusp(CuspStructure *cusp) {
 
 void update_path_holonomy(CurveComponent *path, int edge_class) {
     PathNode *path_node;
+    FaceIndex index;
 
     for (path_node = path->curves_begin.next; path_node != &path->curves_end; path_node = path_node->next) {
-        path_node->tri->tet->extra[edge_class].curve[path_node->tri->tet_vertex][path_node->next_face]++;
-        path_node->tri->tet->extra[edge_class].curve[path_node->tri->tet_vertex][path_node->prev_face]--;
+        if (path_node->inside_vertex == -1 || path_node->prev_face == path_node->next_face)
+            continue;
+
+        index = edge3_between_faces[path_node->prev_face][path_node->next_face];
+
+        if (remaining_face[path_node->inside_vertex][path_node->prev_face] == path_node->next_face)
+            path_node->tri->tet->extra[edge_class].curve[index]++;
+        else
+            path_node->tri->tet->extra[edge_class].curve[index]--;
     }
 }
 
@@ -3731,17 +3761,8 @@ void calculate_holonomy(Triangulation *manifold, int **symp_eqns, int num_curves
         // which curve
         for (curve = 0; curve < num_curves; curve++) {
             // which tet v
-            for (v = 0; v < 4; v++) {
-
-                for (f = 0; f < 4; f++) {
-                    if (f == v)
-                        continue;
-
-                    ff = (int) remaining_face[v][f];
-
-                    symp_eqns[curve][3 * tet->index + edge3_between_faces[f][ff]]
-                                += FLOW(tet->extra[curve].curve[v][f], tet->extra[curve].curve[v][ff]);
-                }
+            for (v = 0; v < 3; v++) {
+                symp_eqns[curve][3 * tet->index + v] += tet->extra[curve].curve[v];
             }
         }
     }
