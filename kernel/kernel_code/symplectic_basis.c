@@ -2395,27 +2395,24 @@ Boolean *update_edge_classes_on_cusp(CuspStructure **cusps, Boolean **edge_class
 void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMultiGraph *multi_graph) {
     int endpoint_start_index;
     PathEndPoint *start;
-    Boolean *endpoints = edge_classes_on_cusp(multi_graph, cusp->cusp->index);
+    Boolean *edge_classes = edge_classes_on_cusp(multi_graph, cusp->cusp->index);
+
+    if (cusp->train_line_endpoint[multi_graph->e0].tri != NULL)
+        edge_classes[multi_graph->e0] = TRUE;
 
     endpoint_start_index = next_valid_endpoint_index(cusp->train_line_endpoint, multi_graph->num_edge_classes, -1);
     start = NULL;
 
     if (cusp->extra_endpoint_e0.tri == NULL) {
-        for (int i = 0; i < cusp->num_edge_classes; i++) {
-            if (cusp->train_line_endpoint[i].tri == NULL)
-                continue;
-
-            start = &cusp->train_line_endpoint[i];
-            endpoints[i] = FALSE;
-            break;
-        }
+        start = &cusp->train_line_endpoint[endpoint_start_index];
+        edge_classes[endpoint_start_index] = FALSE;
     } else {
         start = &cusp->extra_endpoint_e0;
-        endpoints[multi_graph->e0] = TRUE;
+        edge_classes[multi_graph->e0] = TRUE;
     }
 
-    if (start == NULL || !array_contains_true(endpoints, multi_graph->num_edge_classes)) {
-        my_free(endpoints);
+    if (start == NULL || !array_contains_true(edge_classes, multi_graph->num_edge_classes)) {
+        my_free(edge_classes);
         return;
     }
 
@@ -2428,7 +2425,7 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
 //        start = &cusp->extra_endpoint_e0;
 
     tri_endpoint_to_region_endpoint(cusp, start);
-    endpoint_start_index = do_initial_train_line_segment_on_cusp(cusp, start, endpoints);
+    endpoint_start_index = do_initial_train_line_segment_on_cusp(cusp, start, edge_classes);
 
     if (debug) {
         log_structs(cusps[0]->manifold, cusps, NULL, "cusp_regions");
@@ -2436,10 +2433,10 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
 
     }
 
-    while (array_contains_true(endpoints, multi_graph->num_edge_classes)) {
+    while (array_contains_true(edge_classes, multi_graph->num_edge_classes)) {
         start = &cusp->train_line_endpoint[endpoint_start_index];
         construct_cusp_region_dual_graph(cusp);
-        endpoint_start_index = do_train_line_segment_on_cusp(cusp, start, endpoints);
+        endpoint_start_index = do_train_line_segment_on_cusp(cusp, start, edge_classes);
 
         if (debug) {
             log_structs(cusps[0]->manifold, cusps, NULL, "cusp_regions");
@@ -2447,7 +2444,7 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
         }
     }
 
-    my_free(endpoints);
+    my_free(edge_classes);
 }
 
 /*

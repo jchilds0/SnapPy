@@ -154,6 +154,10 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test_link_complements()
+    # test_link_complements()
     # generate_tests(True)
     # unittest.main()
+    # save_manifold(167680)
+
+    print(snappy.HTLinkExteriors[167680].identify())
+    print(snappy.HTLinkExteriors[167680].symplectic_basis())

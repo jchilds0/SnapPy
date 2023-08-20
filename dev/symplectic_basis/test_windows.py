@@ -39,7 +39,7 @@ def process_manifold(index: int, output: bool = True):
         with open("logs/links-0.log", "a") as file:
             file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
 
-    print(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}")
+    # print(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}")
 
     return result
 
@@ -60,15 +60,15 @@ def test_link_complements_pool(manifolds):
         else:
             result = pool.imap(process_manifold, range(start * scale, end * scale))
 
-        # for _ in range(start, end):
-        #     lst = list(itertools.islice(result, scale))
+        for _ in range(start, end):
+            lst = list(itertools.islice(result, scale))
 
-        lst = list(result)
-        time = datetime.now().strftime('%d-%m-%y %H:%M:%S')
-        print(f"[{time}]    Passed: {sum(lst)} / {len(lst)}")
+        # lst = list(result)
+            time = datetime.now().strftime('%d-%m-%y %H:%M:%S')
+            print(f"[{time}]    Passed: {sum(lst)} / {len(lst)}")
 
-        with open("logs/total.log", "a") as file:
-            file.write(f"[{time}]    Passed: {sum(lst)} / {len(lst)}\n")
+            with open("logs/total.log", "a") as file:
+                file.write(f"[{time}]    Passed: {sum(lst)} / {len(lst)}\n")
 
 
 if __name__ == "__main__":
