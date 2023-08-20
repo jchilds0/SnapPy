@@ -231,6 +231,8 @@ void                    find_path(int, int, int *, EdgeNode *, EdgeNode *);
 Boolean                 cycle_exists(Graph *, int, Boolean *, Boolean *, int *, int *, int *);
 int                     **ford_fulkerson(Graph *, int, int);
 int                     augment_path(Graph *, int **, Boolean *, int, int, int);
+int                     bfs_target_list(Graph *, int, int *, int, Boolean *, Boolean *, int *);
+Boolean                 contains(int *, int, int);
 
 /**
  * Symplectic Basis
@@ -273,10 +275,12 @@ void                    find_edge_class_edges_on_cusp(CuspStructure *, EndMultiG
 void                    find_e0_edges_on_cusp(CuspStructure **, EndMultiGraph *, const int *);
 Boolean                 *update_edge_classes_on_cusp(CuspStructure **, Boolean **, int, int, int);
 void                    find_primary_train_line(CuspStructure **, CuspStructure *, EndMultiGraph *);
-void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
-void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
+int                     do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, Boolean *);
+int                     do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, Boolean *);
 int                     next_valid_endpoint_index(PathEndPoint *, int, int);
 void                    tri_endpoint_to_region_endpoint(CuspStructure *, PathEndPoint *);
+int                     *target_endpoints(CuspStructure *, const Boolean *, int *);
+Boolean                 array_contains_true(Boolean *, int);
 void                    graph_path_to_path_node(Graph *, EdgeNode *, EdgeNode *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
 void                    split_cusp_regions_along_train_line_segment(CuspStructure *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
 void                    update_cusp_triangle_train_line_endpoints(CuspRegion *, CuspRegion *, CuspRegion *, PathNode *, PathEndPoint *, int);
@@ -308,7 +312,7 @@ void                    split_cusp_region_path_endpoint(CuspRegion *, CuspRegion
 void                    update_cusp_triangle_path_interior(CuspRegion *, CuspRegion *, CuspRegion *, PathNode *);
 void                    update_cusp_triangle_endpoints(CuspRegion *, CuspRegion *, CuspRegion *, PathEndPoint *, PathNode *, int);
 void                    copy_region(CuspRegion *, CuspRegion *);
-void                    update_adj_curve_along_path(CuspStructure **, OscillatingCurves *, int);
+void                    update_adj_curve_along_path(CuspStructure **, OscillatingCurves *, int, Boolean);
 void                    update_adj_curve_at_endpoint(PathEndPoint *, CurveComponent *, int);
 void                    update_adj_curve_on_cusp(CuspStructure *);
 void                    update_path_holonomy(CurveComponent *, int);
@@ -695,6 +699,55 @@ int augment_path(Graph *g, int **residual_network, Boolean *visited, int u, int 
     }
 
     return 0;
+}
+
+/*
+ * Modified breadth first search which starts at vertex 'start' and
+ * searches until we find an element of 'targets'.
+ */
+
+int bfs_target_list(Graph *g, int start, int *targets, int num_targets, Boolean *processed, Boolean *discovered, int *parent) {
+    Queue *q = init_queue(10);
+    Boolean found = FALSE;
+    int v, y, retval = -1;
+    EdgeNode *p;
+
+    enqueue(q, start);
+    discovered[start] = TRUE;
+
+    while (!empty_queue(q)) {
+        v = dequeue(q);
+        processed[v] = TRUE;
+        p = &g->edge_list_begin[v];
+
+        if (!found && contains(targets, num_targets, v)) {
+            found = TRUE;
+            retval = v;
+        }
+
+        while ((p = p->next)->next != NULL) {
+            y = p->y;
+
+            if (!discovered[y]) {
+                q = enqueue(q, y);
+                discovered[y] = TRUE;
+                parent[y] = v;
+            }
+        }
+    }
+
+    free_queue(q);
+    return retval;
+}
+
+Boolean contains(int *array, int len, int target) {
+    Boolean found = FALSE;
+
+    for (int i = 0; i < len; i++)
+        if (array[i] == target)
+            found = TRUE;
+
+    return found;
 }
 
 // ---------------------------------------------------
@@ -2340,53 +2393,61 @@ Boolean *update_edge_classes_on_cusp(CuspStructure **cusps, Boolean **edge_class
  */
 
 void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMultiGraph *multi_graph) {
-    int endpoint_start_index, endpoint_finish_index;
-    PathEndPoint *start, *finish;
+    int endpoint_start_index;
+    PathEndPoint *start;
+    Boolean *endpoints = edge_classes_on_cusp(multi_graph, cusp->cusp->index);
 
-    endpoint_start_index = next_valid_endpoint_index(cusp->train_line_endpoint,
-                                                     multi_graph->num_edge_classes,
-                                                     -1);
-    endpoint_finish_index = next_valid_endpoint_index(cusp->train_line_endpoint,
-                                                      multi_graph->num_edge_classes,
-                                                      endpoint_start_index);
-
-    if (endpoint_start_index == -1 || (cusp->extra_endpoint_e0.tri == NULL && endpoint_finish_index == -1))
-        return;
+    endpoint_start_index = next_valid_endpoint_index(cusp->train_line_endpoint, multi_graph->num_edge_classes, -1);
+    start = NULL;
 
     if (cusp->extra_endpoint_e0.tri == NULL) {
-        start = &cusp->train_line_endpoint[endpoint_start_index];
-        finish = &cusp->train_line_endpoint[endpoint_finish_index];
+        for (int i = 0; i < cusp->num_edge_classes; i++) {
+            if (cusp->train_line_endpoint[i].tri == NULL)
+                continue;
+
+            start = &cusp->train_line_endpoint[i];
+            endpoints[i] = FALSE;
+            break;
+        }
     } else {
         start = &cusp->extra_endpoint_e0;
-        finish = &cusp->train_line_endpoint[endpoint_start_index];
-
-        endpoint_finish_index = endpoint_start_index;
+        endpoints[multi_graph->e0] = TRUE;
     }
+
+    if (start == NULL || !array_contains_true(endpoints, multi_graph->num_edge_classes)) {
+        my_free(endpoints);
+        return;
+    }
+
+//    if (endpoint_start_index == -1 || (cusp->extra_endpoint_e0.tri == NULL && endpoint_finish_index == -1))
+//        return;
+
+//    if (cusp->extra_endpoint_e0.tri == NULL)
+//        start = &cusp->train_line_endpoint[endpoint_start_index];
+//    else
+//        start = &cusp->extra_endpoint_e0;
 
     tri_endpoint_to_region_endpoint(cusp, start);
-    tri_endpoint_to_region_endpoint(cusp, finish);
+    endpoint_start_index = do_initial_train_line_segment_on_cusp(cusp, start, endpoints);
 
-    do_initial_train_line_segment_on_cusp(cusp, start, finish);
+    if (debug) {
+        log_structs(cusps[0]->manifold, cusps, NULL, "cusp_regions");
+        log_structs(cusps[0]->manifold, cusps, NULL, "graph");
 
-    endpoint_start_index = endpoint_finish_index;
-    endpoint_finish_index = next_valid_endpoint_index(cusp->train_line_endpoint,
-                                                      multi_graph->num_edge_classes,
-                                                      endpoint_start_index);
-
-    while (endpoint_finish_index != -1) {
-        start = &cusp->train_line_endpoint[endpoint_start_index];
-        finish = &cusp->train_line_endpoint[endpoint_finish_index];
-
-        tri_endpoint_to_region_endpoint(cusp, finish);
-
-        do_train_line_segment_on_cusp(cusp, start, finish);
-
-        // update endpoint indices
-        endpoint_start_index = endpoint_finish_index;
-        endpoint_finish_index = next_valid_endpoint_index(cusp->train_line_endpoint,
-                                                          multi_graph->num_edge_classes,
-                                                          endpoint_start_index);
     }
+
+    while (array_contains_true(endpoints, multi_graph->num_edge_classes)) {
+        start = &cusp->train_line_endpoint[endpoint_start_index];
+        construct_cusp_region_dual_graph(cusp);
+        endpoint_start_index = do_train_line_segment_on_cusp(cusp, start, endpoints);
+
+        if (debug) {
+            log_structs(cusps[0]->manifold, cusps, NULL, "cusp_regions");
+            log_structs(cusps[0]->manifold, cusps, NULL, "graph");
+        }
+    }
+
+    my_free(endpoints);
 }
 
 /*
@@ -2395,19 +2456,16 @@ void find_primary_train_line(CuspStructure **cusps, CuspStructure *cusp, EndMult
  * line.
  */
 
-void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint) {
-    EdgeNode *node_begin, *node_end, *edge_node;
-    Boolean *processed;
-    Boolean *discovered;
-    int *parent;
+int do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endpoint, Boolean *endpoints) {
+    EdgeNode node_begin, node_end, *edge_node;
+    PathEndPoint *finish_endpoint;
+    Boolean *processed, *discovered;
+    int *targets, *parent, finish_region_index, finish_edge_class, len;
 
-    node_begin  = NEW_STRUCT( EdgeNode );
-    node_end    = NEW_STRUCT( EdgeNode );
-
-    node_begin->next = node_end;
-    node_begin->prev = NULL;
-    node_end->next   = NULL;
-    node_end->prev   = node_begin;
+    node_begin.next = &node_end;
+    node_begin.prev = NULL;
+    node_end.next   = NULL;
+    node_end.prev   = &node_begin;
 
     construct_cusp_region_dual_graph(cusp);
 
@@ -2415,16 +2473,39 @@ void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *st
     discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
 
+    // update regions
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i])
+            tri_endpoint_to_region_endpoint(cusp, &cusp->train_line_endpoint[i]);
+    }
+
+    targets = target_endpoints(cusp, endpoints, &len);
     init_search(cusp->dual_graph, processed, discovered, parent);
-    bfs(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent);
-    find_path(start_endpoint->region_index, finish_endpoint->region_index, parent, node_begin, node_end);
+    finish_region_index = bfs_target_list(cusp->dual_graph, start_endpoint->region_index, targets, len, processed, discovered, parent);
+    find_path(start_endpoint->region_index, finish_region_index, parent, &node_begin, &node_end);
+
+    finish_edge_class = -1;
+
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i] == FALSE || cusp->train_line_endpoint[i].region_index != finish_region_index)
+            continue;
+
+        finish_edge_class = i;
+    }
+
+    if (finish_edge_class == -1)
+        uFatalError("do_initial_train_line_segment_on_cusp", "symplectic_basis");
+
+    finish_endpoint = &cusp->train_line_endpoint[finish_edge_class];
+    endpoints[finish_edge_class] = FALSE;
 
     my_free(processed);
     my_free(discovered);
     my_free(parent);
+    my_free(targets);
 
     // split along curve
-    graph_path_to_dual_curve(cusp->dual_graph, node_begin, node_end,
+    graph_path_to_dual_curve(cusp->dual_graph, &node_begin, &node_end,
                              &cusp->train_line_path_begin, &cusp->train_line_path_end,
                              start_endpoint, finish_endpoint);
     split_cusp_regions_along_path(cusp, &cusp->train_line_path_begin,
@@ -2433,14 +2514,13 @@ void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *st
     start_endpoint->node = cusp->train_line_path_begin.next;
     finish_endpoint->node = cusp->train_line_path_end.prev;
 
-    while (node_begin->next != node_end) {
-        edge_node = node_begin->next;
+    while (node_begin.next != &node_end) {
+        edge_node = node_begin.next;
         REMOVE_NODE(edge_node);
         my_free(edge_node);
     }
 
-    my_free(node_begin);
-    my_free(node_end);
+    return finish_edge_class;
 }
 
 /*
@@ -2450,12 +2530,14 @@ void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *st
  * adjacent across the face of the cusp triangle we dive along.
  */
 
-void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint) {
+int do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endpoint, Boolean *endpoints) {
     EdgeNode node_begin, node_end, *edge_node;
     PathNode *start_node;
+    PathEndPoint *finish_endpoint;
     CuspRegion *region;
     Boolean cycle, *processed, *discovered;
-    int start, start_index, cycle_start, cycle_end, visited, *parent;
+    int start, finish_region_index, finish_edge_class, start_index, cycle_start, cycle_end, visited, len;
+    int *targets, *parent;
 
     node_begin.next = &node_end;
     node_begin.prev = NULL;
@@ -2466,6 +2548,12 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     processed = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
+
+    // update regions
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i])
+            tri_endpoint_to_region_endpoint(cusp, &cusp->train_line_endpoint[i]);
+    }
 
     init_search(cusp->dual_graph, processed, discovered, parent);
 
@@ -2517,36 +2605,47 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
     }
 
     delete_edge(cusp->dual_graph, visited, start, cusp->dual_graph->directed);
+    targets = target_endpoints(cusp, endpoints, &len);
+    finish_region_index = bfs_target_list(cusp->dual_graph, start, targets, len, processed, discovered, parent);
+    find_path(start, finish_region_index, parent, &node_begin, &node_end);
 
-    bfs(cusp->dual_graph, start, processed, discovered, parent);
+//    if (parent[finish_endpoint->region_index] == -1 && start != finish_endpoint->region_index) {
+//        /*
+//         * The finish endpoint is not in the subgraph we created by removing the edge
+//         * (visited, start). Assume there exists a cycle in this subgraph, we use this to
+//         * 'turn the curve around' and use the edge (visited, start).
+//         */
+//
+//        init_search(cusp->dual_graph, processed, discovered, parent);
+//        cycle = cycle_exists(cusp->dual_graph, start, processed, discovered, parent, &cycle_start, &cycle_end);
+//
+//        if (cycle == FALSE)
+//            // nothing we can do, train line does not work
+//            uFatalError("do_train_line_segment_on_cusp", "symplectic_basis");
+//
+//        // reset parent array
+//        init_search(cusp->dual_graph, processed, discovered, parent);
+//        bfs(cusp->dual_graph, start, processed, discovered, parent);
+//
+//        cycle_path(cusp->dual_graph, &node_begin, &node_end, processed, discovered, parent,
+//                   start, visited, finish_endpoint->region_index, cycle_start, cycle_end);
+//    } else {
+//        find_path(start, finish_endpoint->region_index, parent, &node_begin, &node_end);
+//    }
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i] == FALSE || cusp->train_line_endpoint[i].region_index != finish_region_index)
+            continue;
 
-    if (parent[finish_endpoint->region_index] == -1 && start != finish_endpoint->region_index) {
-        /*
-         * The finish endpoint is not in the subgraph we created by removing the edge
-         * (visited, start). Assume there exists a cycle in this subgraph, we use this to
-         * 'turn the curve around' and use the edge (visited, start).
-         */
-
-        init_search(cusp->dual_graph, processed, discovered, parent);
-        cycle = cycle_exists(cusp->dual_graph, start, processed, discovered, parent, &cycle_start, &cycle_end);
-
-        if (cycle == FALSE)
-            // nothing we can do, train line does not work
-            uFatalError("do_train_line_segment_on_cusp", "symplectic_basis");
-
-        // reset parent array
-        init_search(cusp->dual_graph, processed, discovered, parent);
-        bfs(cusp->dual_graph, start, processed, discovered, parent);
-
-        cycle_path(cusp->dual_graph, &node_begin, &node_end, processed, discovered, parent,
-                   start, visited, finish_endpoint->region_index, cycle_start, cycle_end);
-    } else {
-        find_path(start, finish_endpoint->region_index, parent, &node_begin, &node_end);
+        finish_edge_class = i;
     }
+
+    finish_endpoint = &cusp->train_line_endpoint[finish_edge_class];
+    endpoints[finish_edge_class] = FALSE;
 
     my_free(processed);
     my_free(discovered);
     my_free(parent);
+    my_free(targets);
 
     // split along curve
     start_node = cusp->train_line_path_end.prev;
@@ -2562,8 +2661,9 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
         REMOVE_NODE(edge_node);
         my_free(edge_node);
     }
-}
 
+    return finish_edge_class;
+}
 
 int next_valid_endpoint_index(PathEndPoint *endpoints, int num_endpoints, int current_index) {
     int index;
@@ -2600,6 +2700,37 @@ void tri_endpoint_to_region_endpoint(CuspStructure *cusp, PathEndPoint *endpoint
 
     if (endpoint->region == NULL)
         uFatalError("tri_endpoint_to_region_endpoint", "symplectic_basis");
+}
+
+int *target_endpoints(CuspStructure *cusp, const Boolean *endpoints, int *len) {
+    int j, *targets;
+    *len = 0;
+
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i])
+            (*len)++;
+    }
+
+    targets = NEW_ARRAY(*len, int);
+    j = 0;
+    for (int i = 0; i < cusp->num_edge_classes; i++) {
+        if (endpoints[i]) {
+            targets[j++] = cusp->train_line_endpoint[i].region_index;
+        }
+    }
+
+    return targets;
+}
+
+Boolean array_contains_true(Boolean *array, int len) {
+    Boolean found = FALSE;
+
+    for (int i = 0; i < len; i++) {
+        if (array[i])
+            found = TRUE;
+    }
+
+    return found;
 }
 
 void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end, PathNode *path_begin,
@@ -2922,7 +3053,7 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
     update_path_holonomy(path, edge_class);
 
-    update_adj_curve_along_path(cusps, curves, curve_index);
+    update_adj_curve_along_path(cusps, curves, curve_index, (Boolean) (cusp_end_point->next->next != NULL));
 
     if (debug) {
         printf("\n");
@@ -3738,7 +3869,7 @@ void update_cusp_triangle_endpoints(CuspRegion *cusp_region_start, CuspRegion *c
     }
 }
 
-void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curves, int curve_index) {
+void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curves, int curve_index, Boolean train_line) {
     int i, j;
     CurveComponent *curve,
                *dual_curve_begin = &curves->curve_begin[curve_index],
@@ -3755,16 +3886,18 @@ void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curve
         cusp = cusps[i];
 
         if (cusp->extra_endpoint_e0.tri != NULL) {
-            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_begin->next, 1);
-            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_end->prev, 1);
+            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_begin->next, START);
+            if (train_line == FALSE)
+                update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_end->prev, FINISH);
         }
 
         for (j = 0; j < manifold->num_tetrahedra; j++) {
             if (cusp->train_line_endpoint[j].tri == NULL)
                 continue;
 
-            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_begin->next, 1);
-            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_end->prev, 1);
+            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_begin->next, START);
+            if (train_line == FALSE)
+                update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_end->prev, FINISH);
         }
     }
 }
@@ -3779,17 +3912,15 @@ void update_adj_curve_at_endpoint(PathEndPoint *path_endpoint, CurveComponent *p
     int i;
     PathEndPoint *curve_end_point;
 
-    for (i = 0; i < 2; i++) {
-        curve_end_point = &path->endpoints[i];
+    curve_end_point = &path->endpoints[pos];
 
-        if (curve_end_point->tri->tet_index != path_endpoint->tri->tet_index ||
-            curve_end_point->tri->tet_vertex != path_endpoint->tri->tet_vertex ||
-            curve_end_point->face != path_endpoint->face ||
-            curve_end_point->vertex != path_endpoint->vertex)
-            continue;
+    if (curve_end_point->tri->tet_index != path_endpoint->tri->tet_index ||
+        curve_end_point->tri->tet_vertex != path_endpoint->tri->tet_vertex ||
+        curve_end_point->face != path_endpoint->face ||
+        curve_end_point->vertex != path_endpoint->vertex)
+        return;
 
-        path_endpoint->num_adj_curves++;
-    }
+    path_endpoint->num_adj_curves++;
 }
 
 /*

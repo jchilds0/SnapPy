@@ -19,19 +19,20 @@ int main(void) {
 
     int fromFile = 1;
 
-    int count = 8;
+    int count = 5;
     int numTet[] = {7};
-    int index[] = {1252};
+    int index[] = {3227};
 
     char *error[] = {
             "CuspedCensusData/link-60819.tri",  /* curve holonomy */
             "CuspedCensusData/link-179680.tri",  /* curve holonomy */
-            "CuspedCensusData/link-83001.tri",  /* find matching endpoints */
-            "CuspedCensusData/link-159285.tri",  /* find_matching_endpoints */
+            "CuspedCensusData/link-83001.tri",  /* curve holonomy */
+            "CuspedCensusData/link-159285.tri",  /* curve holonomy */
+            "CuspedCensusData/link-83653.tri",  /* do curve component train line */
     };
 
 
-    for (i = 3; i < count; i++) {
+    for (i = 4; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
@@ -44,7 +45,7 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 0);
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
             printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 

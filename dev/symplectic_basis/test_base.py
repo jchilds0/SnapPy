@@ -55,6 +55,8 @@ def process_manifold(index: int):
     if index == 0:
         return True
 
+    print(index)
+
     basis = M.symplectic_basis()
     result = is_symplectic(basis)
 
@@ -152,6 +154,6 @@ class TestSymplecticBasis(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # test_link_complements()
-    generate_tests(True)
+    test_link_complements()
+    # generate_tests(True)
     # unittest.main()
