@@ -6,9 +6,9 @@ import itertools
 import random
 
 start = 0
-end = 3
-scale = 10
-test = "sequence"
+end = 1
+scale = 500
+test = "random"
 
 print(f"[{datetime.now().strftime('%d-%m-%y %H:%M:%S')}]    Building test set")
 
@@ -38,6 +38,8 @@ def process_manifold(i: int, output: bool = True):
     if output:
         with open(f"logs/links-{i // scale}.log", "a") as file:
             file.write(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}\n")
+
+    print(f"Testing: {str(index)} {(20 - len(str(index))) * ' '} {str(label)} {(40 - len(str(label))) * ' '} {string}")
 
     return result
 

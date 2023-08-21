@@ -17,19 +17,19 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 1;
+    int fromFile = 0;
 
-    int count = 2;
-    int numTet[] = {7};
-    int index[] = {3227};
+    int count = 1;
+    int numTet[] = {5};
+    int index[] = {4};
 
     char *error[] = {
             "CuspedCensusData/link-83653.tri",  /* curve holonomy */
-            "CuspedCensusData/link-167680.tri",  /* */
+            "CuspedCensusData/link-116084.tri",  /* */
     };
 
 
-    for (i = 1; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (fromFile == 1) {
             printf("Triangulation: %s\n", error[i]);
             theTriangulation = read_triangulation(error[i]);
@@ -42,7 +42,7 @@ int main(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold)
                 continue;
 
-            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 0);
+            eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
             printMatrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 

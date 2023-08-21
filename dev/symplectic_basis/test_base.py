@@ -8,7 +8,7 @@ from tqdm import tqdm
 start = 0
 end = 1
 scale = 1000
-num_tests = 1000
+num_tests = 5000
 test = "random"
 
 if len(snappy.HTLinkExteriors(crossings=15)) == 0:
@@ -157,7 +157,5 @@ if __name__ == "__main__":
     # test_link_complements()
     # generate_tests(True)
     # unittest.main()
-    # save_manifold(167680)
 
-    print(snappy.HTLinkExteriors[167680].identify())
-    print(snappy.HTLinkExteriors[167680].symplectic_basis())
+    save_manifold(116084)

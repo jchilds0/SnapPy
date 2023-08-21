@@ -48,7 +48,7 @@ def file_to_graph(filename: str):
 
 
 if __name__ == "__main__":
-    graphs = file_to_graph("graph")
+    graphs = file_to_graph("logs/link-116084.log")
     pos = nx.spring_layout(graphs[0][0])
     for i, graph in enumerate(graphs):
         plt.figure(i)
