@@ -144,18 +144,17 @@ typedef struct PathNode {
 typedef struct CurveComponent {
     int                         edge_class[2];          /** edge classes at path end points */
     int                         cusp_index;             /** which cusp does the curve lie in */
-    PathNode                    curves_begin;           /** header node of doubbly linked list */
-    PathNode                    curves_end;             /** tailer node of ... */
+    PathNode                    path_begin;             /** header node of doubbly linked list */
+    PathNode                    path_end;               /** tailer node of ... */
     PathEndPoint                endpoints[2];           /** path end points */
     struct CurveComponent       *next;                  /** next curve component in doubly linked list */
     struct CurveComponent       *prev;                  /** prev ... */
 } CurveComponent;
 
 typedef struct OscillatingCurves {
-    int                         num_curves;
-    int                         *edge_class;
-    CurveComponent              *curve_begin;          /** array of doubly linked lists of dual curves */
-    CurveComponent              *curve_end;            /** array of doubly linkek lists of dual curves */
+    int                         edge_class;
+    CurveComponent              curve_begin;            /** array of doubly linked lists of dual curves */
+    CurveComponent              curve_end;              /** array of doubly linkek lists of dual curves */
 } OscillatingCurves;
 
 /**
@@ -262,7 +261,7 @@ void                    free_edge_node(EdgeNode *, EdgeNode *);
 
 int                     *gluing_equations_for_edge_class(Triangulation *, int);
 int                     *combinatorial_holonomy(Triangulation *, int);
-void                    get_symplectic_equations(Triangulation *, Boolean *);
+void                    oscillating_curves(Triangulation *manifold, Boolean *edge_classes);
 
 CuspStructure           *init_cusp_structure(Triangulation *, Cusp *);
 void                    free_cusp_structure(CuspStructure **, int, int);
@@ -281,8 +280,6 @@ void                    update_adj_region_data(CuspStructure *);
 CuspRegion              *find_adj_region(CuspRegion *, CuspRegion *, CuspRegion *, int);
 void                    init_train_line(CuspStructure *);
 CurveComponent          *init_curve_component(int, int, int);
-OscillatingCurves       *init_oscillating_curves(Triangulation *, const Boolean *);
-void                    free_oscillating_curves(OscillatingCurves *);
 void                    find_intersection_triangle(Triangulation *, CuspStructure *);
 void                    construct_cusp_region_dual_graph(CuspStructure *);
 void                    log_structs(Triangulation *, CuspStructure **, OscillatingCurves *, char *);
@@ -315,8 +312,8 @@ void                    cycle_path(Graph *, EdgeNode *, EdgeNode *, Boolean *, B
  * Construct Oscillating Curves and calculate holonomy
  */
 
-void                    do_oscillating_curves(CuspStructure **, OscillatingCurves *, EndMultiGraph *);
-void                    do_one_oscillating_curve(CuspStructure **, OscillatingCurves *, EndMultiGraph *, CuspEndPoint *, CuspEndPoint *, int, int);
+void                    do_oscillating_curves(Triangulation *, CuspStructure **, EndMultiGraph *, Boolean *);
+void                    do_one_oscillating_curve(CuspStructure **, OscillatingCurves *, EndMultiGraph *, CuspEndPoint *, CuspEndPoint *);
 CurveComponent          *setup_train_line_component(CuspStructure *, EndMultiGraph *, CurveComponent *, CurveComponent *, CuspEndPoint *, int);
 void                    do_curve_component_on_train_line(CuspStructure *, CurveComponent *);
 CurveComponent          *setup_first_curve_component(CuspStructure *, EndMultiGraph *, CuspEndPoint *, CurveComponent *, CurveComponent *);
@@ -334,7 +331,7 @@ void                    split_cusp_region_path_endpoint(CuspRegion *, CuspRegion
 void                    update_cusp_triangle_path_interior(CuspRegion *, CuspRegion *, CuspRegion *, PathNode *);
 void                    update_cusp_triangle_endpoints(CuspRegion *, CuspRegion *, CuspRegion *, PathEndPoint *, PathNode *, int);
 void                    copy_region(CuspRegion *, CuspRegion *);
-void                    update_adj_curve_along_path(CuspStructure **, OscillatingCurves *, int, Boolean);
+void                    update_adj_curve_along_path(CuspStructure **, OscillatingCurves *, Boolean);
 void                    update_adj_curve_at_endpoint(PathEndPoint *, CurveComponent *, int);
 void                    update_adj_curve_on_cusp(CuspStructure *);
 void                    update_path_holonomy(CurveComponent *, int);
@@ -793,7 +790,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
 
     for (tet = manifold->tet_list_begin.next; tet != &manifold->tet_list_end; tet = tet->next) {
         if (tet->extra != NULL)
-            uFatalError("get_symplectic_equations", "symplectic_basis");
+            uFatalError("oscillating_curves", "symplectic_basis");
 
         tet->extra = NEW_ARRAY(manifold->num_tetrahedra, Extra);
 
@@ -804,7 +801,7 @@ int** get_symplectic_basis(Triangulation *manifold, int *num_rows, int *num_cols
     }
 
     // Dual Edge Curves Gamma_i -> symplectic equations
-    get_symplectic_equations(manifold, edge_classes);
+    oscillating_curves(manifold, edge_classes);
 
     // Construct return array
     *num_rows = 2 * (manifold->num_tetrahedra - manifold->num_cusps);
@@ -903,13 +900,13 @@ int *combinatorial_holonomy(Triangulation *manifold, int edge_class) {
 }
 
 /*
- * Initialise cusp structure on each cusp.
- * Construct train lines. 
- * Construct oscillating curves. 
- * Construct Neumann-Zagier matrix.
+ * Initialise cusp structure on each cusp, construct train lines, construct
+ * oscillating curves and store the intersection numbers of each curve with the
+ * cusp triangles it enters in tet->extra[edge_class]->curve, in the same fashion
+ * as the peripheral curves.
  */
 
-void get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes) {
+void oscillating_curves(Triangulation *manifold, Boolean *edge_classes) {
     int i;
     label_triangulation_edges(manifold);
 
@@ -922,13 +919,11 @@ void get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes) {
 
     edge_classes[end_multi_graph->e0] = FALSE;
 
-    OscillatingCurves *dual_curves   = init_oscillating_curves(manifold, edge_classes);
-
     for (i = 0; i < manifold->num_cusps; i++) {
         for (cusp = manifold->cusp_list_begin.next; cusp != &manifold->cusp_list_end && cusp->index != i; cusp = cusp->next);
 
         if (cusp == &manifold->cusp_list_end)
-            uFatalError("get_symplectic_equations", "symplectic_basis");
+            uFatalError("oscillating_curves", "symplectic_basis");
 
         cusps[i] = init_cusp_structure(manifold, cusp);
     }
@@ -938,16 +933,16 @@ void get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes) {
         printf("Struct Initialisation\n");
         printf("\n");
 
-        log_structs(manifold, cusps, dual_curves, "gluing");       
-        log_structs(manifold, cusps, dual_curves, "homology");    
-        log_structs(manifold, cusps, dual_curves, "edge_indices");     
-        log_structs(manifold, cusps, dual_curves, "inside_edge");       
-        log_structs(manifold, cusps, dual_curves, "cusp_regions");       
+        log_structs(manifold, cusps, NULL, "gluing");
+        log_structs(manifold, cusps, NULL, "homology");
+        log_structs(manifold, cusps, NULL, "edge_indices");
+        log_structs(manifold, cusps, NULL, "inside_edge");
+        log_structs(manifold, cusps, NULL, "cusp_regions");
     }
 
     // Allocate Symplectic Equations Array
     do_manifold_train_lines(cusps, end_multi_graph);
-    do_oscillating_curves(cusps, dual_curves, end_multi_graph);
+    do_oscillating_curves(manifold, cusps, end_multi_graph, edge_classes);
 
     if (debug) {
         for (i = 0; i < manifold->num_cusps; i++) {
@@ -957,7 +952,6 @@ void get_symplectic_equations(Triangulation *manifold, Boolean *edge_classes) {
     }
 
     free_end_multi_graph(end_multi_graph);
-    free_oscillating_curves(dual_curves);
     free_cusp_structure(cusps, manifold->num_cusps, manifold->num_tetrahedra);
 }
 
@@ -1619,10 +1613,10 @@ CurveComponent *init_curve_component(int edge_class_start, int edge_class_finish
 
     CurveComponent *path = NEW_STRUCT(CurveComponent );
 
-    path->curves_begin.next     = &path->curves_end;
-    path->curves_begin.prev     = NULL;
-    path->curves_end.next       = NULL;
-    path->curves_end.prev       = &path->curves_begin;
+    path->path_begin.next     = &path->path_end;
+    path->path_begin.prev     = NULL;
+    path->path_end.next       = NULL;
+    path->path_end.prev       = &path->path_begin;
 
     path->edge_class[START]     = edge_class_start;
     path->edge_class[FINISH]    = edge_class_finish;
@@ -1635,70 +1629,6 @@ CurveComponent *init_curve_component(int edge_class_start, int edge_class_finish
     }
 
     return path;
-}
-
-/*
- * Initialise dual curve doubly linked list which stores the oscillating curves 
- * on the cusp
- */
-
-OscillatingCurves *init_oscillating_curves(Triangulation *manifold, const Boolean *edge_classes) {
-    int i, j;
-    OscillatingCurves *curves = NEW_STRUCT(OscillatingCurves );
-
-    curves->num_curves = 0;
-    for (i = 0; i < manifold->num_tetrahedra; i++)
-        if (edge_classes[i])
-            curves->num_curves++;
-
-    curves->curve_begin               = NEW_ARRAY(curves->num_curves, CurveComponent );
-    curves->curve_end                 = NEW_ARRAY(curves->num_curves, CurveComponent );
-    curves->edge_class                = NEW_ARRAY(curves->num_curves, int);
-
-    j = 0;
-    for (i = 0; i < manifold->num_tetrahedra; i++) {
-        if (!edge_classes[i])
-            continue;
-
-        curves->edge_class[j] = i;
-        j++;
-    }
-
-    // which curve
-    for (i = 0; i < curves->num_curves; i++) {
-        curves->curve_begin[i].next    = &curves->curve_end[i];
-        curves->curve_begin[i].prev    = NULL;
-        curves->curve_end[i].next      = NULL;
-        curves->curve_end[i].prev      = &curves->curve_begin[i];
-    }
-
-    return curves;
-}
-
-void free_oscillating_curves(OscillatingCurves *curves) {
-    int i;
-    CurveComponent *path;
-    PathNode *path_node;
-
-    for (i = 0; i < curves->num_curves; i++) {
-        while (curves->curve_begin[i].next != &curves->curve_end[i]) {
-            path = curves->curve_begin[i].next;
-            REMOVE_NODE(path);
-
-            while (path->curves_begin.next != &path->curves_end) {
-                path_node = path->curves_begin.next;
-                REMOVE_NODE(path_node);
-                my_free(path_node);
-            }
-
-            my_free(path);
-        }
-    }
-
-    my_free(curves->curve_begin);
-    my_free(curves->curve_end);
-    my_free(curves->edge_class);
-    my_free(curves);
 }
 
 /*
@@ -1750,7 +1680,7 @@ void construct_cusp_region_dual_graph(CuspStructure *cusp) {
  * dual_curves, inside_edge, graph, endpoints
  */
 
-void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurves *curves, char *type) {
+void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurves *curve, char *type) {
     int i, j, k, x_vertex1, x_vertex2, y_vertex1, y_vertex2, v1, v2, v3;
 
     CuspTriangle *tri;
@@ -1921,26 +1851,22 @@ void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurv
             }
         }
     } else if (strcmp(type, "dual_curves") == 0) {
-        printf("Oscillating curve paths\n");
+        printf("Oscillating Curve %d\n", curve->edge_class);
 
-        // which dual curve
-        for (i = 0; i < curves->num_curves; i++) {
-            j = 0;
+        j = 0;
+        for (path = curve->curve_begin.next; path != &curve->curve_end; path = path->next) {
+            printf("    Part %d: \n", j);
 
-            printf("Dual Curve %d\n", i);
-            // which curve component
-            for (path = curves->curve_begin[i].next; path != &curves->curve_end[i]; path = path->next) {
-                printf("    Part %d: \n", j);
+            for (path_node = path->path_begin.next;
+                path_node != &path->path_end;
+                path_node = path_node->next) {
+                printf("        Node %d: (Tet Index %d, Tet Vertex %d) Next Face: %d, Prev Face: %d, Inside Vertex: %d\n",
+                       path_node->cusp_region_index, path_node->tri->tet_index, path_node->tri->tet_vertex,
+                       path_node->next_face, path_node->prev_face, path_node->inside_vertex
+                );
 
-                for (path_node = path->curves_begin.next; 
-                    path_node != &path->curves_end; 
-                    path_node = path_node->next)
-                    printf("        Node %d: (Tet Index %d, Tet Vertex %d) Next Face: %d, Prev Face: %d, Inside Vertex: %d\n", 
-                           path_node->cusp_region_index, path_node->tri->tet_index, path_node->tri->tet_vertex, 
-                           path_node->next_face, path_node->prev_face, path_node->inside_vertex
-                           );
-                j++;
             }
+            j++;
         }
     } else if (strcmp(type, "inside_edge") == 0) {
         printf("Inside edge info\n");
@@ -1985,35 +1911,29 @@ void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurv
             }
         }
     } else if (strcmp(type, "endpoints") == 0) {
-        printf("EndPoint Info\n");
+        printf("EndPoint Info - Curve %d\n", curve->edge_class);
+        j = 0;
 
-        // which curve
-        for (i = 0; i < curves->num_curves; i++) {
-            printf("Dual Curve %d\n", i);
+        // which component
+        for (path = curve->curve_begin.next; path != &curve->curve_end; path = path->next) {
+            printf("    Part %d Cusp %d\n", j, path->endpoints[0].tri->tet->cusp[path->endpoints[0].tri->tet_vertex]->index);
+            for (k = 0; k < 2; k++) {
+                if (k == 0)
+                    printf("        Start: ");
+                else
+                    printf("        End:   ");
 
-            j = 0;
-            // which component
-            for (path = curves->curve_begin[i].next; path != &curves->curve_end[i]; path = path->next) {
-                printf("    Part %d Cusp %d\n", j, path->endpoints[0].tri->tet->cusp[path->endpoints[0].tri->tet_vertex]->index);
-                for (k = 0; k < 2; k++) {
-                    if (k == 0)
-                        printf("        Start: ");
-                    else
-                        printf("        End:   ");
+                x_vertex1 = (int) remaining_face[path->endpoints[k].tri->tet_vertex][path->endpoints[k].vertex];
+                x_vertex2 = (int) remaining_face[path->endpoints[k].vertex][path->endpoints[k].tri->tet_vertex];
 
-                    x_vertex1 = (int) remaining_face[path->endpoints[k].tri->tet_vertex][path->endpoints[k].vertex];
-                    x_vertex2 = (int) remaining_face[path->endpoints[k].vertex][path->endpoints[k].tri->tet_vertex];
-
-                    printf("Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d Edge Class (%d, %d) Adj Curves %d\n",
-                           path->endpoints[k].region_index, path->endpoints[k].tri->tet_index,
-                           path->endpoints[k].tri->tet_vertex, path->endpoints[k].face, path->endpoints[k].vertex,
-                           path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_class,
-                           path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_index,
-                           path->endpoints[k].num_adj_curves);
-                }
-
-                j++;
+                printf("Region %d (Tet Index %d, Tet Vertex %d) Face %d Vertex %d Edge Class (%d, %d) Adj Curves %d\n",
+                       path->endpoints[k].region_index, path->endpoints[k].tri->tet_index,
+                       path->endpoints[k].tri->tet_vertex, path->endpoints[k].face, path->endpoints[k].vertex,
+                       path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_class,
+                       path->endpoints[k].tri->vertices[path->endpoints[k].vertex].edge_index,
+                       path->endpoints[k].num_adj_curves);
             }
+            j++;
         }
     } else {
         printf("Unknown type: %s\n", type);
@@ -3012,18 +2932,42 @@ void cycle_path(Graph *g, EdgeNode *node_begin, EdgeNode *node_end, Boolean *pro
  * graph.
  */
 
-void do_oscillating_curves(CuspStructure **cusps, OscillatingCurves *curves, EndMultiGraph *multi_graph) {
+void do_oscillating_curves(Triangulation *manifold, CuspStructure **cusps, EndMultiGraph *multi_graph, Boolean *edge_classes) {
     CuspEndPoint cusp_path_begin, cusp_path_end, *temp_cusp;
-    int i;
+    OscillatingCurves curve;
+    CurveComponent *curve_comp;
+    PathNode *path_node;
+    int edge_class;
 
     cusp_path_begin.next = &cusp_path_end;
     cusp_path_begin.prev = NULL;
     cusp_path_end.next   = NULL;
     cusp_path_end.prev   = &cusp_path_begin;
 
-    for (i = 0; i < curves->num_curves; i++) {
-        find_multi_graph_path(cusps[0]->manifold, multi_graph, &cusp_path_begin, &cusp_path_end, curves->edge_class[i]);
-        do_one_oscillating_curve(cusps, curves, multi_graph, &cusp_path_begin, &cusp_path_end, curves->edge_class[i], i);
+    curve.curve_begin.next    = &curve.curve_end;
+    curve.curve_begin.prev    = NULL;
+    curve.curve_end.next      = NULL;
+    curve.curve_end.prev      = &curve.curve_begin;
+
+    for (edge_class = 0; edge_class < manifold->num_tetrahedra; edge_class++) {
+        if (!edge_classes[edge_class])
+            continue;
+
+        curve.edge_class = edge_class;
+        find_multi_graph_path(cusps[0]->manifold, multi_graph, &cusp_path_begin, &cusp_path_end, edge_class);
+        do_one_oscillating_curve(cusps, &curve, multi_graph, &cusp_path_begin, &cusp_path_end);
+
+        if (debug) {
+            printf("\n");
+            printf("Oscillating Curve %d\n", edge_class);
+            printf("\n");
+            printf("-------------------------------\n");
+
+            log_structs(cusps[0]->manifold, cusps, &curve, "dual_curves");
+            log_structs(cusps[0]->manifold, cusps, &curve, "endpoints");
+            log_structs(cusps[0]->manifold, cusps, &curve, "cusp_regions");
+            log_structs(cusps[0]->manifold, cusps, &curve, "graph");
+        }
 
         while (cusp_path_begin.next != &cusp_path_end) {
             temp_cusp = cusp_path_begin.next;
@@ -3031,16 +2975,16 @@ void do_oscillating_curves(CuspStructure **cusps, OscillatingCurves *curves, End
             my_free(temp_cusp);
         }
 
-        if (debug) {
-            printf("\n");
-            printf("Oscillating Curve %d\n", i);
-            printf("\n");
-            printf("-------------------------------\n");
+        while (curve.curve_begin.next != &curve.curve_end) {
+            curve_comp = curve.curve_begin.next;
+            while (curve_comp->path_begin.next != &curve_comp->path_end) {
+                path_node = curve_comp->path_begin.next;
+                REMOVE_NODE(path_node);
+                my_free(path_node);
+            }
 
-            log_structs(cusps[0]->manifold, cusps, curves, "dual_curves");
-            log_structs(cusps[0]->manifold, cusps, curves, "endpoints");
-            log_structs(cusps[0]->manifold, cusps, curves, "cusp_regions");
-            log_structs(cusps[0]->manifold, cusps, curves, "graph");
+            REMOVE_NODE(curve_comp);
+            my_free(curve_comp);
         }
     }
 }
@@ -3053,35 +2997,33 @@ void do_oscillating_curves(CuspStructure **cusps, OscillatingCurves *curves, End
  * in the end multi graph and thus is a segment of the train line.
  */
 
-void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, EndMultiGraph *multi_graph,
-                              CuspEndPoint *cusp_path_begin, CuspEndPoint *cusp_path_end, int edge_class, int curve_index) {
+void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curve, EndMultiGraph *multi_graph,
+                              CuspEndPoint *cusp_path_begin, CuspEndPoint *cusp_path_end) {
     int orientation = START;
     CuspEndPoint *endpoint = cusp_path_begin->next;
-    CurveComponent *path,
-                   *curve_begin = &curves->curve_begin[curve_index],
-                   *curve_end = &curves->curve_end[curve_index];
+    CurveComponent *path;
 
-    curve_begin->edge_class[FINISH] = edge_class;
-    curve_end->edge_class[START]    = edge_class;
+    curve->curve_begin.edge_class[FINISH] = curve->edge_class;
+    curve->curve_end.edge_class[START]    = curve->edge_class;
 
-    path = setup_first_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint, curve_begin, curve_end);
+    path = setup_first_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint, &curve->curve_begin, &curve->curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
-    update_path_holonomy(path, edge_class);
+    update_path_holonomy(path, curve->edge_class);
 
     // interior curve components, coming from train lines
     for (endpoint = endpoint->next; endpoint->next != cusp_path_end; endpoint = endpoint->next) {
         orientation = (orientation == START ? FINISH : START);
 
-        path = setup_train_line_component(cusps[endpoint->cusp_index], multi_graph, curve_begin, curve_end, endpoint, orientation);
+        path = setup_train_line_component(cusps[endpoint->cusp_index], multi_graph, &curve->curve_begin, &curve->curve_end, endpoint, orientation);
         do_curve_component_on_train_line(cusps[path->cusp_index], path);
-        update_path_holonomy(path, edge_class);
+        update_path_holonomy(path, curve->edge_class);
     }
 
-    path = setup_last_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint, curve_begin, curve_end);
+    path = setup_last_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint, &curve->curve_begin, &curve->curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
-    update_path_holonomy(path, edge_class);
+    update_path_holonomy(path, curve->edge_class);
 
-    update_adj_curve_along_path(cusps, curves, curve_index, (Boolean) (cusp_path_begin->next->next->next != cusp_path_end));
+    update_adj_curve_along_path(cusps, curve, (Boolean) (cusp_path_begin->next->next->next != cusp_path_end));
 }
 
 
@@ -3138,14 +3080,14 @@ void do_curve_component_on_train_line(CuspStructure *cusp, CurveComponent *curve
         for (node = start_node; node != finish_node->next; node = node->next) {
             new_node = NEW_STRUCT( PathNode );
             COPY_PATH_NODE(new_node, node);
-            INSERT_BEFORE(new_node, &curve->curves_end);
+            INSERT_BEFORE(new_node, &curve->path_end);
         }
     } else if (orientation == -1) {
         // copy the train line into the curve
         for (node = start_node; node != finish_node->prev; node = node->prev) {
             new_node = NEW_STRUCT( PathNode );
             COPY_PATH_NODE(new_node, node);
-            INSERT_BEFORE(new_node, &curve->curves_end);
+            INSERT_BEFORE(new_node, &curve->path_end);
 
             // reverse direction of faces
             temp_face = new_node->next_face;
@@ -3156,8 +3098,8 @@ void do_curve_component_on_train_line(CuspStructure *cusp, CurveComponent *curve
         uFatalError("do_curve_component_on_train_line", "symplectic_basis");
 
     // correct endpoint inside vertices
-    curve->curves_begin.next->prev_face = curve->endpoints[START].face;
-    curve->curves_end.prev->next_face = curve->endpoints[FINISH].face;
+    curve->path_begin.next->prev_face = curve->endpoints[START].face;
+    curve->path_end.prev->next_face = curve->endpoints[FINISH].face;
 }
 
 CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
@@ -3218,7 +3160,7 @@ void do_curve_component_to_new_edge_class(CuspStructure *cusp, CurveComponent *c
     find_path(curve->endpoints[START].region_index, curve->endpoints[FINISH].region_index,
               parent, &node_begin, &node_end);
     graph_path_to_dual_curve(cusp->dual_graph, &node_begin, &node_end,
-                             &curve->curves_begin,&curve->curves_end,
+                             &curve->path_begin, &curve->path_end,
                              &curve->endpoints[START], &curve->endpoints[FINISH]);
 
     // Reallocate memory
@@ -3227,7 +3169,7 @@ void do_curve_component_to_new_edge_class(CuspStructure *cusp, CurveComponent *c
     my_free(parent);
 
     // Split the regions along the curve
-    split_cusp_regions_along_path(cusp, &curve->curves_begin, &curve->curves_end,
+    split_cusp_regions_along_path(cusp, &curve->path_begin, &curve->path_end,
                                   &curve->endpoints[START], &curve->endpoints[FINISH]);
 
     free_edge_node(&node_begin, &node_end);
@@ -3842,35 +3784,33 @@ void update_cusp_triangle_endpoints(CuspRegion *cusp_region_start, CuspRegion *c
     }
 }
 
-void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curves, int curve_index, Boolean train_line) {
+void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curve, Boolean train_line) {
     int i, j;
-    CurveComponent *curve,
-               *dual_curve_begin = &curves->curve_begin[curve_index],
-               *dual_curve_end   = &curves->curve_end[curve_index];
+    CurveComponent *curve_comp;
     CuspStructure *cusp;
     Triangulation *manifold = cusps[0]->manifold;
 
-    // Update regions curve data
-    for (curve = dual_curve_begin->next; curve != dual_curve_end; curve = curve->next)
-        update_adj_curve_on_cusp(cusps[curve->cusp_index]);
+    // Update regions curve_comp data
+    for (curve_comp = curve->curve_begin.next; curve_comp != &curve->curve_end; curve_comp = curve_comp->next)
+        update_adj_curve_on_cusp(cusps[curve_comp->cusp_index]);
 
     // update train line endpoints
     for (i = 0; i < manifold->num_cusps; i++) {
         cusp = cusps[i];
 
         if (cusp->extra_endpoint_e0.tri != NULL) {
-            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_begin->next, START);
+            update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, curve->curve_begin.next, START);
             if (train_line == FALSE)
-                update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, dual_curve_end->prev, FINISH);
+                update_adj_curve_at_endpoint(&cusp->extra_endpoint_e0, curve->curve_end.prev, FINISH);
         }
 
         for (j = 0; j < manifold->num_tetrahedra; j++) {
             if (cusp->train_line_endpoint[j].tri == NULL)
                 continue;
 
-            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_begin->next, START);
+            update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], curve->curve_begin.next, START);
             if (train_line == FALSE)
-                update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], dual_curve_end->prev, FINISH);
+                update_adj_curve_at_endpoint(&cusp->train_line_endpoint[j], curve->curve_end.prev, FINISH);
         }
     }
 }
@@ -3919,7 +3859,7 @@ void update_adj_curve_on_cusp(CuspStructure *cusp) {
 void update_path_holonomy(CurveComponent *path, int edge_class) {
     PathNode *path_node;
 
-    for (path_node = path->curves_begin.next; path_node != &path->curves_end; path_node = path_node->next) {
+    for (path_node = path->path_begin.next; path_node != &path->path_end; path_node = path_node->next) {
         path_node->tri->tet->extra[edge_class].curve[path_node->tri->tet_vertex][path_node->next_face]++;
         path_node->tri->tet->extra[edge_class].curve[path_node->tri->tet_vertex][path_node->prev_face]--;
     }
