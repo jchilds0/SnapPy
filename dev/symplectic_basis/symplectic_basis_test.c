@@ -58,11 +58,11 @@ void testDual(void) {
                 }
 
                 if (retval1 == 2 && retval2 == 0) {
-//                    printf("Passed\n");
+                    printf("Passed\n");
                     continue;
                 }
 
-//                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
+                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
                 //printMatrix(basis, dual_cols, dual_rows);
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
