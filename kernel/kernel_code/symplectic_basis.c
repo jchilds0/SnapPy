@@ -2937,6 +2937,14 @@ void do_curve_component_on_train_line(CuspStructure *cusp, CurveComponent *curve
     // correct endpoint inside vertices
     curve->curves_begin.next->prev_face = curve->endpoints[START].face;
     curve->curves_end.prev->next_face = curve->endpoints[FINISH].face;
+
+    if (curve->curves_begin.next->next_face == curve->curves_begin.next->prev_face) {
+        curve->curves_begin.next->inside_vertex = -1;
+    }
+
+    if (curve->curves_end.prev->next_face == curve->curves_end.prev->prev_face) {
+        curve->curves_end.prev->inside_vertex = -1;
+    }
 }
 
 CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
