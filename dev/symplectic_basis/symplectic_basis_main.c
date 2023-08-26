@@ -9,7 +9,8 @@
 #include "addl_code.h"
 #include <stdio.h>
 
-void printMatrix(int**, int, int);
+void print_matrix(int **, int, int);
+void print_reduced_matrix(int **, int, int);
 int omega(int *, int *, int);
 void test_matrix(int **, int, int);
 
@@ -44,10 +45,11 @@ int main(void) {
                 continue;
 
             eqns = get_symplectic_basis(theTriangulation, &num_rows, &num_cols, 1);
-            printMatrix(eqns, num_cols, num_rows);
+            print_matrix(eqns, num_cols, num_rows);
             test_matrix(eqns, num_rows, num_cols);
 
             printf("---------------------------\n");
+            print_reduced_matrix(eqns, num_cols, num_rows);
             free_symplectic_basis(eqns, num_rows);
             free_triangulation(theTriangulation);
         } else
@@ -93,8 +95,21 @@ int omega(int *v1, int *v2, int num_cols) {
     return yyval;
 }
 
+void print_reduced_matrix(int **M, int num_cols, int num_rows) {
+    int i, j, x = num_cols / 3 ;
 
-void printMatrix(int** M, int numCols, int numRows) {
+    for (i = 0; i < num_rows; i ++) {
+        printf("[");
+
+        for (j = 0; j < x - 1; j ++) {
+            printf(" %d, %d,", M[i][3 * j] - M[i][3 * j + 2], M[i][3 * j + 1] - M[i][3 * j + 2]);
+        }
+
+        printf(" %d, %d]\n", M[i][3 * j] - M[i][3 * j + 2], M[i][3 * j + 1] - M[i][3 * j + 2]);
+    }
+}
+
+void print_matrix(int** M, int numCols, int numRows) {
     int i, j;
 
     for (i = 0; i < numRows; i ++) {

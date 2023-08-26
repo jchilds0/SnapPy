@@ -2083,19 +2083,15 @@ void setup_train_lines_and_oscillating_curves(Triangulation *manifold, CuspStruc
         cusp1 = tet->cusp[one_vertex_at_edge[edge->incident_edge_index]]->index;
         cusp2 = tet->cusp[other_vertex_at_edge[edge->incident_edge_index]]->index;
 
-        if (multi_graph->edge_classes[edge->index] ||
-            (cusp1 == e0_cusp1 && cusp2 == e0_cusp2) ||
-            (cusp2 == e0_cusp1 && cusp1 == e0_cusp2) ||
-            !edge_exists(multi_graph->multi_graph, cusp1, cusp2)) {
+        if (multi_graph->edge_classes[edge->index] || multi_graph->e0 == edge->index) {
+//            (cusp1 == e0_cusp1 && cusp2 == e0_cusp2) ||
+//            (cusp2 == e0_cusp1 && cusp1 == e0_cusp2) ||
+//            !edge_exists(multi_graph->multi_graph, cusp1, cusp2)) {
             edge_classes[edge->index] = TRUE;
         } else {
             edge_classes[edge->index] = FALSE;
         }
     }
-
-//    for (int i = 0; i < manifold->num_tetrahedra; i++) {
-//        edge_classes[i] = TRUE;
-//    }
 
     // find endpoints for train lines
     find_edge_class_edges(manifold, cusps, edge_classes);
@@ -2712,6 +2708,7 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
     EdgeNode *edge_node, *node;
     PathNode *path_node;
     CuspRegion *region;
+    VertexIndex v1, v2;
 
     if (node_begin->next == node_end) {
         // path len 0
@@ -2762,6 +2759,14 @@ void graph_path_to_path_node(Graph *g, EdgeNode *node_begin, EdgeNode *node_end,
 
     if (path_end->prev->next_face == -1)
         uFatalError("graph_path_to_path_node", "symplectic_basis");
+
+    v1 = remaining_face[start_endpoint->region->tet_vertex][path_end->prev->prev_face];
+    v2 = remaining_face[path_end->prev->prev_face][start_endpoint->region->tet_vertex];
+
+    if (path_end->prev->next_face == v1)
+        path_end->prev->inside_vertex = v2;
+    else
+        path_end->prev->inside_vertex = v1;
 
     for (edge_node = node_begin->next->next; edge_node->next != node_end; edge_node = edge_node->next)
         interior_edge_node_to_path_node(g->regions[edge_node->y], path_end, edge_node);
@@ -3162,6 +3167,14 @@ void do_curve_component_on_train_line(CuspStructure *cusp, CurveComponent *curve
     // correct endpoint inside vertices
     curve->curves_begin.next->prev_face = curve->endpoints[START].face;
     curve->curves_end.prev->next_face = curve->endpoints[FINISH].face;
+
+    if (curve->curves_begin.next->prev_face == curve->curves_begin.next->next_face) {
+        curve->curves_begin.next->inside_vertex = -1;
+    }
+
+    if (curve->curves_end.prev->prev_face == curve->curves_end.prev->next_face) {
+        curve->curves_end.prev->inside_vertex = -1;
+    }
 }
 
 CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
@@ -3436,6 +3449,9 @@ void endpoint_edge_node_to_path_node(CuspRegion *region, PathNode *path_end, Edg
     path_node->cusp_region_index = edge_node->y;
     path_node->tri = region->tri;
 
+    vertex1 = remaining_face[region->tet_vertex][path_endpoint->vertex];
+    vertex2 = remaining_face[path_endpoint->vertex][region->tet_vertex];
+
     if (pos == START) {
         path_node->next_face = -1;
         for (face = 0; face < 4; face++) {
@@ -3446,28 +3462,36 @@ void endpoint_edge_node_to_path_node(CuspRegion *region, PathNode *path_end, Edg
             path_node->next_face = face;
         }
 
-//         next node isn't in an adjacent region
+        // next node isn't in an adjacent region
         if (path_node->next_face == -1)
             uFatalError("endpoint_edge_node_to_path_node", "symplectic_basis");
 
         path_node->prev_face = path_endpoint->face;
+
+        if (path_node->next_face == path_endpoint->vertex) {
+            if (path_endpoint->face == vertex1)
+                path_node->inside_vertex = vertex2;
+            else
+                path_node->inside_vertex = vertex1;
+        } else if (path_node->next_face == path_endpoint->face) {
+            path_node->inside_vertex = -1;
+        } else {
+            path_node->inside_vertex = path_endpoint->vertex;
+        }
     } else {
         path_node->prev_face = EVALUATE(path_end->prev->tri->tet->gluing[path_end->prev->next_face], path_end->prev->next_face);
         path_node->next_face = path_endpoint->face;
-    }
 
-    vertex1 = remaining_face[region->tet_vertex][path_endpoint->vertex];
-    vertex2 = remaining_face[path_endpoint->vertex][region->tet_vertex];
-
-    if (path_node->prev_face == path_endpoint->vertex) {
-        if (path_endpoint->face == vertex1)
-            path_node->inside_vertex = vertex2;
-        else
-            path_node->inside_vertex = vertex1;
-    } else if (path_node->prev_face == path_endpoint->face) {
-        path_node->inside_vertex = -1;
-    } else {
-        path_node->inside_vertex = path_endpoint->vertex;
+        if (path_node->prev_face == path_endpoint->vertex) {
+            if (path_endpoint->face == vertex1)
+                path_node->inside_vertex = vertex2;
+            else
+                path_node->inside_vertex = vertex1;
+        } else if (path_node->prev_face == path_endpoint->face) {
+            path_node->inside_vertex = -1;
+        } else {
+            path_node->inside_vertex = path_endpoint->vertex;
+        }
     }
 
     INSERT_BEFORE(path_node, path_end);

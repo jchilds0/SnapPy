@@ -11,7 +11,7 @@
 
 void testDual(void);
 int omega(int *, int *, int);
-void printMatrix(int **, int, int);
+void print_matrix(int **, int, int);
 
 int main() {
     printf("Testing Symplectic Basis: \n");
@@ -58,12 +58,12 @@ void testDual(void) {
                 }
 
                 if (retval1 == 2 && retval2 == 0) {
-                    printf("Passed\n");
+//                    printf("Passed\n");
                     continue;
                 }
 
-                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
-                //printMatrix(basis, dual_cols, dual_rows);
+//                printf("Failed Num Tet: %d Index: %d \n", index[i][0], j);
+                //print_matrix(basis, dual_cols, dual_rows);
                 passed[i][j - index[i][1]] = 0;
                 failed[i]++;
                 break;
@@ -95,7 +95,7 @@ int omega(int *v1, int *v2, int num_cols) {
     return yyval;
 }
 
-void printMatrix(int** M, int numCols, int numRows) {
+void print_matrix(int** M, int numCols, int numRows) {
     int i, j;
 
     for (i = 0; i < numRows; i++) {
