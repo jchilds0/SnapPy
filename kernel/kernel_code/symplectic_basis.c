@@ -17,6 +17,7 @@
 #include "addl_code.h"
 #include "kernel_prototypes.h"
 #include "kernel_typedefs.h"
+#include "tables.h"
 
 #define ATLEAST_TWO(a, b, c)                    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 #define TRI_TO_INDEX(tet_index, tet_vertex)     (4 * (tet_index) + (tet_vertex))
@@ -309,6 +310,8 @@ Boolean                 *edge_classes_on_cusp(CuspStructure *, Boolean *);
 void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    extended_train_line_path(CuspStructure *, PathEndPoint *, PathEndPoint *, EdgeNode *, EdgeNode *, int);
+void                    path_finding_with_loops(Graph *, int, int, Orientation, int, int, EdgeNode *, EdgeNode *);
+void                    cycle_path(Graph *, EdgeNode *, EdgeNode *, int, int, int, int, int);
 PathEndPoint            *next_valid_endpoint_index(CuspStructure *, PathEndPoint *);
 void                    tri_endpoint_to_region_endpoint(CuspStructure *, PathEndPoint *);
 int                     *target_endpoints(CuspStructure *, const Boolean *, int *);
@@ -317,8 +320,6 @@ void                    graph_path_to_path_node(Graph *, EdgeNode *, EdgeNode *,
 void                    split_cusp_regions_along_train_line_segment(CuspStructure *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
 void                    update_cusp_triangle_train_line_endpoints(CuspRegion *, CuspRegion *, CuspRegion *, PathNode *, PathEndPoint *, int);
 void                    split_cusp_region_train_line_endpoint(CuspRegion *, CuspRegion *, PathNode *, PathEndPoint *, int, int);
-void                    path_finding_with_loops(Graph *, int, int, Orientation, EdgeNode *, EdgeNode *);
-void                    cycle_path(Graph *, EdgeNode *, EdgeNode *, int, int, int, int, int);
 
 /**
  * Construct Oscillating Curves and calculate holonomy
@@ -2589,19 +2590,129 @@ PathEndPoint *next_valid_endpoint_index(CuspStructure *cusp, PathEndPoint *curre
  * the finish endpoint dives along.
  */
 
-void path_finding_with_loops(Graph *g, int start, int finish, Orientation orientation, 
+void path_finding_with_loops(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint, 
+                             int loop_edge_class, int loop_edge_index, 
                              EdgeNode *node_begin, EdgeNode *node_end) {
-    int cycle_start, cycle_end;
+    int tet_index, tet_vertex, index, edge_class, edge_index;
     int *parent;
+    VertexIndex v, loop_vertex;
     Boolean *discovered, *processed;
+    CuspRegion *region, *loop_region = NULL;
+    EdgeNode cycle_begin, cycle_end, *node;
 
-    processed = NEW_ARRAY(g->num_vertices, Boolean);
-    discovered = NEW_ARRAY(g->num_vertices, Boolean);
-    parent = NEW_ARRAY(g->num_vertices, int);
+    processed = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
+    discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
+    parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
 
-    init_search(g, processed, discovered, parent);
-    cycle = cycle_exists(g, start, processed, discovered, parent, &cycle_start, &cycle_end);
+    init_search(cusp->dual_graph, processed, discovered, parent);
 
+    // find a cusp region incident to the cycle vertex
+    for (tet_index = 0; tet_index < cusp->manifold->num_tetrahedra; tet_index++) {
+        for (tet_vertex = 0; tet_vertex < 4; tet_vertex++) {
+            index = TRI_TO_INDEX(tet_index, tet_vertex);
+
+            for (region = cusp->cusp_region_begin[index].next; region != &cusp->cusp_region_end[index]; region = region->next) {
+                for (v = 0; v < 4; v++) {
+                    if (v == tet_vertex)
+                        continue;
+
+                    edge_class = region->tri->vertices[v].edge_class; 
+                    edge_index = region->tri->vertices[v].edge_index; 
+
+                    if (edge_class == loop_edge_class && edge_index == loop_edge_index && 
+                        (region->dive[remaining_face[tet_vertex][v]] || region->dive[remaining_face[v][tet_vertex]])) {
+                        loop_region = region;
+                        loop_vertex = v;
+                    }
+                }
+            }
+        }
+    }
+
+    if (loop_region == NULL) {
+        uFatalError("path_finding_with_loops", "symplectic_basis");
+    }
+
+    // find the cycle of path nodes around cycle vertex 
+
+    cycle_begin.next = &cycle_end;
+    cycle_begin.prev = NULL;
+    cycle_end.next   = NULL;
+    cycle_end.prev   = &cycle_begin;
+
+    node = NEW_STRUCT( EdgeNode );
+    INSERT_BEFORE(node, &cycle_end);
+    node->y = loop_region->index;
+    v = remaining_face[loop_region->tet_vertex][loop_vertex];
+
+    do {
+        region = cusp->dual_graph->regions[cycle_end.prev->y];
+        node = NEW_STRUCT( EdgeNode );
+        INSERT_BEFORE(node, &cycle_end);
+        node->y = region->adj_cusp_regions[v]->index;
+
+        if (remaining_face[loop_region->tet_vertex][loop_vertex] == v) {
+            v = EVALUATE(region->tri->tet->gluing[v], remaining_face[loop_vertex][loop_region->tet_vertex]);
+        } else {
+            v = EVALUATE(region->tri->tet->gluing[v], remaining_face[loop_region->tet_vertex][loop_vertex]);
+        }
+
+        loop_vertex = EVALUATE(region->tri->tet->gluing[v], loop_vertex);
+    } while (node->y != loop_region->index);
+    
+    v = inside_curve_vertex(cusp, cycle_begin, cycle_end, finish_endpoint);
+}
+
+VertexIndex inside_curve_vertex(CuspStructure *cusp, EdgeNode *cycle_begin, EdgeNode *cycle_end, PathEndPoint *endpoint) {
+    int i, region_index, len = -1;
+    VertexIndex inside_vertex;
+    int *cycle, *parent;
+    EdgeNode node_begin, node_end, *node;
+    Boolean *discovered, *processed;
+    CuspRegion *region;
+
+    node_begin.next = &node_end;
+    node_begin.prev = NULL;
+    node_end.next   = NULL;
+    node_end.prev   = &node_begin;
+
+    processed = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
+    discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
+    parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
+
+    // convert doubly linked list to array for bfs target 
+    for (node = cycle_begin->next; node != cycle_end; node = node->next) {
+        len++;
+    }
+
+    cycle = NEW_ARRAY(len, int);
+    for (node = cycle_begin->next; node != cycle_end; node = node->next) {
+        cycle[i++] = node->y;
+    }
+
+    init_search(cusp->dual_graph, processed, discovered, parent);
+    region_index = bfs_target_list(cusp->dual_graph, endpoint->region_index, cycle, len, processed, discovered, parent);
+    
+    if (region_index == -1) {
+        uFatalError("inside_curve_vertex", "symplectic_basis");
+    }
+
+    find_path(endpoint->region_index, region_index, parent, &node_begin, &node_end);
+
+    inside_vertex = endpoint->vertex;
+    for (node = node_begin.next; node->next != &node_end; node = node->next) {
+        region = cusp->dual_graph->regions[node->y];
+
+        if (node->next->y == region->adj_cusp_regions[inside_vertex]) {
+            inside_vertex = ;
+        } else if (node->next->y == region->adj_cusp_regions[remaining_face[region->tet_vertex][inside_vertex]]) {
+            inside_vertex = ;
+        } else {
+            inside_vertex = ;
+        }
+    }
+
+    return inside_vertex;
 }
 
 /*
