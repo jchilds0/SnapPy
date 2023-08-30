@@ -20,8 +20,8 @@ int main(void) {
     int fromFile = 0;
 
     int count = 1;
-    int numTet[] = {5};
-    int index[] = {4};
+    int numTet[] = {6};
+    int index[] = {286};
 
     char *error[] = {
             "CuspedCensusData/link-83653.tri",  /* curve holonomy */
