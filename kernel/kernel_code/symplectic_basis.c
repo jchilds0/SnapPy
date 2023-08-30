@@ -309,7 +309,7 @@ void                    find_primary_train_line(CuspStructure *, Boolean *);
 Boolean                 *edge_classes_on_cusp(CuspStructure *, Boolean *);
 void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
-void                    extended_train_line_path(CuspStructure *, PathEndPoint *, PathEndPoint *, EdgeNode *, EdgeNode *, int);
+void                    extended_train_line_path(CuspStructure *, PathEndPoint *, PathEndPoint *, EdgeNode *, EdgeNode *);
 void                    path_finding_with_loops(CuspStructure *, PathEndPoint *, PathEndPoint *, int, int, EdgeNode *, EdgeNode *);
 void                    cycle_path(Graph *, EdgeNode *, EdgeNode *, int, int, int, int, int);
 PathEndPoint            *next_valid_endpoint_index(CuspStructure *, PathEndPoint *);
@@ -2100,6 +2100,8 @@ void setup_train_lines_and_oscillating_curves(Triangulation *manifold, CuspStruc
 
     // find train lines
     do_manifold_train_lines(cusps, edge_classes);
+
+    my_free(edge_classes);
 }
 
 /*
@@ -2522,21 +2524,7 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
      * added back when the dual graph is reconstructed.
      */
 
-    if (start_endpoint->face == cusp->train_line_path_end.prev->prev_face) {
-        // curve dives along the face it passes through
-
-        start = start_endpoint->region_index;
-        visited = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
-    } else {
-        // curve dives through the vertex opposite the face it passes through or
-        // curve travells around the vertex it dives through
-
-        start = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
-        visited = start_endpoint->region_index;
-    }
-
-    finish = finish_endpoint->region_index;
-    extended_train_line_path(cusp, start_endpoint, finish_endpoint, &node_begin, &node_end, visited);
+    extended_train_line_path(cusp, start_endpoint, finish_endpoint, &node_begin, &node_end);
 
     if (finish_endpoint == NULL)
         uFatalError("do_initial_train_line_segment_on_cusp", "symplectic_basis");
@@ -2600,11 +2588,11 @@ void path_finding_with_loops(CuspStructure *cusp, PathEndPoint *start_endpoint, 
     CuspRegion *region, *loop_region = NULL;
     EdgeNode cycle_begin, cycle_end, *node;
 
+    construct_cusp_region_dual_graph(cusp);
     processed = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
 
-    construct_cusp_region_dual_graph(cusp);
     init_search(cusp->dual_graph, processed, discovered, parent);
     bfs(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent);
     find_path(start_endpoint->region_index, finish_endpoint->region_index, parent, node_begin, node_end);
@@ -2623,21 +2611,36 @@ void path_finding_with_loops(CuspStructure *cusp, PathEndPoint *start_endpoint, 
  */
 
 void extended_train_line_path(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint,
-                              EdgeNode *node_begin, EdgeNode *node_end, int visited) {
-    int cycle_start, cycle_end;
+                              EdgeNode *node_begin, EdgeNode *node_end) {
+    int cycle_start, cycle_end, start, finish, visited;
     Boolean cycle;
     Boolean *discovered, *processed;
     int *parent;
 
+    construct_cusp_region_dual_graph(cusp);
     processed = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     discovered = NEW_ARRAY(cusp->dual_graph->num_vertices, Boolean);
     parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
 
-    init_search(cusp->dual_graph, processed, discovered, parent);
-    delete_edge(cusp->dual_graph, visited, start_endpoint->region_index, cusp->dual_graph->directed);
-    bfs(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent);
+    if (start_endpoint->face == cusp->train_line_path_end.prev->prev_face) {
+        // curve dives along the face it passes through
 
-    if (parent[finish_endpoint->region_index] == -1 && start_endpoint->region_index != finish_endpoint->region_index) {
+        start = start_endpoint->region_index;
+        visited = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
+    } else {
+        // curve dives through the vertex opposite the face it passes through or
+        // curve travells around the vertex it dives through
+
+        start = start_endpoint->region->adj_cusp_regions[start_endpoint->face]->index;
+        visited = start_endpoint->region_index;
+    }
+
+    finish = finish_endpoint->region_index;
+    init_search(cusp->dual_graph, processed, discovered, parent);
+    delete_edge(cusp->dual_graph, visited, start, cusp->dual_graph->directed);
+    bfs(cusp->dual_graph, start, processed, discovered, parent);
+
+    if (parent[finish] == -1 && start != finish) {
         /*
          * The finish endpoint is not in the subgraph we created by removing the edge
          * (visited, start). Assume there exists a cycle in this subgraph, we use this to
@@ -2645,7 +2648,7 @@ void extended_train_line_path(CuspStructure *cusp, PathEndPoint *start_endpoint,
          */
 
         init_search(cusp->dual_graph, processed, discovered, parent);
-        cycle = cycle_exists(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent, &cycle_start, &cycle_end);
+        cycle = cycle_exists(cusp->dual_graph, start, processed, discovered, parent, &cycle_start, &cycle_end);
 
         if (cycle == FALSE)
             // nothing we can do, train line does not work
@@ -2653,12 +2656,12 @@ void extended_train_line_path(CuspStructure *cusp, PathEndPoint *start_endpoint,
 
         // reset parent array
         init_search(cusp->dual_graph, processed, discovered, parent);
-        bfs(cusp->dual_graph, start_endpoint->region_index, processed, discovered, parent);
+        bfs(cusp->dual_graph, start, processed, discovered, parent);
 
-        cycle_path(cusp->dual_graph, node_begin, node_end, start_endpoint->region_index, visited,
-                   finish_endpoint->region_index, cycle_start, cycle_end);
+        cycle_path(cusp->dual_graph, node_begin, node_end, start, visited,
+                   finish, cycle_start, cycle_end);
     } else {
-        path_finding_with_loops(cusp, start_endpoint, finish_endpoint, 0, 0, node_begin, node_end);
+        find_path(start, finish, parent, node_begin, node_end);
     }
 
     my_free(processed);
