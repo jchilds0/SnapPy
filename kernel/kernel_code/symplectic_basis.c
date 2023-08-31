@@ -2526,7 +2526,7 @@ void do_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *start_endp
 }
 
 PathEndPoint *next_valid_endpoint_index(CuspStructure *cusp, PathEndPoint *current_endpoint) {
-    int start_index, start_class, class;
+    int start_index, start_class, edge_class;
 
     if (current_endpoint == NULL) {
         start_index = 0;
@@ -2537,21 +2537,21 @@ PathEndPoint *next_valid_endpoint_index(CuspStructure *cusp, PathEndPoint *curre
     }
 
     if (start_index == 0) {
-        for (class = start_class + 1; class < cusp->num_edge_classes; class++) {
-            if (cusp->train_line_endpoint[0][class].tri == NULL)
+        for (edge_class = start_class + 1; edge_class < cusp->num_edge_classes; edge_class++) {
+            if (cusp->train_line_endpoint[0][edge_class].tri == NULL)
                 continue;
 
-            return &cusp->train_line_endpoint[0][class];
+            return &cusp->train_line_endpoint[0][edge_class];
         }
 
         start_class = -1;
     }
 
-    for (class = start_class + 1; class < cusp->num_edge_classes; class++) {
-        if (cusp->train_line_endpoint[1][class].tri == NULL)
+    for (edge_class = start_class + 1; edge_class < cusp->num_edge_classes; edge_class++) {
+        if (cusp->train_line_endpoint[1][edge_class].tri == NULL)
             continue;
 
-        return &cusp->train_line_endpoint[1][class];
+        return &cusp->train_line_endpoint[1][edge_class];
     }
 
     return NULL;
