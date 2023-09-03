@@ -75,8 +75,8 @@ void test_matrix(int **basis, int dual_rows, int dual_cols) {
             continue;
         }
 
-        printf("Failed\n");
-        return;
+        printf("Failed %d\n", k);
+//        return;
     }
 
     printf("Passed\n");

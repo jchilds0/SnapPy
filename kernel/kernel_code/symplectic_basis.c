@@ -299,14 +299,13 @@ void                    log_structs(Triangulation *, CuspStructure **, Oscillati
  * Train lines
  */
 
-void                    setup_train_lines(Triangulation *manifold, CuspStructure **cusps, EndMultiGraph *multi_graph);
+void                    do_manifold_train_lines(Triangulation *, CuspStructure **, EndMultiGraph *);
 int                     *find_tet_index_for_edge_classes(Triangulation *, Boolean *);
 void                    find_edge_class_edges(Triangulation *, CuspStructure **, Boolean *);
 void                    find_edge_class_edges_on_cusp(CuspStructure *, const Boolean *, const int *);
 void                    find_e0_edges_on_cusp(CuspStructure **, EndMultiGraph *, const int *);
 Boolean                 *update_edge_classes_on_cusp(CuspStructure **, Boolean **, int, int, int);
 
-void                    do_manifold_train_lines(CuspStructure **, Boolean *);
 void                    find_primary_train_line(CuspStructure *, Boolean *);
 void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
@@ -960,7 +959,7 @@ void oscillating_curves(Triangulation *manifold, Boolean *edge_classes) {
         log_structs(manifold, cusps, NULL, "cusp_regions");
     }
 
-    setup_train_lines(manifold, cusps, multi_graph);
+    do_manifold_train_lines(manifold, cusps, multi_graph);
     do_oscillating_curves(cusps, curves, multi_graph);
 
     if (debug) {
@@ -2112,9 +2111,10 @@ void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurv
 
 // ------------------------------------
 
-void setup_train_lines(Triangulation *manifold, CuspStructure **cusps, EndMultiGraph *multi_graph) {
+void do_manifold_train_lines(Triangulation *manifold, CuspStructure **cusps, EndMultiGraph *multi_graph) {
+    int cusp_index;
     EdgeClass *edge;
-    Boolean *edge_classes = NEW_ARRAY(manifold->num_tetrahedra, Boolean);
+    Boolean *edge_class_on_cusp, *edge_classes = NEW_ARRAY(manifold->num_tetrahedra, Boolean);
 
     // pick edge classes for train lines
     for (edge = manifold->edge_list_begin.next; edge != &manifold->edge_list_end; edge = edge->next) {
@@ -2126,7 +2126,24 @@ void setup_train_lines(Triangulation *manifold, CuspStructure **cusps, EndMultiG
     }
 
     find_edge_class_edges(manifold, cusps, edge_classes);
-    do_manifold_train_lines(cusps, edge_classes);
+
+    for (cusp_index = 0; cusp_index < manifold->num_cusps; cusp_index++) {
+        edge_class_on_cusp = edge_classes_on_cusp(cusps[cusp_index], edge_classes);
+
+        find_primary_train_line(cusps[cusp_index], edge_class_on_cusp);
+        update_adj_curve_on_cusp(cusps[cusp_index]);
+    }
+
+    if (debug) {
+        printf("\n");
+        printf("Manifold Train Lines\n");
+        printf("\n");
+        printf("-------------------------------\n");
+
+        log_structs(manifold, cusps, NULL, "train_lines");
+        log_structs(manifold, cusps, NULL, "cusp_regions");
+        log_structs(manifold, cusps, NULL, "graph");
+    }
     my_free(edge_classes);
 }
 
@@ -2408,34 +2425,7 @@ Boolean *edge_classes_on_cusp(CuspStructure *cusp, Boolean *edge_classes) {
 
 /*
  * Train lines
- *
- * edge_classes gives the target edge classes for the train line.
  */
-
-void do_manifold_train_lines(CuspStructure **cusps, Boolean *edge_classes) {
-    int cusp_index;
-    Triangulation *manifold = cusps[0]->manifold;
-    Boolean *edge_class_on_cusp;
-
-    for (cusp_index = 0; cusp_index < manifold->num_cusps; cusp_index++) {
-        edge_class_on_cusp = edge_classes_on_cusp(cusps[cusp_index], edge_classes);
-
-        find_primary_train_line(cusps[cusp_index], edge_class_on_cusp);
-        update_adj_curve_on_cusp(cusps[cusp_index]);
-    }
-
-    if (debug) {
-        printf("\n");
-        printf("Manifold Train Lines\n");
-        printf("\n");
-        printf("-------------------------------\n");
-
-        log_structs(manifold, cusps, NULL, "train_lines");
-        log_structs(manifold, cusps, NULL, "cusp_regions");
-        log_structs(manifold, cusps, NULL, "graph");
-    }
-}
-
 
 /*
  * Use the regions on either side of the target edges to find a curve
