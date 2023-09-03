@@ -17,13 +17,14 @@ int main(void) {
     int i, **eqns, num_rows, num_cols;
     Triangulation *theTriangulation;
 
-    int fromFile = 0;
+    int fromFile = 1;
 
     int count = 1;
     int numTet[] = {6};
     int index[] = {286};
 
     char *error[] = {
+            "CuspedCensusData/link-60819.tri",  /* curve holonomy */
             "CuspedCensusData/link-83653.tri",  /* curve holonomy */
             "CuspedCensusData/link-116084.tri",  /* */
     };

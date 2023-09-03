@@ -2592,20 +2592,20 @@ PathEndPoint *next_valid_endpoint_index(CuspStructure *cusp, PathEndPoint *curre
 
     if (start_index == 0) {
         for (edge_class = start_class + 1; edge_class < cusp->num_edge_classes; edge_class++) {
-            if (cusp->train_line_endpoint[0][edge_class].tri == NULL)
+            if (cusp->train_line_endpoint[START][edge_class].tri == NULL)
                 continue;
 
-            return &cusp->train_line_endpoint[0][edge_class];
+            return &cusp->train_line_endpoint[START][edge_class];
         }
 
         start_class = -1;
     }
 
     for (edge_class = start_class + 1; edge_class < cusp->num_edge_classes; edge_class++) {
-        if (cusp->train_line_endpoint[1][edge_class].tri == NULL)
+        if (cusp->train_line_endpoint[FINISH][edge_class].tri == NULL)
             continue;
 
-        return &cusp->train_line_endpoint[1][edge_class];
+        return &cusp->train_line_endpoint[FINISH][edge_class];
     }
 
     return NULL;
@@ -3154,16 +3154,16 @@ CurveComponent *setup_train_line_component(CuspStructure *cusp, EndMultiGraph *m
 
     INSERT_BEFORE(path, curve_end);
 
-    if (cusp->train_line_endpoint[1][path->edge_class[START]].tri != NULL && orientation == START) {
-        COPY_PATH_ENDPOINT(&path->endpoints[START], &cusp->train_line_endpoint[1][path->edge_class[START]]);
+    if (cusp->train_line_endpoint[FINISH][path->edge_class[START]].tri != NULL && orientation == START) {
+        COPY_PATH_ENDPOINT(&path->endpoints[START], &cusp->train_line_endpoint[FINISH][path->edge_class[START]]);
     } else {
-        COPY_PATH_ENDPOINT(&path->endpoints[START], &cusp->train_line_endpoint[0][path->edge_class[START]]);
+        COPY_PATH_ENDPOINT(&path->endpoints[START], &cusp->train_line_endpoint[START][path->edge_class[START]]);
     }
 
-    if (cusp->train_line_endpoint[1][path->edge_class[FINISH]].tri != NULL && orientation == START) {
-        COPY_PATH_ENDPOINT(&path->endpoints[FINISH], &cusp->train_line_endpoint[1][path->edge_class[FINISH]]);
+    if (cusp->train_line_endpoint[FINISH][path->edge_class[FINISH]].tri != NULL && orientation == START) {
+        COPY_PATH_ENDPOINT(&path->endpoints[FINISH], &cusp->train_line_endpoint[FINISH][path->edge_class[FINISH]]);
     } else {
-        COPY_PATH_ENDPOINT(&path->endpoints[FINISH], &cusp->train_line_endpoint[0][path->edge_class[FINISH]]);
+        COPY_PATH_ENDPOINT(&path->endpoints[FINISH], &cusp->train_line_endpoint[START][path->edge_class[FINISH]]);
     }
 
     return path;
@@ -3606,9 +3606,8 @@ void interior_edge_node_to_path_node(CuspRegion *region, PathNode *path_end, Edg
 void split_cusp_regions_along_path(CuspStructure *cusp, PathNode *path_begin, PathNode *path_end,
                                    PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint) {
     int index = cusp->num_cusp_regions, region_index;
-    FaceIndex face;
     PathNode *node;
-    CuspRegion *region, *p_region, *current_region;
+    CuspRegion *region;
     Graph *g = cusp->dual_graph;
 
     // empty path
@@ -3629,32 +3628,32 @@ void split_cusp_regions_along_path(CuspStructure *cusp, PathNode *path_begin, Pa
      * of the curve and region to the left of the curve.
      */
     node = path_begin->next;
-    p_region = g->regions[node->cusp_region_index];
-    region_index = TRI_TO_INDEX(p_region->tet_index, p_region->tet_vertex);
+    region = g->regions[node->cusp_region_index];
+    region_index = TRI_TO_INDEX(region->tet_index, region->tet_vertex);
     update_cusp_triangle_endpoints(&cusp->cusp_region_begin[region_index],
                                    &cusp->cusp_region_end[region_index],
-                                   p_region, start_endpoint, node, START);
-    split_cusp_region_path_endpoint(&cusp->cusp_region_end[region_index], p_region,
+                                   region, start_endpoint, node, START);
+    split_cusp_region_path_endpoint(&cusp->cusp_region_end[region_index], region,
                                     node, start_endpoint, index, START);
     index++;
 
     // interior edges
     while ((node = node->next)->next->next != NULL) {
-        p_region = g->regions[node->cusp_region_index];
-        region_index = TRI_TO_INDEX(p_region->tet_index, p_region->tet_vertex);
+        region = g->regions[node->cusp_region_index];
+        region_index = TRI_TO_INDEX(region->tet_index, region->tet_vertex);
         update_cusp_triangle_path_interior(&cusp->cusp_region_begin[region_index],
-                                           &cusp->cusp_region_end[region_index], p_region, node);
-        split_cusp_region_path_interior(&cusp->cusp_region_end[region_index], p_region, node, index);
+                                           &cusp->cusp_region_end[region_index], region, node);
+        split_cusp_region_path_interior(&cusp->cusp_region_end[region_index], region, node, index);
         index++;
     }
 
     // update last region
-    p_region = g->regions[node->cusp_region_index];
-    region_index = TRI_TO_INDEX(p_region->tet_index, p_region->tet_vertex);
+    region = g->regions[node->cusp_region_index];
+    region_index = TRI_TO_INDEX(region->tet_index, region->tet_vertex);
     update_cusp_triangle_endpoints(&cusp->cusp_region_begin[region_index],
                                    &cusp->cusp_region_end[region_index],
-                                   p_region, finish_endpoint, node, FINISH);
-    split_cusp_region_path_endpoint(&cusp->cusp_region_end[region_index], p_region,
+                                   region, finish_endpoint, node, FINISH);
+    split_cusp_region_path_endpoint(&cusp->cusp_region_end[region_index], region,
                                     node, finish_endpoint, index, FINISH);
     index++;
 
