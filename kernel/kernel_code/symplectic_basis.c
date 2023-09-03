@@ -310,7 +310,8 @@ Boolean                 *edge_classes_on_cusp(CuspStructure *, Boolean *);
 void                    do_initial_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    do_train_line_segment_on_cusp(CuspStructure *, PathEndPoint *, PathEndPoint *);
 void                    extended_train_line_path(CuspStructure *, PathEndPoint *, PathEndPoint *, EdgeNode *, EdgeNode *, int);
-void                    path_finding_with_loops(Graph *, int, int, Orientation, int, int, EdgeNode *, EdgeNode *);
+void                    path_finding_with_loops(CuspStructure *, PathEndPoint *, PathEndPoint *, int, int, EdgeNode *, EdgeNode *);
+VertexIndex             inside_curve_vertex(CuspStructure *, EdgeNode *, EdgeNode *, PathEndPoint *);
 void                    cycle_path(Graph *, EdgeNode *, EdgeNode *, int, int, int, int, int);
 PathEndPoint            *next_valid_endpoint_index(CuspStructure *, PathEndPoint *);
 void                    tri_endpoint_to_region_endpoint(CuspStructure *, PathEndPoint *);
@@ -2456,7 +2457,7 @@ void do_initial_train_line_segment_on_cusp(CuspStructure *cusp, PathEndPoint *st
     parent = NEW_ARRAY(cusp->dual_graph->num_vertices, int);
 
     init_search(cusp->dual_graph, processed, discovered, parent);
-    path_finding_with_loops(cusp->dual_graph, start_endpoint, finish_endpoint, &node_begin, &node_end);
+    path_finding_with_loops(cusp, start_endpoint, finish_endpoint, 0, 0, &node_begin, &node_end);
 
     if (finish_endpoint == NULL)
         uFatalError("do_initial_train_line_segment_on_cusp", "symplectic_basis");
@@ -2591,8 +2592,7 @@ PathEndPoint *next_valid_endpoint_index(CuspStructure *cusp, PathEndPoint *curre
  */
 
 void path_finding_with_loops(CuspStructure *cusp, PathEndPoint *start_endpoint, PathEndPoint *finish_endpoint, 
-                             int loop_edge_class, int loop_edge_index, 
-                             EdgeNode *node_begin, EdgeNode *node_end) {
+                             int loop_edge_class, int loop_edge_index, EdgeNode *node_begin, EdgeNode *node_end) {
     int tet_index, tet_vertex, index, edge_class, edge_index;
     int *parent;
     VertexIndex v, loop_vertex;
@@ -2660,7 +2660,7 @@ void path_finding_with_loops(CuspStructure *cusp, PathEndPoint *start_endpoint, 
         loop_vertex = EVALUATE(region->tri->tet->gluing[v], loop_vertex);
     } while (node->y != loop_region->index);
     
-    v = inside_curve_vertex(cusp, cycle_begin, cycle_end, finish_endpoint);
+    v = inside_curve_vertex(cusp, &cycle_begin, &cycle_end, finish_endpoint);
 }
 
 VertexIndex inside_curve_vertex(CuspStructure *cusp, EdgeNode *cycle_begin, EdgeNode *cycle_end, PathEndPoint *endpoint) {
@@ -2703,9 +2703,9 @@ VertexIndex inside_curve_vertex(CuspStructure *cusp, EdgeNode *cycle_begin, Edge
     for (node = node_begin.next; node->next != &node_end; node = node->next) {
         region = cusp->dual_graph->regions[node->y];
 
-        if (node->next->y == region->adj_cusp_regions[inside_vertex]) {
+        if (node->next->y == region->adj_cusp_regions[inside_vertex]->index) {
             inside_vertex = ;
-        } else if (node->next->y == region->adj_cusp_regions[remaining_face[region->tet_vertex][inside_vertex]]) {
+        } else if (node->next->y == region->adj_cusp_regions[remaining_face[region->tet_vertex][inside_vertex]]->index) {
             inside_vertex = ;
         } else {
             inside_vertex = ;
@@ -2759,7 +2759,7 @@ void extended_train_line_path(CuspStructure *cusp, PathEndPoint *start_endpoint,
         cycle_path(cusp->dual_graph, node_begin, node_end, start_endpoint->region_index, visited, 
                    finish_endpoint->region_index, cycle_start, cycle_end);
     } else {
-        path_finding_with_loops(cusp->dual_graph, start_endpoint->region_index, finish_endpoint->region_index, right_handed, node_begin, node_end);
+        path_finding_with_loops(cusp, start_endpoint, finish_endpoint, 0, 0, node_begin, node_end);
     }
 
     my_free(processed);
