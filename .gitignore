@@ -56,3 +56,4 @@ dev/symplectic_basis/build
 dev/symplectic_basis/.cache
 venv
 .cache
+dev/symplectic_basis/cmake-build-debug-coverage
