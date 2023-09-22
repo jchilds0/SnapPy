@@ -3040,6 +3040,7 @@ cdef class Triangulation():
         """
         Extend the Neumann-Zagier Matrix to one which is symplectic (up to factors of 2)
         using oscillating curves. Verify parameter explicitly tests if the resulting matrix is symplectic.
+        Only accepts triangulations with 1 cusp.
 
         >>> M = Manifold("4_1")
         >>> M.symplectic_basis()                    # doctest:
@@ -3080,6 +3081,10 @@ cdef class Triangulation():
 
         if self.c_triangulation is NULL:
             raise ValueError('The Triangulation is empty.')
+
+        # current get_symplectic_eqns() implementation requires 1 cusp
+        if self.num_cusps() > 1:
+            raise ValueError('Triangulation contains {self.num_cusps()} cusps, only accepts triangulations with 1 cusp')
 
         eqns = []
 
