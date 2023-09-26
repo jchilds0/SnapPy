@@ -17,8 +17,6 @@
 #include <string.h>
 #include "SnapPea.h"
 #include "kernel.h"
-#include "kernel_prototypes.h"
-#include "kernel_typedefs.h"
 
 #define ATLEAST_TWO(a, b, c)                    ((a) && (b)) || ((a) && (c)) || ((b) && (c))
 #define TRI_TO_INDEX(tet_index, tet_vertex)     (4 * (tet_index) + (tet_vertex))
@@ -1818,6 +1816,10 @@ void log_structs(Triangulation *manifold, CuspStructure **cusps, OscillatingCurv
                 for (region = cusp->cusp_region_begin[j].next;
                      region != &cusp->cusp_region_end[j];
                      region = region->next) {
+                    if (region->index >= g->num_vertices) {
+                        continue;
+                    }
+
                     printf("    Vertex %d (Tet Index: %d, Tet Vertex: %d): ",
                            region->index, region->tet_index, region->tet_vertex
                     );
@@ -1939,9 +1941,12 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
                                        curve_begin, curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
 
-    // interior curve components, coming from train lines
+    // interior curve components (not used for knots)
     for (endpoint = endpoint->next; endpoint->next != cusp_path_end; endpoint = endpoint->next) {
+        // not implemented
+        uFatalError("do_one_oscillating_curve", "symplectic_basis");
     }
+
     orientation = (orientation == START ? FINISH : START);
 
     path = setup_last_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint,
@@ -1966,7 +1971,7 @@ CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *
 
     construct_cusp_region_dual_graph(cusp);
     find_single_endpoint(cusp, &path->endpoints[START], path->edge_class[START], START);
-    find_single_endpoint(cusp, &path->endpoints[FINISH], path->edge_class[FINISH], FINISH);
+    find_single_endpoint(cusp, &path->endpoints[FINISH], path->edge_class[FINISH], START);
     return path;
 }
 
@@ -1978,7 +1983,7 @@ CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *
 CurveComponent *setup_last_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
                                            CurveComponent *curves_begin, CurveComponent *curves_end) {
     CurveComponent *path;
-    path = init_curve_component(endpoint->edge_class[START], endpoint->edge_class[FINISH], endpoint->cusp_index);
+    path = init_curve_component(endpoint->edge_class[FINISH], endpoint->edge_class[START], endpoint->cusp_index);
     INSERT_BEFORE(path, curves_end);
 
     construct_cusp_region_dual_graph(cusp);
@@ -2126,7 +2131,7 @@ void find_single_matching_endpoint(CuspStructure *cusp, PathEndPoint *path_endpo
             path_endpoint2->tri             = region->tri;
             path_endpoint2->vertex          = path_endpoint1->tri->tet_vertex;
             path_endpoint2->face            = path_endpoint1->face;
-            path_endpoint2->region_index    = i;
+            path_endpoint2->region_index    = region->index;
             path_endpoint2->num_adj_curves  = region->num_adj_curves[path_endpoint2->face][path_endpoint2->vertex];
 
             return ;
