@@ -44,7 +44,7 @@ void testDual(void) {
             if (get_orientability(theTriangulation) == nonorientable_manifold || get_num_cusps(theTriangulation) > 1)
                 continue;
 
-            printf("Num Tet: %d Index: %d \n", index[i][0], j);
+//            printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
             basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols, 0);
 

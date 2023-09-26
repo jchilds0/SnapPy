@@ -1940,6 +1940,7 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
     path = setup_first_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint,
                                        curve_begin, curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
+    update_path_holonomy(path, edge_class);
 
     // interior curve components (not used for knots)
     for (endpoint = endpoint->next; endpoint->next != cusp_path_end; endpoint = endpoint->next) {
@@ -1952,8 +1953,8 @@ void do_one_oscillating_curve(CuspStructure **cusps, OscillatingCurves *curves, 
     path = setup_last_curve_component(cusps[endpoint->cusp_index], multi_graph, endpoint,
                                       curve_begin, curve_end);
     do_curve_component_to_new_edge_class(cusps[path->cusp_index], path);
-
     update_path_holonomy(path, edge_class);
+
     update_adj_curve_along_path(cusps, curves, curve_index,
                                 (Boolean) (cusp_path_begin->next->next->next != cusp_path_end));
 }
