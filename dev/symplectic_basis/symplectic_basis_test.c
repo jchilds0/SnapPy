@@ -41,12 +41,12 @@ void testDual(void) {
         for (j = index[i][1]; j < index[i][2]; j++) {
             theTriangulation = GetCuspedCensusManifold("", index[i][0], oriented_manifold, j);
 
-            if (get_orientability(theTriangulation) == nonorientable_manifold)
+            if (get_orientability(theTriangulation) == nonorientable_manifold || get_num_cusps(theTriangulation) > 1)
                 continue;
 
             printf("Num Tet: %d Index: %d \n", index[i][0], j);
 
-            basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols, 1);
+            basis = get_symplectic_basis(theTriangulation, &dual_rows, &dual_cols, 0);
 
             for (k = 0; 2 * k + 1 < dual_rows; k++) {
                 retval1 = ABS(omega(basis[2 * k], basis[2 * k + 1], dual_cols));

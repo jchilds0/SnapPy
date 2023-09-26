@@ -305,7 +305,7 @@ CurveComponent          *setup_first_curve_component(CuspStructure *, EndMultiGr
 CurveComponent          *setup_last_curve_component(CuspStructure *, EndMultiGraph *, CuspEndPoint *, CurveComponent *, CurveComponent *);
 void                    do_curve_component_to_new_edge_class(CuspStructure *, CurveComponent *);
 void                    find_single_endpoint(CuspStructure *, PathEndPoint *, int, int);
-void                    find_single_matching_endpoint(CuspStructure *, PathEndPoint *, PathEndPoint *, int, int);
+void                    find_single_matching_endpoint(CuspStructure *, PathEndPoint *, PathEndPoint *);
 
 void                    graph_path_to_dual_curve(CuspStructure *, EdgeNode *, EdgeNode *, PathNode *, PathNode *, PathEndPoint *, PathEndPoint *);
 void                    endpoint_edge_node_to_path_node(CuspRegion *, PathNode *, EdgeNode *, PathEndPoint *, int);
@@ -1983,19 +1983,12 @@ CurveComponent *setup_first_curve_component(CuspStructure *cusp, EndMultiGraph *
 CurveComponent *setup_last_curve_component(CuspStructure *cusp, EndMultiGraph *multi_graph, CuspEndPoint *endpoint,
                                            CurveComponent *curves_begin, CurveComponent *curves_end) {
     CurveComponent *path;
-    path = init_curve_component(endpoint->edge_class[FINISH], endpoint->edge_class[START], endpoint->cusp_index);
+    path = init_curve_component(endpoint->edge_class[START], endpoint->edge_class[FINISH], endpoint->cusp_index);
     INSERT_BEFORE(path, curves_end);
 
     construct_cusp_region_dual_graph(cusp);
-    find_single_matching_endpoint(cusp,
-                                  &curves_begin->next->endpoints[START],
-                                  &path->endpoints[START],
-                                  path->edge_class[START], FINISH);
-
-    find_single_matching_endpoint(cusp,
-                                  &path->prev->endpoints[FINISH],
-                                  &path->endpoints[FINISH],
-                                  path->edge_class[FINISH], FINISH);
+    find_single_matching_endpoint(cusp, &curves_begin->next->endpoints[START], &path->endpoints[START]);
+    find_single_matching_endpoint(cusp, &path->prev->endpoints[FINISH], &path->endpoints[FINISH]);
 
     return path;
 }
@@ -2085,7 +2078,7 @@ void find_single_endpoint(CuspStructure *cusp, PathEndPoint *path_endpoint, int 
                 path_endpoint->tri              = region->tri;
                 path_endpoint->vertex           = vertex;
                 path_endpoint->face             = face;
-                path_endpoint->region_index     = i;
+                path_endpoint->region_index     = region->index;
                 path_endpoint->num_adj_curves   = region->num_adj_curves[path_endpoint->face][path_endpoint->vertex];
 
                 return ;
@@ -2105,8 +2098,7 @@ void find_single_endpoint(CuspStructure *cusp, PathEndPoint *path_endpoint, int 
  * conditions for a matching endpoint.
  */
 
-void find_single_matching_endpoint(CuspStructure *cusp, PathEndPoint *path_endpoint1, PathEndPoint *path_endpoint2,
-                                   int edge_class, int edge_index) {
+void find_single_matching_endpoint(CuspStructure *cusp, PathEndPoint *path_endpoint1, PathEndPoint *path_endpoint2) {
     int i;
     Boolean region_index, region_vertex, region_dive, region_curve;
     CuspRegion *region;
@@ -2606,14 +2598,29 @@ void update_cusp_triangle_endpoints(CuspRegion *cusp_region_start, CuspRegion *c
 void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curves, int curve_index, Boolean train_line) {
     int cusp_index, edge_class, edge_index;
     CurveComponent *curve,
-               *dual_curve_begin = &curves->curve_begin[curve_index],
-               *dual_curve_end   = &curves->curve_end[curve_index];
+                   *current_begin = &curves->curve_begin[curve_index],
+                   *current_end   = &curves->curve_end[curve_index];
     CuspStructure *cusp;
     Triangulation *manifold = cusps[0]->manifold;
 
-    // Update regions curve data
-    for (curve = dual_curve_begin->next; curve != dual_curve_end; curve = curve->next)
+    // Update regions curve data along the current curve
+    for (curve = current_begin->next; curve != current_end; curve = curve->next)
         update_adj_curve_on_cusp(cusps[curve->cusp_index]);
+
+    // update endpoint curve data
+    for (int i = 0; i < curve_index; i++) {
+        // which oscillating curve
+
+        for (curve = curves->curve_begin[i].next; curve != &curves->curve_end[i]; curve = curve->next) {
+            // which component of the curve
+
+            for (int j = 0; j < 2; j++) {
+                // which end point
+                update_adj_curve_at_endpoint(&curve->endpoints[j], current_begin->next, START);
+                update_adj_curve_at_endpoint(&curve->endpoints[j], current_end->prev, FINISH);
+            }
+        }
+    }
 }
 
 /*
