@@ -1,15 +1,11 @@
 /**
  *  Symplectic Basis
  *
- *  Computes a symplectic basis of a triangulated knot or link exterior with
- *  orientable torus cusps. This symplectic matrix extends the Neumann-Zagier
- *  matrix to one which is symplectic up to factors of 2, and which arises
- *  from the triangulation of the manifold.
+ *  Computes a symplectic basis of a triangulated knot with orientable torus cusps.
+ *  This symplectic matrix extends the Neumann-Zagier matrix to one which is symplectic
+ *  up to factors of 2, and which arises from the triangulation of the manifold.
  *
  *  See - https://arxiv.org/abs/2208.06969
- *
- *  Current implementation is only valid for triangulations with
- *  1 cusp. 
  *
  */
 
@@ -79,6 +75,12 @@ typedef struct Graph {
     Boolean                     directed;                /** is the graph directed */
 } Graph;
 
+/**
+ * The End multi graph is a quotient of certain Heegard surface by a map which
+ * collapses each boundary component of the manifold to a point and collapses
+ * each annulus around an edge of the triangulation to an edge.
+ */
+
 typedef struct CuspEndPoint {
     int                         cusp_index;
     int                         edge_class[2];
@@ -120,6 +122,11 @@ struct extra {
  * split along the curve. In either of the previous cases the tri pointer is 
  * still valid. If tri is not NULL and region is not NULL then the region 
  * pointer is valid and tri = region->tri.
+ *
+ * Oscillating curves consist of a path through the end multi graph, on each
+ * cusp of the path, we have a curve component, which contains a path through
+ * the cusp region graph on the cusp, and two path end points, one at either
+ * end of the curve.
  */
 
 typedef struct PathEndPoint {
@@ -156,7 +163,7 @@ typedef struct OscillatingCurves {
     int                         num_curves;
     int                         *edge_class;
     CurveComponent              *curve_begin;          /** array of doubly linked lists of dual curves */
-    CurveComponent              *curve_end;            /** array of doubly linkek lists of dual curves */
+    CurveComponent              *curve_end;            /** array of ... */
 } OscillatingCurves;
 
 /**
@@ -1582,8 +1589,8 @@ void copy_region(CuspRegion *region1, CuspRegion *region2) {
 }
 
 /*
- * Construct the graph dual to the cusp regions, using region->index to label
- * each vertex, and adding edges using region->adj_cusp_regions[].
+ * Construct the graph with edges coming from adjacent regions, using
+ * region->index to label each vertex.
  */
 
 void construct_cusp_region_dual_graph(CuspStructure *cusp) {
@@ -2597,12 +2604,9 @@ void update_cusp_triangle_endpoints(CuspRegion *cusp_region_start, CuspRegion *c
 }
 
 void update_adj_curve_along_path(CuspStructure **cusps, OscillatingCurves *curves, int curve_index, Boolean train_line) {
-    int cusp_index, edge_class, edge_index;
     CurveComponent *curve,
                    *current_begin = &curves->curve_begin[curve_index],
                    *current_end   = &curves->curve_end[curve_index];
-    CuspStructure *cusp;
-    Triangulation *manifold = cusps[0]->manifold;
 
     // Update regions curve data along the current curve
     for (curve = current_begin->next; curve != current_end; curve = curve->next)
