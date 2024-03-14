@@ -75,7 +75,7 @@ except ValueError:
 
 from setuptools.extension import Extension
 from setuptools import setup, Command
-from pkg_resources import load_entry_point
+from importlib import metadata
 
 # A real clean
 
@@ -123,7 +123,11 @@ class SnapPyBuildDocs(Command):
             import sphinx_rtd_theme
         except ImportError:
             raise ImportError(no_sphinx_theme_message)
-        sphinx_cmd = load_entry_point('sphinx>=1.7', 'console_scripts', 'sphinx-build')
+        try:
+            (sphinx,) = metadata.entry_points(group='console_scripts', name='sphinx-build')
+            sphinx_cmd = sphinx.load()
+        except ValueError:
+            raise ValueError("Couldn't find sphinx build entry point")
         sphinx_args = ['-a', '-E', '-d', 'doc_src/_build/doctrees',
                        'doc_src', 'python/doc']
         sys.path.insert(0, build_lib_dir())
